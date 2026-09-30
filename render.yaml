@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: casper-live-data-analysis
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DERIV_CLIENT_ID
+        sync: false
