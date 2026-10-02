@@ -11,3 +11,5 @@ services:
         value: production
       - key: DERIV_CLIENT_ID
         sync: false
+      - key: CASPER_PREMIUM_OWNER_IDS
+        sync: false

@@ -1,38 +1,21 @@
-# Deriv OAuth setup
+# Deriv sign-in and account selection
 
-The production app runs as a Cloudflare Pages Advanced Mode Worker. Its callback shares the same HTTPS origin as the dashboard, so browser requests use same-origin cookies.
+This project is deployed as a Render Node.js web service. After Deriv OAuth returns, the server redirects the browser to `/`, which is the trading dashboard.
 
-## Values you need
+## Deriv OAuth app
 
-1. A Deriv OAuth app's **client ID**.
-2. Your Cloudflare Pages production host, such as `casper-site.pages.dev`.
-3. A unique random `SESSION_ENCRYPTION_KEY` with at least 32 characters. Create it privately and add it only as a Cloudflare secret.
+In the Deriv developer dashboard, configure the app's redirect URL to exactly:
 
-Do not send passwords, Deriv access tokens, or the encryption key in chat. The Deriv client ID belongs in Cloudflare's project settings, not in `index.html`.
+`https://YOUR-RENDER-SERVICE.onrender.com/auth/callback`
 
-## Exact callback
+Use the client ID in Render's `DERIV_CLIENT_ID` environment variable. The app requests the `trade` scope, which enables account-scoped trading APIs when order execution is added. Users choose their Deriv demo or real account explicitly after signing in; the app does not silently choose an account.
 
-After the first Cloudflare deployment, register this exact URL in the Deriv OAuth app:
+## Site owner Premium access
 
-`https://YOUR-PAGES-HOST/auth/callback`
+To unlock the Premium strategy controls for your own account, set `CASPER_PREMIUM_OWNER_IDS` in Render's private environment settings to your Deriv account ID. This is the account identifier returned after OAuth, not the OAuth client ID and not an API token. Keep it out of GitHub and chat. Separate multiple owner IDs with commas. Save the setting and redeploy.
 
-For example, if Cloudflare gives you `casper-site.pages.dev`, register `https://casper-site.pages.dev/auth/callback`. The host must be the same address where people will open the login page. If you later use a custom domain, add that domain's callback to Deriv and redeploy/reconfigure as needed.
+## Current implementation boundary
 
-## Cloudflare variables
+Login, account listing/selection, and account balance updates are implemented. The four Premium cards have separate strategy roles, but their signal filters and execution are not complete or accuracy-validated. Order placement remains disabled. The owner allowlist unlocks the Premium controls for this account; it does not bypass validation or start trades.
 
-In the Cloudflare Pages project, open **Settings → Variables and Secrets** and set these for the **Production** environment:
-
-- `DERIV_CLIENT_ID`: the client ID from your registered Deriv OAuth app.
-- `SESSION_ENCRYPTION_KEY`: your unique random value, stored as a secret.
-
-Redeploy after saving the values. The callback URL is derived from the incoming Cloudflare Pages hostname, so no redirect URL variable is required.
-
-## Security behavior
-
-- OAuth Authorization Code with PKCE/S256 and a short-lived, encrypted state cookie.
-- State is checked on the callback; account and logout POST requests must come from the same site origin.
-- The Deriv access token is encrypted with AES-GCM and stored only in a Secure, HttpOnly, SameSite=Lax cookie. JavaScript cannot read it.
-- Session cookies expire no later than the Deriv token or eight hours.
-- Only the `trade` scope is requested, and the demo account is selected first when available.
-
-For local development, the separate Node server uses a local `.env` file and callback `http://127.0.0.1:8080/auth/callback`.
+Do not store a Deriv password, OAuth access token, or personal trading token in this project or in GitHub.

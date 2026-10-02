@@ -23,6 +23,7 @@ const HOST = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0
 const CLIENT_ID = process.env.DERIV_CLIENT_ID;
 const REDIRECT_URI = process.env.DERIV_REDIRECT_URI || (process.env.RENDER_EXTERNAL_URL ? `${process.env.RENDER_EXTERNAL_URL}/auth/callback` : undefined);
 const PRODUCTION = process.env.NODE_ENV === 'production';
+const PREMIUM_OWNER_IDS = new Set((process.env.CASPER_PREMIUM_OWNER_IDS || '').split(',').map(id => id.trim()).filter(Boolean));
 const SESSION_TTL = 8 * 60 * 60 * 1000;
 const LOGIN_TTL = 10 * 60 * 1000;
 const sessions = new Map();
@@ -88,6 +89,11 @@ function getSession(req) {
   return { sid, session };
 }
 
+function sameOrigin(req) {
+  if (!REDIRECT_URI || !req.headers.origin) return false;
+  try { return req.headers.origin === new URL(REDIRECT_URI).origin; } catch { return false; }
+}
+
 function normalizeAccounts(payload) {
   const raw = payload?.data;
   const list = Array.isArray(raw) ? raw : Array.isArray(raw?.accounts) ? raw.accounts : raw ? [raw] : [];
@@ -115,7 +121,7 @@ const server = createServer(async (req, res) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://auth.deriv.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.derivws.com wss://ws.derivws.com");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://auth.deriv.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.derivws.com wss://api.derivws.com");
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
   if (url.pathname === '/healthz') return send(res, 200, { ok: true });
@@ -165,12 +171,10 @@ const server = createServer(async (req, res) => {
     if (!current) return send(res, 200, { authenticated: false });
     try {
       current.session.accounts = await getAccounts(current.session);
-      if (!current.session.activeAccountId || !current.session.accounts.some(a => a.id === current.session.activeAccountId)) {
-        const demo = current.session.accounts.find(a => a.type === 'demo');
-        current.session.activeAccountId = demo?.id || current.session.accounts[0]?.id || null;
-      }
+      if (!current.session.accounts.some(a => a.id === current.session.activeAccountId)) current.session.activeAccountId = null;
       const account = current.session.accounts.find(a => a.id === current.session.activeAccountId) || null;
-      return send(res, 200, { authenticated: true, accounts: current.session.accounts, activeAccountId: current.session.activeAccountId, activeAccount: account });
+      const premiumOwner = current.session.accounts.some(a => PREMIUM_OWNER_IDS.has(a.id));
+      return send(res, 200, { authenticated: true, accounts: current.session.accounts, activeAccountId: current.session.activeAccountId, activeAccount: account, premiumOwner });
     } catch (error) {
       sessions.delete(current.sid);
       clearCookie(res, cookieName);
@@ -189,17 +193,43 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/auth/account') {
-    const origin = req.headers.origin;
-    if (!origin || origin !== new URL(REDIRECT_URI).origin) return send(res, 403, { error: 'Request origin rejected.' });
+    if (!sameOrigin(req)) return send(res, 403, { error: 'Request origin rejected.' });
     const current = getSession(req);
     if (!current) return send(res, 401, { error: 'Sign in again.' });
     let body = '';
     for await (const chunk of req) { body += chunk; if (body.length > 2048) return send(res, 413, { error: 'Request too large.' }); }
     let parsed;
     try { parsed = JSON.parse(body); } catch { return send(res, 400, { error: 'Invalid request.' }); }
-    if (!current.session.accounts.some(a => a.id === parsed.accountId)) return send(res, 400, { error: 'That account is not available in this session.' });
+    if (typeof parsed.accountId !== 'string' || !current.session.accounts.some(a => a.id === parsed.accountId)) return send(res, 400, { error: 'That account is not available in this session.' });
     current.session.activeAccountId = parsed.accountId;
     return send(res, 200, { ok: true });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/auth/account-otp') {
+    if (!sameOrigin(req)) return send(res, 403, { error: 'Request origin rejected.' });
+    const current = getSession(req);
+    if (!current) return send(res, 401, { error: 'Sign in again.' });
+    let body = '';
+    for await (const chunk of req) { body += chunk; if (body.length > 2048) return send(res, 413, { error: 'Request too large.' }); }
+    let parsed;
+    try { parsed = JSON.parse(body); } catch { return send(res, 400, { error: 'Invalid request.' }); }
+    const account = current.session.accounts.find(a => a.id === parsed.accountId);
+    if (!account) return send(res, 400, { error: 'That account is not available in this session.' });
+    try {
+      const response = await fetch(`https://api.derivws.com/trading/v1/options/accounts/${encodeURIComponent(account.id)}/otp`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${current.session.accessToken}`, Accept: 'application/json' },
+        signal: AbortSignal.timeout(12000)
+      });
+      const payload = await response.json().catch(() => ({}));
+      const wsUrl = payload?.data?.url;
+      if (!response.ok || typeof wsUrl !== 'string') return send(res, response.status || 502, { error: 'Could not open the selected Deriv account connection.' });
+      const parsedWsUrl = new URL(wsUrl);
+      if (parsedWsUrl.protocol !== 'wss:' || parsedWsUrl.hostname !== 'api.derivws.com' || !parsedWsUrl.pathname.startsWith('/trading/v1/options/ws/')) return send(res, 502, { error: 'Deriv returned an invalid account connection URL.' });
+      return send(res, 200, { url: parsedWsUrl.href, accountType: account.type });
+    } catch {
+      return send(res, 502, { error: 'Could not open the selected Deriv account connection.' });
+    }
   }
 
   if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
