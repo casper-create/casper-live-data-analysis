@@ -2167,6 +2167,14 @@ window.CASPER_ENGINE = (() => {
   const $=s=>document.querySelector(s);
   const $$=s=>[...document.querySelectorAll(s)];
 
+  /*
+    IMPORTANT:
+    The frontend is hosted on GitHub Pages while the secure
+    Deriv OAuth/session backend is hosted on Render.
+  */
+  const AUTH_BASE=
+    'https://casper-live-data-analysis.onrender.com';
+
   const names={
     "1HZ100V":"Volatility 100 (1s)",
     "1HZ75V":"Volatility 75 (1s)",
@@ -2428,12 +2436,6 @@ window.CASPER_ENGINE = (() => {
 
             state(true);
 
-            /*
-              Analysis is deliberately kept in the
-              engine rather than changing the UI layout.
-              This gives us a stable backend analysis
-              layer while preserving the screenshot UI.
-            */
 
             if(activeStrategy==='Smart AI'){
 
@@ -2734,12 +2736,14 @@ window.CASPER_ENGINE = (() => {
 
       const response=
         await fetch(
-          '/auth/account-otp',
+          `${AUTH_BASE}/auth/account-otp`,
           {
             method:'POST',
-            credentials:'same-origin',
+            credentials:'include',
             headers:{
               'Content-Type':
+                'application/json',
+              'Accept':
                 'application/json'
             },
             body:JSON.stringify({
@@ -2892,32 +2896,20 @@ window.CASPER_ENGINE = (() => {
   }
 
 
-  const githubPages=
-    location.hostname.endsWith('.github.io');
-
-
+  /*
+    GitHub Pages hosts the frontend.
+    Render hosts the secure OAuth/session backend.
+  */
   async function loadSession(){
-
-    if(githubPages){
-
-      signedIn=false;
-
-      $('#loginBtn').textContent=
-        'Login with Deriv';
-
-      setAccountHeader();
-
-      return;
-    }
-
 
     try{
 
       const r=
         await fetch(
-          '/auth/session',
+          `${AUTH_BASE}/auth/session`,
           {
-            credentials:'same-origin',
+            method:'GET',
+            credentials:'include',
             headers:{
               Accept:
                 'application/json'
@@ -3126,17 +3118,13 @@ window.CASPER_ENGINE = (() => {
 
       if(!signedIn){
 
-        if(githubPages){
-
-          showToast(
-            'Secure Deriv login needs the Node.js server deployed with this site.'
-          );
-
-          return;
-        }
-
+        /*
+          Always send the user to the Render OAuth backend.
+          This works even though the frontend itself is on
+          GitHub Pages.
+        */
         location.assign(
-          '/auth/login'
+          `${AUTH_BASE}/auth/login`
         );
 
         return;
@@ -3147,12 +3135,14 @@ window.CASPER_ENGINE = (() => {
 
         const r=
           await fetch(
-            '/auth/logout',
+            `${AUTH_BASE}/auth/logout`,
             {
               method:'POST',
-              credentials:'same-origin',
+              credentials:'include',
               headers:{
                 'Content-Type':
+                  'application/json',
+                'Accept':
                   'application/json'
               }
             }
@@ -3193,12 +3183,14 @@ window.CASPER_ENGINE = (() => {
 
         const r=
           await fetch(
-            '/auth/account',
+            `${AUTH_BASE}/auth/account`,
             {
               method:'POST',
-              credentials:'same-origin',
+              credentials:'include',
               headers:{
                 'Content-Type':
+                  'application/json',
+                'Accept':
                   'application/json'
               },
               body:JSON.stringify({
@@ -3214,7 +3206,8 @@ window.CASPER_ENGINE = (() => {
         if(!r.ok){
 
           throw new Error(
-            data.error
+            data.error ||
+            'Could not change account.'
           );
         }
 
@@ -3231,15 +3224,39 @@ window.CASPER_ENGINE = (() => {
   );
 
 
-  if(
+  /*
+    OAuth callback handling.
+
+    The backend may return the browser to the GitHub Pages
+    frontend with ?login=... .
+
+    We do NOT assume success or failure from the query alone.
+    The real session is checked against Render using /auth/session.
+  */
+  const loginParams=
     new URLSearchParams(
       location.search
-    ).has('login')
+    );
+
+  if(
+    loginParams.has('login')
   ){
 
-    showToast(
-      'Deriv sign-in did not complete. You can try again.'
-    );
+    const loginStatus=
+      loginParams.get('login');
+
+    if(loginStatus==='error'){
+
+      showToast(
+        'Deriv sign-in did not complete. You can try again.'
+      );
+
+    }else{
+
+      showToast(
+        'Deriv sign-in completed. Loading your account...'
+      );
+    }
 
     history.replaceState(
       {},
@@ -3387,6 +3404,10 @@ window.CASPER_ENGINE = (() => {
      STARTUP
      ========================================================== */
 
+  /*
+    Authentication is checked automatically against Render.
+    No manual connection button is required.
+  */
   loadSession();
 
   /*
@@ -3427,6 +3448,11 @@ window.CASPER_ENGINE = (() => {
 
   console.info(
     '[CASPER] Live multi-market validation active.'
+  );
+
+  console.info(
+    '[CASPER] Render authentication backend:',
+    AUTH_BASE
   );
 
 })();
