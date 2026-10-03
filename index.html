@@ -5,154 +5,3432 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#06171d">
   <title>CASPER Live Data Analysis</title>
+
   <style>
-    :root{color-scheme:dark;--bg:#06171d;--panel:#0a2028;--panel2:#0d2730;--line:#173b46;--cyan:#18d5ea;--blue:#0999b6;--muted:#86a4bb;--text:#f1f5fb;--gold:#ffc629;--green:#22d5a0;--red:#ff6681;--purple:#a45cff;--radius:18px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;min-width:320px;background:var(--bg);color:var(--text)}button,input,select{font:inherit}button{cursor:pointer;color:inherit}.topbar{height:82px;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:#071b22;position:sticky;top:0;z-index:5}.brand{display:flex;align-items:center;gap:13px;font-weight:800;letter-spacing:.04em;font-size:22px}.brandmark{width:58px;height:58px;border:2px solid var(--cyan);border-radius:50%;display:grid;place-items:center;color:var(--cyan);font-size:27px;box-shadow:0 0 22px #08c8df33}.brand small{display:block;color:var(--cyan);font-size:17px;letter-spacing:.12em}.topactions{display:flex;align-items:center;gap:12px}.iconbtn,.account{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 15px}.account{display:flex;align-items:center;gap:13px;min-width:205px}.flag{font-size:22px}.bal{color:var(--green);font-weight:800}.account small{display:block;color:var(--muted);font-weight:500}.login{border:1px solid #168ca3;background:#0a5264;border-radius:12px;padding:12px 17px;font-weight:750}.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 24px;border-bottom:1px solid var(--line);background:#071b22}.tab{background:#0a2028;border:1px solid var(--line);border-radius:999px;padding:14px 10px;font-weight:760;font-size:17px;color:#cfdae6}.tab.active{background:#0a91ac;border-color:var(--cyan);box-shadow:0 0 18px #00d9ec50;color:white}.wrap{max-width:1500px;margin:24px auto;padding:0 24px 44px}.card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:28px 30px;box-shadow:0 18px 60px #0002}.heading{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:30px}.titlegroup{display:flex;align-items:center;gap:15px}.spark{font-size:38px;color:#b175ff}.heading h1{font-size:26px;margin:0;background:linear-gradient(90deg,#23c9ef,#b064f5,#ffae24);color:transparent;background-clip:text}.subtitle{color:var(--muted);margin-top:5px}.pills{display:flex;gap:8px;margin-top:8px}.pill{border:1px solid #624ba3;color:#bba4ff;background:#17152a;border-radius:99px;font-size:12px;padding:4px 10px;font-weight:800}.pill.demo{border-color:#087e69;background:#092b29;color:#37ddb2}.feed{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:13px}.dot{width:9px;height:9px;border-radius:50%;background:#718396}.dot.live{background:var(--green);box-shadow:0 0 12px var(--green)}.sectionlabel{display:block;color:var(--muted);font-weight:650;margin:18px 0 10px}.strategies{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.strategy{min-height:92px;text-align:center;background:#091d25;border:1px solid var(--line);border-radius:16px;padding:15px;position:relative;transition:.18s}.strategy:hover{border-color:#1a8699;background:#0b2933}.strategy.selected{border-color:var(--cyan);background:#0d3039;box-shadow:0 0 16px #00cee329}.strategy .ico{font-size:22px;color:#96adc0;display:block;margin-bottom:5px}.strategy b{font-size:16px}.strategy .recommended{position:absolute;right:0;top:-10px;background:#00b98d;color:#fff;padding:4px 9px;font-weight:800;font-size:12px;border-radius:6px 6px 0 6px}.strategy .lock{position:absolute;right:10px;top:9px;border:1px solid #4b6370;border-radius:99px;padding:2px 7px;color:#92a7b3;font-size:10px;font-weight:800}.premium{display:none}.premium.active{display:block}.free.active{display:grid}.free{display:grid}.premiumGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.premiumGrid .strategy{text-align:left;min-height:98px}.premiumGrid .ico{margin-bottom:6px}.strategy p{margin:5px 0 0;color:#8399aa;font-size:13px}.fields{display:grid;grid-template-columns:1.15fr 1.08fr;gap:20px;margin-top:24px}.control label{display:block;color:var(--muted);margin:0 0 8px}.control select,.control input{width:100%;background:#091d25;border:1px solid var(--line);border-radius:12px;color:white;padding:15px 17px;min-height:58px;font-size:16px;font-weight:680;outline:none}.control select:focus,.control input:focus{border-color:var(--cyan)}.riskset{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.risk{background:#091d25;border:1px solid var(--line);border-radius:14px;padding:17px 8px;font-weight:800}.risk[data-risk="Low"]{color:var(--green)}.risk[data-risk="Medium"]{color:var(--gold)}.risk[data-risk="High"]{color:var(--red)}.risk.active{border-color:var(--cyan);background:#0d3039;color:#fff}.risknote{padding:12px 15px;margin-top:10px;border:1px solid #806318;border-radius:11px;background:#282518;color:#ffda69;font-weight:650}.risknote.safe{background:#092a28;border-color:#087e69;color:#42dbae}.moneygrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:26px}.inputwrap{position:relative}.inputwrap input{padding-right:65px}.currency{position:absolute;right:15px;top:18px;color:var(--muted)}.run{width:100%;border:0;border-radius:999px;padding:19px;margin-top:24px;font-size:20px;font-weight:850;background:linear-gradient(100deg,#1cc5e3,#a450ef 55%,#ffa800);box-shadow:0 0 30px #7852ec40}.run:disabled{opacity:.55;cursor:not-allowed}.message{margin-top:14px;min-height:22px;color:var(--muted);font-size:14px}.marketbar{margin-top:22px;display:grid;grid-template-columns:1fr auto;align-items:center;gap:14px;border-top:1px solid var(--line);padding-top:18px}.marketstats{display:flex;gap:22px;flex-wrap:wrap}.stat small{display:block;color:var(--muted);margin-bottom:4px}.stat strong{font-size:19px;font-variant-numeric:tabular-nums}.ticker{color:var(--cyan)}.feedbox{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:22px}.feedhead,.tickrow{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr;padding:12px 16px;gap:12px}.feedhead{background:#0b2630;color:var(--muted);font-size:13px}.tickrow{border-top:1px solid #12323c;font-variant-numeric:tabular-nums}.right{text-align:right}.panels{display:none}.panels.show{display:block}.manualnote{color:var(--muted);line-height:1.65}.foot{color:#688397;font-size:12px;margin:18px 4px}.hidden{display:none!important}.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#102d36;border:1px solid var(--line);padding:12px 18px;border-radius:12px;box-shadow:0 10px 40px #0008;z-index:10}
-    .strategy:disabled{opacity:.5;cursor:not-allowed}.strategy.locked .lock{color:#ffc629}.ownerPanel{display:flex;flex-direction:column;gap:6px;padding:14px 16px;margin:-10px 0 18px;border:1px solid #806318;border-radius:12px;background:#282518;color:#ffda69}.ownerPanel span{color:#dfd3a0;font-size:14px;line-height:1.45}
-    @media(max-width:850px){.topbar{padding:10px 14px}.brand{font-size:17px}.brand small{font-size:13px}.brandmark{width:46px;height:46px}.account{min-width:auto;padding:9px}.tabs{grid-template-columns:repeat(2,1fr);padding:10px}.tab{font-size:14px}.wrap{padding:0 12px 30px;margin:14px auto}.card{padding:20px 16px}.heading{align-items:flex-start;flex-direction:column;margin-bottom:20px}.strategies{grid-template-columns:repeat(2,1fr)}.fields{grid-template-columns:1fr}.moneygrid{grid-template-columns:1fr;gap:12px}.marketbar{grid-template-columns:1fr}.feedhead,.tickrow{grid-template-columns:1fr 1fr}.feedhead span:nth-child(n+3),.tickrow span:nth-child(n+3){display:none}}@media(max-width:480px){.topactions{gap:5px}.topbar{height:70px}.login{padding:10px}.account .flag{display:none}.account{font-size:13px}.premiumGrid{grid-template-columns:1fr}.tab{padding:12px 6px}.strategy{min-height:78px}.riskset{gap:5px}.risk{padding:14px 4px}}
+    :root{
+      color-scheme:dark;
+      --bg:#06171d;
+      --panel:#0a2028;
+      --panel2:#0d2730;
+      --line:#173b46;
+      --cyan:#18d5ea;
+      --blue:#0999b6;
+      --muted:#86a4bb;
+      --text:#f1f5fb;
+      --gold:#ffc629;
+      --green:#22d5a0;
+      --red:#ff6681;
+      --purple:#a45cff;
+      --radius:18px;
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      min-width:320px;
+      background:var(--bg);
+      color:var(--text)
+    }
+
+    button,input,select{font:inherit}
+    button{cursor:pointer;color:inherit}
+
+    .topbar{
+      height:82px;
+      padding:12px 28px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      border-bottom:1px solid var(--line);
+      background:#071b22;
+      position:sticky;
+      top:0;
+      z-index:5
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:13px;
+      font-weight:800;
+      letter-spacing:.04em;
+      font-size:22px
+    }
+
+    .brandmark{
+      width:58px;
+      height:58px;
+      border:2px solid var(--cyan);
+      border-radius:50%;
+      display:grid;
+      place-items:center;
+      color:var(--cyan);
+      font-size:27px;
+      box-shadow:0 0 22px #08c8df33
+    }
+
+    .brand small{
+      display:block;
+      color:var(--cyan);
+      font-size:17px;
+      letter-spacing:.12em
+    }
+
+    .topactions{
+      display:flex;
+      align-items:center;
+      gap:12px
+    }
+
+    .iconbtn,.account{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px 15px
+    }
+
+    .account{
+      display:flex;
+      align-items:center;
+      gap:13px;
+      min-width:205px
+    }
+
+    .flag{font-size:22px}
+    .bal{color:var(--green);font-weight:800}
+
+    .account small{
+      display:block;
+      color:var(--muted);
+      font-weight:500
+    }
+
+    .login{
+      border:1px solid #168ca3;
+      background:#0a5264;
+      border-radius:12px;
+      padding:12px 17px;
+      font-weight:750
+    }
+
+    .tabs{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:10px;
+      padding:14px 24px;
+      border-bottom:1px solid var(--line);
+      background:#071b22
+    }
+
+    .tab{
+      background:#0a2028;
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:14px 10px;
+      font-weight:760;
+      font-size:17px;
+      color:#cfdae6
+    }
+
+    .tab.active{
+      background:#0a91ac;
+      border-color:var(--cyan);
+      box-shadow:0 0 18px #00d9ec50;
+      color:white
+    }
+
+    .wrap{
+      max-width:1500px;
+      margin:24px auto;
+      padding:0 24px 44px
+    }
+
+    .card{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:var(--panel);
+      padding:28px 30px;
+      box-shadow:0 18px 60px #0002
+    }
+
+    .heading{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:20px;
+      margin-bottom:30px
+    }
+
+    .titlegroup{
+      display:flex;
+      align-items:center;
+      gap:15px
+    }
+
+    .spark{
+      font-size:38px;
+      color:#b175ff
+    }
+
+    .heading h1{
+      font-size:26px;
+      margin:0;
+      background:linear-gradient(90deg,#23c9ef,#b064f5,#ffae24);
+      color:transparent;
+      background-clip:text
+    }
+
+    .subtitle{
+      color:var(--muted);
+      margin-top:5px
+    }
+
+    .pills{
+      display:flex;
+      gap:8px;
+      margin-top:8px
+    }
+
+    .pill{
+      border:1px solid #624ba3;
+      color:#bba4ff;
+      background:#17152a;
+      border-radius:99px;
+      font-size:12px;
+      padding:4px 10px;
+      font-weight:800
+    }
+
+    .pill.demo{
+      border-color:#087e69;
+      background:#092b29;
+      color:#37ddb2
+    }
+
+    .feed{
+      display:flex;
+      align-items:center;
+      gap:9px;
+      color:var(--muted);
+      font-size:13px
+    }
+
+    .dot{
+      width:9px;
+      height:9px;
+      border-radius:50%;
+      background:#718396
+    }
+
+    .dot.live{
+      background:var(--green);
+      box-shadow:0 0 12px var(--green)
+    }
+
+    .sectionlabel{
+      display:block;
+      color:var(--muted);
+      font-weight:650;
+      margin:18px 0 10px
+    }
+
+    .strategies{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:12px
+    }
+
+    .strategy{
+      min-height:92px;
+      text-align:center;
+      background:#091d25;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:15px;
+      position:relative;
+      transition:.18s
+    }
+
+    .strategy:hover{
+      border-color:#1a8699;
+      background:#0b2933
+    }
+
+    .strategy.selected{
+      border-color:var(--cyan);
+      background:#0d3039;
+      box-shadow:0 0 16px #00cee329
+    }
+
+    .strategy .ico{
+      font-size:22px;
+      color:#96adc0;
+      display:block;
+      margin-bottom:5px
+    }
+
+    .strategy b{font-size:16px}
+
+    .strategy .recommended{
+      position:absolute;
+      right:0;
+      top:-10px;
+      background:#00b98d;
+      color:#fff;
+      padding:4px 9px;
+      font-weight:800;
+      font-size:12px;
+      border-radius:6px 6px 0 6px
+    }
+
+    .strategy .lock{
+      position:absolute;
+      right:10px;
+      top:9px;
+      border:1px solid #4b6370;
+      border-radius:99px;
+      padding:2px 7px;
+      color:#92a7b3;
+      font-size:10px;
+      font-weight:800
+    }
+
+    .premium{display:none}
+    .premium.active{display:block}
+    .free.active{display:grid}
+    .free{display:grid}
+
+    .premiumGrid{
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:10px
+    }
+
+    .premiumGrid .strategy{
+      text-align:left;
+      min-height:98px
+    }
+
+    .premiumGrid .ico{margin-bottom:6px}
+
+    .strategy p{
+      margin:5px 0 0;
+      color:#8399aa;
+      font-size:13px
+    }
+
+    .fields{
+      display:grid;
+      grid-template-columns:1.15fr 1.08fr;
+      gap:20px;
+      margin-top:24px
+    }
+
+    .control label{
+      display:block;
+      color:var(--muted);
+      margin:0 0 8px
+    }
+
+    .control select,
+    .control input{
+      width:100%;
+      background:#091d25;
+      border:1px solid var(--line);
+      border-radius:12px;
+      color:white;
+      padding:15px 17px;
+      min-height:58px;
+      font-size:16px;
+      font-weight:680;
+      outline:none
+    }
+
+    .control select:focus,
+    .control input:focus{
+      border-color:var(--cyan)
+    }
+
+    .riskset{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:10px
+    }
+
+    .risk{
+      background:#091d25;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:17px 8px;
+      font-weight:800
+    }
+
+    .risk[data-risk="Low"]{color:var(--green)}
+    .risk[data-risk="Medium"]{color:var(--gold)}
+    .risk[data-risk="High"]{color:var(--red)}
+
+    .risk.active{
+      border-color:var(--cyan);
+      background:#0d3039;
+      color:#fff
+    }
+
+    .risknote{
+      padding:12px 15px;
+      margin-top:10px;
+      border:1px solid #806318;
+      border-radius:11px;
+      background:#282518;
+      color:#ffda69;
+      font-weight:650
+    }
+
+    .risknote.safe{
+      background:#092a28;
+      border-color:#087e69;
+      color:#42dbae
+    }
+
+    .moneygrid{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:18px;
+      margin-top:26px
+    }
+
+    .inputwrap{position:relative}
+
+    .inputwrap input{padding-right:65px}
+
+    .currency{
+      position:absolute;
+      right:15px;
+      top:18px;
+      color:var(--muted)
+    }
+
+    .run{
+      width:100%;
+      border:0;
+      border-radius:999px;
+      padding:19px;
+      margin-top:24px;
+      font-size:20px;
+      font-weight:850;
+      background:linear-gradient(100deg,#1cc5e3,#a450ef 55%,#ffa800);
+      box-shadow:0 0 30px #7852ec40
+    }
+
+    .run:disabled{
+      opacity:.55;
+      cursor:not-allowed
+    }
+
+    .message{
+      margin-top:14px;
+      min-height:22px;
+      color:var(--muted);
+      font-size:14px
+    }
+
+    .marketbar{
+      margin-top:22px;
+      display:grid;
+      grid-template-columns:1fr auto;
+      align-items:center;
+      gap:14px;
+      border-top:1px solid var(--line);
+      padding-top:18px
+    }
+
+    .marketstats{
+      display:flex;
+      gap:22px;
+      flex-wrap:wrap
+    }
+
+    .stat small{
+      display:block;
+      color:var(--muted);
+      margin-bottom:4px
+    }
+
+    .stat strong{
+      font-size:19px;
+      font-variant-numeric:tabular-nums
+    }
+
+    .ticker{color:var(--cyan)}
+
+    .feedbox{
+      border:1px solid var(--line);
+      border-radius:14px;
+      overflow:hidden;
+      margin-top:22px
+    }
+
+    .feedhead,.tickrow{
+      display:grid;
+      grid-template-columns:1.1fr 1fr 1fr 1fr;
+      padding:12px 16px;
+      gap:12px
+    }
+
+    .feedhead{
+      background:#0b2630;
+      color:var(--muted);
+      font-size:13px
+    }
+
+    .tickrow{
+      border-top:1px solid #12323c;
+      font-variant-numeric:tabular-nums
+    }
+
+    .right{text-align:right}
+    .panels{display:none}
+    .panels.show{display:block}
+
+    .manualnote{
+      color:var(--muted);
+      line-height:1.65
+    }
+
+    .foot{
+      color:#688397;
+      font-size:12px;
+      margin:18px 4px
+    }
+
+    .hidden{display:none!important}
+
+    .toast{
+      position:fixed;
+      bottom:22px;
+      left:50%;
+      transform:translateX(-50%);
+      background:#102d36;
+      border:1px solid var(--line);
+      padding:12px 18px;
+      border-radius:12px;
+      box-shadow:0 10px 40px #0008;
+      z-index:10
+    }
+
+    .strategy:disabled{
+      opacity:.5;
+      cursor:not-allowed
+    }
+
+    .strategy.locked .lock{color:#ffc629}
+
+    .ownerPanel{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      padding:14px 16px;
+      margin:-10px 0 18px;
+      border:1px solid #806318;
+      border-radius:12px;
+      background:#282518;
+      color:#ffda69
+    }
+
+    .ownerPanel span{
+      color:#dfd3a0;
+      font-size:14px;
+      line-height:1.45
+    }
+
+    @media(max-width:850px){
+      .topbar{padding:10px 14px}
+      .brand{font-size:17px}
+      .brand small{font-size:13px}
+      .brandmark{width:46px;height:46px}
+      .account{min-width:auto;padding:9px}
+      .tabs{
+        grid-template-columns:repeat(2,1fr);
+        padding:10px
+      }
+      .tab{font-size:14px}
+      .wrap{
+        padding:0 12px 30px;
+        margin:14px auto
+      }
+      .card{padding:20px 16px}
+      .heading{
+        align-items:flex-start;
+        flex-direction:column;
+        margin-bottom:20px
+      }
+      .strategies{grid-template-columns:repeat(2,1fr)}
+      .fields{grid-template-columns:1fr}
+      .moneygrid{
+        grid-template-columns:1fr;
+        gap:12px
+      }
+      .marketbar{grid-template-columns:1fr}
+      .feedhead,.tickrow{grid-template-columns:1fr 1fr}
+      .feedhead span:nth-child(n+3),
+      .tickrow span:nth-child(n+3){display:none}
+    }
+
+    @media(max-width:480px){
+      .topactions{gap:5px}
+      .topbar{height:70px}
+      .login{padding:10px}
+      .account .flag{display:none}
+      .account{font-size:13px}
+      .premiumGrid{grid-template-columns:1fr}
+      .tab{padding:12px 6px}
+      .strategy{min-height:78px}
+      .riskset{gap:5px}
+      .risk{padding:14px 4px}
+    }
   </style>
 </head>
+
 <body>
-  <header class="topbar">
-    <div class="brand"><div class="brandmark">↗</div><div>Live Deriv<small>Data Analysis</small></div></div>
-    <div class="topactions"><button class="iconbtn" id="themeBtn" aria-label="Toggle theme">☼</button><div class="account"><span class="flag">◉</span><div><span class="bal" id="balance">— USD</span><small id="accountType">Choose a Deriv account</small><select id="accountSelect" class="hidden" aria-label="Choose Deriv account"></select></div></div><button class="login" id="loginBtn">Login with Deriv</button></div>
-  </header>
-  <nav class="tabs" aria-label="Trading sections"><button class="tab" data-panel="manual">♧ &nbsp;Manual Trading</button><button class="tab active" data-panel="free">✧ &nbsp;Nexora AI Free</button><button class="tab" data-panel="premium">♛ &nbsp;Nexora AI Premium</button><button class="tab" data-panel="pricing">◇ &nbsp;AI Pricing</button></nav>
-  <main class="wrap">
-    <section class="card panels show" id="free">
-      <div class="heading"><div class="titlegroup"><span class="spark">✧</span><div><h1>Nexora AI</h1><div class="pills"><span class="pill">FREE TIER</span><span class="pill demo">DEMO &amp; REAL</span></div><div class="subtitle">Live market analysis and strategy selection</div></div></div><div class="feed" aria-live="polite"><i class="dot" id="feedDot"></i><span id="feedStatus"></span></div></div>
-      <span class="sectionlabel">Strategy</span>
-      <div class="strategies free" id="freeStrategies">
-        <button class="strategy" data-strategy="Rise &amp; Fall"><span class="ico">↗</span><b>Rise / Fall</b><p>Price direction contracts</p></button>
-        <button class="strategy" data-strategy="Even &amp; Odd"><span class="ico">＃</span><b>Even / Odd</b><p>Last-digit parity contracts</p></button>
-        <button class="strategy selected" data-strategy="Mix Both"><span class="ico">⤨</span><b>Mix Both</b><p>Compare direction and parity signals</p></button>
-        <button class="strategy" data-strategy="Smart AI"><span class="ico">♧</span><b>Smart AI</b><p>Planned: rank markets and strategies by validated signal edge</p><span class="recommended">Recommended</span></button>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brandmark">↗</div>
+    <div>
+      Live Deriv
+      <small>Data Analysis</small>
+    </div>
+  </div>
+
+  <div class="topactions">
+    <button class="iconbtn" id="themeBtn" aria-label="Toggle theme">☼</button>
+
+    <div class="account">
+      <span class="flag">◉</span>
+      <div>
+        <span class="bal" id="balance">— USD</span>
+        <small id="accountType">Choose a Deriv account</small>
+        <select id="accountSelect" class="hidden" aria-label="Choose Deriv account"></select>
       </div>
-      <div class="fields"><div class="control"><label for="market">Market</label><select id="market"><option value="1HZ100V">Volatility 100 (1s)</option><option value="1HZ75V">Volatility 75 (1s)</option><option value="1HZ50V">Volatility 50 (1s)</option><option value="1HZ25V">Volatility 25 (1s)</option><option value="1HZ10V">Volatility 10 (1s)</option><option value="R_100">Volatility 100 Index</option><option value="R_75">Volatility 75 Index</option><option value="R_50">Volatility 50 Index</option><option value="R_25">Volatility 25 Index</option><option value="R_10">Volatility 10 Index</option></select></div><div class="control"><label>Risk level</label><div class="riskset"><button class="risk" data-risk="Low">Low</button><button class="risk active" data-risk="Medium">Medium</button><button class="risk" data-risk="High">High</button></div><div class="risknote" id="riskNote">▱ &nbsp;Medium risk preset · stake escalation disabled during validation</div></div></div>
-      <div class="moneygrid"><div class="control"><label for="stake">Stake per trade</label><div class="inputwrap"><input id="stake" type="number" value="1" min="0.35" step="0.01"><span class="currency">USD</span></div></div><div class="control"><label for="target">Profit target</label><div class="inputwrap"><input id="target" type="number" value="10" min="0.35" step="0.01"><span class="currency">USD</span></div></div><div class="control"><label for="maxloss">Max loss</label><div class="inputwrap"><input id="maxloss" type="number" value="10" min="0.35" step="0.01"><span class="currency">USD</span></div></div></div>
-      <button class="run" id="runBtn" disabled>▷ &nbsp;Trading engine in validation</button><div class="message" id="runMessage">Live quotes and account balances are available. Automated orders stay off until each signal and risk rule has been validated.</div>
-      <div class="marketbar"><div class="marketstats"><div class="stat"><small>Selected market</small><strong id="marketName">Volatility 100 (1s)</strong></div><div class="stat"><small>Live quote</small><strong class="ticker" id="quote">—</strong></div><div class="stat"><small>Last digit</small><strong id="lastDigit">—</strong></div><div class="stat"><small>Ticks received</small><strong id="tickCount">0</strong></div></div><div class="feed"><span class="dot" id="connDot"></span><span id="connLabel"></span></div></div>
-      <div class="feedbox"><div class="feedhead"><span>Market</span><span class="right">Live quote</span><span class="right">Last digit</span><span class="right">Feed</span></div><div class="tickrow"><span id="rowMarket">Volatility 100 (1s)</span><span class="right ticker" id="rowQuote">—</span><span class="right" id="rowDigit">—</span><span class="right" id="rowState">—</span></div></div>
-    </section>
-    <section class="card panels" id="premium"><div class="heading"><div class="titlegroup"><span class="spark" style="color:var(--gold)">♛</span><div><h1>Nexora AI Premium</h1><div class="pills"><span class="pill" style="color:var(--gold);border-color:#856618">PREMIUM</span><span class="pill demo">REAL &amp; DEMO</span></div><div class="subtitle" id="premiumSubtitle">Premium strategy access</div></div></div><button class="login" id="unlockBtn">♛ &nbsp;Premium access</button></div><div id="ownerPanel" class="ownerPanel hidden"><b>Site owner access</b><span id="ownerStatus">Sign in with the Deriv account listed in the private server allowlist to enable Premium controls.</span></div><span class="sectionlabel">Bot strategy</span><div class="premiumGrid"><button class="strategy selected" data-strategy="Matches Printer"><span class="ico">≡</span><span class="lock">▣ ALPHA</span><b>Matches Printer</b><p>Digit Match: evaluates recent last-digit frequencies and payout before qualifying a trade.</p></button><button class="strategy" data-strategy="Over 8 Killer"><span class="ico">◎</span><span class="lock">▣ QUANTUM</span><b>Over 8 Killer</b><p>Digit Over 8: requires a calibrated probability and payout edge before entry.</p></button><button class="strategy" data-strategy="TickStrike Pro"><span class="ico">ϟ</span><span class="lock">▣ APEX</span><b>TickStrike Pro</b><p>Rise / Fall: measures short-window price direction, volatility, and signal stability.</p></button><button class="strategy" data-strategy="Auto Switcher"><span class="ico">⤨</span><span class="lock">▣ APEX</span><b>Auto Switcher</b><p>Direction manager only: switches Rise ↔ Fall from its own trend rule; it does not pick markets or engines.</p></button></div><div class="fields"><div class="control"><label for="marketPremium">Market</label><select class="marketMirror" id="marketPremium"></select></div><div class="control"><label for="stakePremium">Stake per trade</label><div class="inputwrap"><input id="stakePremium" type="number" value="1" min="0.35" step="0.01"><span class="currency">USD</span></div></div></div><div class="moneygrid" style="grid-template-columns:repeat(2,1fr)"><div class="control"><label for="targetPremium">Profit target</label><div class="inputwrap"><input id="targetPremium" type="number" value="20" min="0.35" step="0.01"><span class="currency">USD</span></div></div><div class="control"><label for="lossPremium">Max loss</label><div class="inputwrap"><input id="lossPremium" type="number" value="20" min="0.35" step="0.01"><span class="currency">USD</span></div></div></div><button class="run" id="premiumRunBtn" style="background:linear-gradient(100deg,#ffc629,#a450ef);color:#111" disabled>▣ &nbsp;Premium strategies are in validation</button><div class="message" id="premiumMessage">No strategy is claimed as accurate yet. Signals, payout checks, and risk limits must be validated before orders are enabled.</div></section>
-    <section class="card panels" id="manual"><div class="heading"><div><h1>Manual Trading</h1><div class="subtitle">Live market feed and account session</div></div></div><p class="manualnote">Choose a market on the Nexora AI Free screen to view its live feed. Select either Deriv demo or real account after sign-in. Order placement is still being implemented.</p></section>
-    <section class="card panels" id="pricing"><div class="heading"><div><h1>AI Pricing</h1><div class="subtitle">Nexora AI Free and Premium</div></div></div><p class="manualnote">Choose Nexora AI Free or Nexora AI Premium from the tabs above.</p></section>
-    <p class="foot">CASPER LIVE DATA ANALYSIS · Public market prices are for display. No trades are placed by this Stage 1 build.</p>
-  </main><div class="toast hidden" id="toast"></div>
-  <script>
-  (()=>{
-    const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-    const names={"1HZ100V":"Volatility 100 (1s)","1HZ75V":"Volatility 75 (1s)","1HZ50V":"Volatility 50 (1s)","1HZ25V":"Volatility 25 (1s)","1HZ10V":"Volatility 10 (1s)",R_100:"Volatility 100 Index",R_75:"Volatility 75 Index",R_50:"Volatility 50 Index",R_25:"Volatility 25 Index",R_10:"Volatility 10 Index"};
-    let ws=null,subId=null,count=0,retryTimer=null,activeStrategy='Mix Both';
-    const pipSizes=new Map();
-    const market=$('#market'), marketPremium=$('#marketPremium');
-    marketPremium.innerHTML=market.innerHTML;
-    function showToast(t){const el=$('#toast');el.textContent=t;el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),3200)}
-    function state(live=false){$('#feedStatus').textContent=live?'Market data live':'';$('#feedDot').classList.toggle('live',live);$('#connDot').classList.toggle('live',live);$('#connLabel').textContent=live?'Live market data':'';$('#rowState').textContent=live?'Live':'—'}
-    function decimalPlaces(value){
-      const n=Number(value);
-      if(!Number.isFinite(n)||n<=0)return null;
-      // Tick responses use pip_size as a decimal count; active-symbol metadata
-      // uses pip_size as the quote increment (for example, 0.01).
-      if(Number.isInteger(n)&&n<=10)return n;
-      if(n<1){const places=Math.round(-Math.log10(n));return places>=0&&places<=10?places:null;}
-      return null;
+    </div>
+
+    <button class="login" id="loginBtn">Login with Deriv</button>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Trading sections">
+  <button class="tab" data-panel="manual">♧ &nbsp;Manual Trading</button>
+  <button class="tab active" data-panel="free">✧ &nbsp;Nexora AI Free</button>
+  <button class="tab" data-panel="premium">♛ &nbsp;Nexora AI Premium</button>
+  <button class="tab" data-panel="pricing">◇ &nbsp;AI Pricing</button>
+</nav>
+
+<main class="wrap">
+
+<section class="card panels show" id="free">
+
+  <div class="heading">
+    <div class="titlegroup">
+      <span class="spark">✧</span>
+
+      <div>
+        <h1>Nexora AI</h1>
+
+        <div class="pills">
+          <span class="pill">FREE TIER</span>
+          <span class="pill demo">DEMO &amp; REAL</span>
+        </div>
+
+        <div class="subtitle">
+          Live market analysis and strategy selection
+        </div>
+      </div>
+    </div>
+
+    <div class="feed" aria-live="polite">
+      <i class="dot" id="feedDot"></i>
+      <span id="feedStatus"></span>
+    </div>
+  </div>
+
+  <span class="sectionlabel">Strategy</span>
+
+  <div class="strategies free" id="freeStrategies">
+
+    <button class="strategy" data-strategy="Rise &amp; Fall">
+      <span class="ico">↗</span>
+      <b>Rise / Fall</b>
+      <p>Price direction contracts</p>
+    </button>
+
+    <button class="strategy" data-strategy="Even &amp; Odd">
+      <span class="ico">＃</span>
+      <b>Even / Odd</b>
+      <p>Last-digit parity contracts</p>
+    </button>
+
+    <button class="strategy selected" data-strategy="Mix Both">
+      <span class="ico">⤨</span>
+      <b>Mix Both</b>
+      <p>Compare direction and parity signals</p>
+    </button>
+
+    <button class="strategy" data-strategy="Smart AI">
+      <span class="ico">♧</span>
+      <b>Smart AI</b>
+      <p>Ranks markets and strategies from validated live data</p>
+      <span class="recommended">Recommended</span>
+    </button>
+
+  </div>
+
+  <div class="fields">
+
+    <div class="control">
+      <label for="market">Market</label>
+
+      <select id="market">
+        <option value="1HZ100V">Volatility 100 (1s)</option>
+        <option value="1HZ75V">Volatility 75 (1s)</option>
+        <option value="1HZ50V">Volatility 50 (1s)</option>
+        <option value="1HZ25V">Volatility 25 (1s)</option>
+        <option value="1HZ10V">Volatility 10 (1s)</option>
+        <option value="R_100">Volatility 100 Index</option>
+        <option value="R_75">Volatility 75 Index</option>
+        <option value="R_50">Volatility 50 Index</option>
+        <option value="R_25">Volatility 25 Index</option>
+        <option value="R_10">Volatility 10 Index</option>
+      </select>
+    </div>
+
+    <div class="control">
+      <label>Risk level</label>
+
+      <div class="riskset">
+        <button class="risk" data-risk="Low">Low</button>
+        <button class="risk active" data-risk="Medium">Medium</button>
+        <button class="risk" data-risk="High">High</button>
+      </div>
+
+      <div class="risknote" id="riskNote">
+        ▱ &nbsp;Medium risk preset · stake escalation disabled during validation
+      </div>
+    </div>
+
+  </div>
+
+  <div class="moneygrid">
+
+    <div class="control">
+      <label for="stake">Stake per trade</label>
+
+      <div class="inputwrap">
+        <input id="stake" type="number" value="1" min="0.35" step="0.01">
+        <span class="currency">USD</span>
+      </div>
+    </div>
+
+    <div class="control">
+      <label for="target">Profit target</label>
+
+      <div class="inputwrap">
+        <input id="target" type="number" value="10" min="0.35" step="0.01">
+        <span class="currency">USD</span>
+      </div>
+    </div>
+
+    <div class="control">
+      <label for="maxloss">Max loss</label>
+
+      <div class="inputwrap">
+        <input id="maxloss" type="number" value="10" min="0.35" step="0.01">
+        <span class="currency">USD</span>
+      </div>
+    </div>
+
+  </div>
+
+  <button class="run" id="runBtn" disabled>
+    ▷ &nbsp;Trading engine in validation
+  </button>
+
+  <div class="message" id="runMessage">
+    Live quotes and account balances are available. Automated orders stay off until each signal and risk rule has been validated.
+  </div>
+
+  <div class="marketbar">
+
+    <div class="marketstats">
+
+      <div class="stat">
+        <small>Selected market</small>
+        <strong id="marketName">Volatility 100 (1s)</strong>
+      </div>
+
+      <div class="stat">
+        <small>Live quote</small>
+        <strong class="ticker" id="quote">—</strong>
+      </div>
+
+      <div class="stat">
+        <small>Last digit</small>
+        <strong id="lastDigit">—</strong>
+      </div>
+
+      <div class="stat">
+        <small>Ticks received</small>
+        <strong id="tickCount">0</strong>
+      </div>
+
+    </div>
+
+    <div class="feed">
+      <span class="dot" id="connDot"></span>
+      <span id="connLabel"></span>
+    </div>
+
+  </div>
+
+  <div class="feedbox">
+
+    <div class="feedhead">
+      <span>Market</span>
+      <span class="right">Live quote</span>
+      <span class="right">Last digit</span>
+      <span class="right">Feed</span>
+    </div>
+
+    <div class="tickrow">
+      <span id="rowMarket">Volatility 100 (1s)</span>
+      <span class="right ticker" id="rowQuote">—</span>
+      <span class="right" id="rowDigit">—</span>
+      <span class="right" id="rowState">—</span>
+    </div>
+
+  </div>
+
+</section>
+
+
+<section class="card panels" id="premium">
+
+  <div class="heading">
+
+    <div class="titlegroup">
+      <span class="spark" style="color:var(--gold)">♛</span>
+
+      <div>
+        <h1>Nexora AI Premium</h1>
+
+        <div class="pills">
+          <span class="pill" style="color:var(--gold);border-color:#856618">PREMIUM</span>
+          <span class="pill demo">REAL &amp; DEMO</span>
+        </div>
+
+        <div class="subtitle" id="premiumSubtitle">
+          Premium strategy access
+        </div>
+      </div>
+    </div>
+
+    <button class="login" id="unlockBtn">
+      ♛ &nbsp;Premium access
+    </button>
+
+  </div>
+
+  <div id="ownerPanel" class="ownerPanel hidden">
+    <b>Site owner access</b>
+    <span id="ownerStatus">
+      Sign in with the Deriv account listed in the private server allowlist to enable Premium controls.
+    </span>
+  </div>
+
+  <span class="sectionlabel">Bot strategy</span>
+
+  <div class="premiumGrid">
+
+    <button class="strategy selected" data-strategy="Matches Printer">
+      <span class="ico">≡</span>
+      <span class="lock">▣ ALPHA</span>
+      <b>Matches Printer</b>
+      <p>
+        Digit Match: evaluates digit probabilities, stability and validation before qualification.
+      </p>
+    </button>
+
+    <button class="strategy" data-strategy="Over 8 Killer">
+      <span class="ico">◎</span>
+      <span class="lock">▣ QUANTUM</span>
+      <b>Over 8 Killer</b>
+      <p>
+        Digit Over 8: evaluates the 9/Over-8 distribution and validates the edge before qualification.
+      </p>
+    </button>
+
+    <button class="strategy" data-strategy="TickStrike Pro">
+      <span class="ico">ϟ</span>
+      <span class="lock">▣ APEX</span>
+      <b>TickStrike Pro</b>
+      <p>
+        Rise / Fall: combines momentum, trend, volatility and signal stability.
+      </p>
+    </button>
+
+    <button class="strategy" data-strategy="Auto Switcher">
+      <span class="ico">⤨</span>
+      <span class="lock">▣ APEX</span>
+      <b>Auto Switcher</b>
+      <p>
+        Direction manager only: switches Rise ↔ Fall from its own validated trend rule.
+      </p>
+    </button>
+
+  </div>
+
+  <div class="fields">
+
+    <div class="control">
+      <label for="marketPremium">Market</label>
+      <select class="marketMirror" id="marketPremium"></select>
+    </div>
+
+    <div class="control">
+      <label for="stakePremium">Stake per trade</label>
+
+      <div class="inputwrap">
+        <input id="stakePremium" type="number" value="1" min="0.35" step="0.01">
+        <span class="currency">USD</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="moneygrid" style="grid-template-columns:repeat(2,1fr)">
+
+    <div class="control">
+      <label for="targetPremium">Profit target</label>
+
+      <div class="inputwrap">
+        <input id="targetPremium" type="number" value="20" min="0.35" step="0.01">
+        <span class="currency">USD</span>
+      </div>
+    </div>
+
+    <div class="control">
+      <label for="lossPremium">Max loss</label>
+
+      <div class="inputwrap">
+        <input id="lossPremium" type="number" value="20" min="0.35" step="0.01">
+        <span class="currency">USD</span>
+      </div>
+    </div>
+
+  </div>
+
+  <button class="run" id="premiumRunBtn"
+    style="background:linear-gradient(100deg,#ffc629,#a450ef);color:#111"
+    disabled>
+    ▣ &nbsp;Premium strategies are in validation
+  </button>
+
+  <div class="message" id="premiumMessage">
+    No strategy is claimed as accurate yet. Signals, payout checks, and risk limits must be validated before orders are enabled.
+  </div>
+
+</section>
+
+
+<section class="card panels" id="manual">
+
+  <div class="heading">
+    <div>
+      <h1>Manual Trading</h1>
+      <div class="subtitle">Live market feed and account session</div>
+    </div>
+  </div>
+
+  <p class="manualnote">
+    Choose a market on the Nexora AI Free screen to view its live feed.
+    Select either Deriv demo or real account after sign-in.
+    Order placement is still being implemented.
+  </p>
+
+</section>
+
+
+<section class="card panels" id="pricing">
+
+  <div class="heading">
+    <div>
+      <h1>AI Pricing</h1>
+      <div class="subtitle">Nexora AI Free and Premium</div>
+    </div>
+  </div>
+
+  <p class="manualnote">
+    Choose Nexora AI Free or Nexora AI Premium from the tabs above.
+  </p>
+
+</section>
+
+
+<p class="foot">
+  CASPER LIVE DATA ANALYSIS · Live market analysis engine active ·
+  No trades are placed by this validation build.
+</p>
+
+</main>
+
+<div class="toast hidden" id="toast"></div>
+
+
+<script>
+/* ============================================================
+   CASPER / NEXORA AI ANALYSIS ENGINE
+   ------------------------------------------------------------
+   Purpose:
+   - live market state
+   - feature extraction
+   - regime detection
+   - strategy signals
+   - Smart AI ranking
+   - pre-outcome validation
+   - data quality
+   - calibration buckets
+   - NO trade execution
+   ============================================================ */
+
+window.CASPER_ENGINE = (() => {
+
+  const DEFAULT_MAX_TICKS = 1800;
+  const MIN_TICKS = 60;
+
+  const clamp = (v,min,max) =>
+    Math.max(min,Math.min(max,v));
+
+  const mean = arr => {
+    if(!arr.length) return 0;
+    return arr.reduce((a,b)=>a+b,0)/arr.length;
+  };
+
+  const variance = arr => {
+    if(arr.length<2) return 0;
+    const m=mean(arr);
+    return mean(arr.map(v=>(v-m)*(v-m)));
+  };
+
+  const stdev = arr => Math.sqrt(variance(arr));
+
+  const slope = arr => {
+    const n=arr.length;
+    if(n<3)return 0;
+
+    const xMean=(n-1)/2;
+    const yMean=mean(arr);
+
+    let num=0;
+    let den=0;
+
+    for(let i=0;i<n;i++){
+      num+=(i-xMean)*(arr[i]-yMean);
+      den+=(i-xMean)*(i-xMean);
     }
-    function connect(){
-      try{
-        if(ws){ws.onclose=null;ws.close()}
-        clearTimeout(retryTimer);
-        ws=new WebSocket('wss://api.derivws.com/trading/v1/options/ws/public');
-        ws.onopen=()=>{
-          ws.send(JSON.stringify({active_symbols:'brief',req_id:1}));
-          ws.send(JSON.stringify({ticks:market.value,subscribe:1,req_id:2}));
-        };
-        ws.onmessage=e=>{
-          let d;try{d=JSON.parse(e.data)}catch{return}
-          if(d.error){state(false);return}
-          if(d.msg_type==='active_symbols'&&Array.isArray(d.active_symbols)){
-            for(const item of d.active_symbols){
-              const symbol=item.underlying_symbol||item.symbol;
-              const places=decimalPlaces(item.pip_size??item.pip);
-              if(symbol&&places!==null)pipSizes.set(symbol,places);
-            }
-            return;
-          }
-          if(d.msg_type==='tick'&&d.tick){
-            const q=Number(d.tick.quote);
-            if(!Number.isFinite(q))return;
-            const symbol=d.tick.symbol||market.value;
-            const precision=decimalPlaces(d.tick.pip_size)??pipSizes.get(symbol);
-            const quote=precision===undefined||precision===null?String(d.tick.quote):q.toFixed(precision);
-            const digit=precision===undefined||precision===null?'—':quote.slice(-1);
-            count++;subId=d.subscription?.id||subId;
-            $('#quote').textContent=quote;$('#rowQuote').textContent=quote;
-            $('#lastDigit').textContent=digit;$('#rowDigit').textContent=digit;
-            $('#tickCount').textContent=count.toLocaleString();
-            state(true);
-          }
-        };
-        ws.onerror=()=>state(false);
-        ws.onclose=()=>{state(false);clearTimeout(retryTimer);retryTimer=setTimeout(connect,2200)};
-      }catch{state(false)}
-    }
-    market.addEventListener('change',()=>{const n=names[market.value];$('#marketName').textContent=n;$('#rowMarket').textContent=n;marketPremium.value=market.value;count=0;$('#tickCount').textContent='0';connect()});
-    marketPremium.addEventListener('change',()=>{market.value=marketPremium.value;market.dispatchEvent(new Event('change'))});
-    $$('.risk').forEach(b=>b.addEventListener('click',()=>{$$('.risk').forEach(x=>x.classList.remove('active'));b.classList.add('active');const risk=b.dataset.risk, note=$('#riskNote');note.classList.toggle('safe',risk==='Low');note.textContent=`▱  ${risk} risk preset · stake escalation disabled during validation`}));
-    $$('.strategy').forEach(b=>b.addEventListener('click',()=>{const p=b.closest('.premiumGrid')?'premium':'free';if(p==='premium'&&!premiumOwner){showToast('Premium controls are available to subscribed users and the site owner.');return}$$(`#${p} .strategy`).forEach(x=>x.classList.remove('selected'));b.classList.add('selected');activeStrategy=b.dataset.strategy;if(p==='premium'&&activeStrategy==='Auto Switcher')showToast('Auto Switcher manages Rise / Fall direction only.')}));
-    $$('.tab').forEach(b=>b.addEventListener('click',()=>{$$('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');$$('.panels').forEach(x=>x.classList.remove('show'));$('#'+b.dataset.panel).classList.add('show')}));
-    let signedIn=false,premiumOwner=false;
-    const balanceSockets=new Map(),balanceRetry=new Map(),accountBalances=new Map(),accountTypes=new Map();let balanceGeneration=0;
-    function setAccountHeader(){const id=$('#accountSelect').value,type=accountTypes.get(id),balance=accountBalances.get(id);if(!id){$('#balance').textContent='— USD';$('#accountType').textContent=signedIn?'Choose a Deriv account':'Not signed in';return}$('#balance').textContent=typeof balance==='number'?`${balance.toFixed(2)} ${accountTypes.get(`${id}:currency`)||'USD'}`:`— ${accountTypes.get(`${id}:currency`)||'USD'}`;$('#accountType').textContent=`${type==='demo'?'Demo':'Real'} account`}
-    function closeBalanceSockets(){balanceGeneration++;for(const [id,socket] of balanceSockets){socket.onclose=null;socket.close();balanceSockets.delete(id)}for(const t of balanceRetry.values())clearTimeout(t);balanceRetry.clear()}
-    async function openBalanceSocket(account){const id=account.id,generation=balanceGeneration;try{const response=await fetch('/auth/account-otp',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountId:id})});const payload=await response.json();if(!response.ok||!payload.url)throw new Error('balance connection unavailable');if(!signedIn||generation!==balanceGeneration)return;const socket=new WebSocket(payload.url);balanceSockets.set(id,socket);socket.onopen=()=>socket.send(JSON.stringify({balance:1,subscribe:1}));socket.onmessage=event=>{let msg;try{msg=JSON.parse(event.data)}catch{return}if(msg.error)return;const data=msg.balance||msg,amount=Number(data.balance);if(Number.isFinite(amount)){accountBalances.set(id,amount);if(data.currency)accountTypes.set(`${id}:currency`,data.currency);if($('#accountSelect').value===id)setAccountHeader();const option=$$('#accountSelect option').find(o=>o.value===id);if(option)option.textContent=`${accountTypes.get(id)==='demo'?'Demo':'Real'} · ${accountTypes.get(`${id}:currency`)||'USD'} · ${amount.toFixed(2)}`}};socket.onerror=()=>{};socket.onclose=()=>{balanceSockets.delete(id);if(signedIn&&accountTypes.has(id)){clearTimeout(balanceRetry.get(id));balanceRetry.set(id,setTimeout(()=>openBalanceSocket(account),3500))}}}catch{if(signedIn&&generation===balanceGeneration&&accountTypes.has(id)){clearTimeout(balanceRetry.get(id));balanceRetry.set(id,setTimeout(()=>openBalanceSocket(account),5000))}}}
-    const githubPages=location.hostname.endsWith('.github.io');
-    async function loadSession(){
-        if(githubPages){signedIn=false;$('#loginBtn').textContent='Login with Deriv';setAccountHeader();return}
-      try{
-        const r=await fetch('/auth/session',{credentials:'same-origin',headers:{Accept:'application/json'}});
-        const data=await r.json();
-        if(!r.ok)throw new Error(data.error||'Could not check your Deriv session.');
-        signedIn=Boolean(data.authenticated);
-        premiumOwner=Boolean(data.premiumOwner);
-        $('#loginBtn').textContent=signedIn?'Sign out':'Login with Deriv';
-        $('#accountSelect').classList.toggle('hidden',!signedIn||!data.accounts?.length);
-        $('#ownerPanel').classList.toggle('hidden',!premiumOwner);
-        $('#unlockBtn').textContent=premiumOwner?'♛  Owner Premium active':'♛  Premium access';
-        $('#premiumSubtitle').textContent=premiumOwner?'Owner access enabled for this Deriv account':'Premium access for subscribed accounts';
-        $('#ownerStatus').textContent=premiumOwner?'This Deriv account is on the private owner allowlist. Premium strategy controls are unlocked; automated orders remain disabled during validation.':'Owner access is granted only when your Deriv account ID is on the server allowlist.';
-        $$('#premium .strategy').forEach(button=>{button.disabled=!premiumOwner;button.classList.toggle('locked',!premiumOwner)});
-        if(signedIn){
-          const accounts=data.accounts||[];
-          closeBalanceSockets();accountBalances.clear();accountTypes.clear();
-          const accountSelect=$('#accountSelect');accountSelect.replaceChildren(new Option('Choose account…',''));
-          accounts.forEach(a=>{accountTypes.set(a.id,a.type);accountTypes.set(`${a.id}:currency`,a.currency||'USD');if(typeof a.balance==='number')accountBalances.set(a.id,a.balance);accountSelect.add(new Option(`${a.type==='demo'?'Demo':'Real'} · ${a.currency||'USD'} · ${typeof a.balance==='number'?a.balance.toFixed(2):'—'}`,a.id))});
-          $('#accountSelect').value=data.activeAccountId||'';
-          accounts.forEach(openBalanceSocket);
-          setAccountHeader();
-        }else{
-          premiumOwner=false;closeBalanceSockets();$('#accountSelect').innerHTML='';setAccountHeader();
-          $('#ownerPanel').classList.add('hidden');$('#unlockBtn').textContent='♛  Premium access';$('#premiumSubtitle').textContent='Premium access for subscribed accounts';$$('#premium .strategy').forEach(button=>{button.disabled=true;button.classList.add('locked')});
+
+    return den?num/den:0;
+  };
+
+  const sigmoid = x => 1/(1+Math.exp(-x));
+
+  function createMarketState(symbol){
+
+    return {
+      symbol,
+      ticks:[],
+      lastEpoch:null,
+      lastQuote:null,
+      lastDigit:null,
+
+      accepted:0,
+      duplicates:0,
+      outOfOrder:0,
+      invalid:0,
+
+      predictions:[],
+
+      validation:{
+        total:0,
+        correct:0,
+        incorrect:0,
+        brier:0,
+        confidenceSum:0,
+        buckets:{
+          low:{n:0,correct:0},
+          medium:{n:0,correct:0},
+          high:{n:0,correct:0}
         }
-      }catch(e){
-        signedIn=false;premiumOwner=false;closeBalanceSockets();$('#ownerPanel').classList.add('hidden');$$('#premium .strategy').forEach(button=>{button.disabled=true;button.classList.add('locked')});
-        $('#loginBtn').textContent='Login with Deriv';
-        setAccountHeader();
+      },
+
+      strategyValidation:{
+        riseFall:{total:0,correct:0},
+        even:{total:0,correct:0},
+        odd:{total:0,correct:0},
+        over8:{total:0,correct:0}
+      }
+    };
+  }
+
+
+  function create(options={}){
+
+    const maxTicks=Number(options.maxTicks)||DEFAULT_MAX_TICKS;
+    const markets=new Map();
+
+    function get(symbol){
+
+      if(!markets.has(symbol)){
+        markets.set(symbol,createMarketState(symbol));
+      }
+
+      return markets.get(symbol);
+    }
+
+
+    function addTick(input){
+
+      const symbol=String(input.symbol||'').trim();
+
+      const quote=Number(input.quote);
+      const epoch=Number(input.epoch);
+
+      if(!symbol || !Number.isFinite(quote)){
+        return null;
+      }
+
+      const state=get(symbol);
+
+      if(state.lastEpoch!==null && epoch===state.lastEpoch){
+        state.duplicates++;
+        return snapshot(symbol);
+      }
+
+      if(state.lastEpoch!==null && epoch<state.lastEpoch){
+        state.outOfOrder++;
+        return snapshot(symbol);
+      }
+
+      if(!Number.isFinite(epoch)){
+        state.invalid++;
+        return snapshot(symbol);
+      }
+
+      let precision=Number(input.pipSize);
+
+      if(!Number.isFinite(precision) || precision<0){
+        precision=2;
+      }
+
+      let text;
+
+      if(Number.isInteger(precision)){
+        text=quote.toFixed(clamp(precision,0,10));
+      }else{
+        text=String(quote);
+      }
+
+      const parts=text.split('.');
+      const lastChar=(parts[1]||parts[0]).slice(-1);
+      const digit=Number(lastChar);
+
+      if(!Number.isInteger(digit)||digit<0||digit>9){
+        state.invalid++;
+        return snapshot(symbol);
+      }
+
+      const previousQuote=state.lastQuote;
+
+      state.ticks.push({
+        quote,
+        epoch,
+        digit,
+        direction:
+          previousQuote===null
+            ? 0
+            : quote>previousQuote
+              ? 1
+              : quote<previousQuote
+                ? -1
+                : 0
+      });
+
+      state.lastEpoch=epoch;
+      state.lastQuote=quote;
+      state.lastDigit=digit;
+      state.accepted++;
+
+      while(state.ticks.length>maxTicks){
+        state.ticks.shift();
+      }
+
+      resolvePredictions(state);
+
+      const result=snapshot(symbol);
+
+      registerPredictions(state,result);
+
+      return result;
+    }
+
+
+    function windowQuotes(state,n){
+
+      return state.ticks
+        .slice(-n)
+        .map(t=>t.quote);
+    }
+
+
+    function windowDigits(state,n){
+
+      return state.ticks
+        .slice(-n)
+        .map(t=>t.digit);
+    }
+
+
+    function windowDirections(state,n){
+
+      return state.ticks
+        .slice(-n)
+        .map(t=>t.direction)
+        .filter(v=>v!==0);
+    }
+
+
+    function digitDistribution(digits){
+
+      const counts=Array(10).fill(0);
+
+      for(const d of digits){
+        if(Number.isInteger(d)&&d>=0&&d<=9){
+          counts[d]++;
+        }
+      }
+
+      const total=digits.length||1;
+
+      return {
+        counts,
+        probabilities:counts.map(v=>v/total)
+      };
+    }
+
+
+    function calculateFeatures(state){
+
+      const ticks=state.ticks;
+
+      if(ticks.length<MIN_TICKS){
+        return {
+          ready:false,
+          sample:ticks.length,
+          minRequired:MIN_TICKS
+        };
+      }
+
+      const q20=windowQuotes(state,20);
+      const q50=windowQuotes(state,50);
+      const q100=windowQuotes(state,100);
+
+      const d20=windowDigits(state,20);
+      const d50=windowDigits(state,50);
+      const d100=windowDigits(state,100);
+
+      const dir20=windowDirections(state,20);
+      const dir50=windowDirections(state,50);
+
+      const mean20=mean(q20);
+      const mean50=mean(q50);
+
+      const volatility20=stdev(q20);
+      const volatility50=stdev(q50);
+
+      const slope20=slope(q20);
+      const slope50=slope(q50);
+
+      const direction20=mean(dir20);
+      const direction50=mean(dir50);
+
+      const momentum=
+        q20.length>5
+          ? (q20[q20.length-1]-q20[0])/(volatility20||1)
+          : 0;
+
+      const persistence20=
+        dir20.length
+          ? dir20.filter(v=>v>0).length/dir20.length
+          : .5;
+
+      const negativePersistence20=
+        dir20.length
+          ? dir20.filter(v=>v<0).length/dir20.length
+          : .5;
+
+      const persistence50=
+        dir50.length
+          ? dir50.filter(v=>v>0).length/dir50.length
+          : .5;
+
+      const stability=
+        clamp(
+          1-
+          Math.abs(direction20-direction50),
+          0,
+          1
+        );
+
+      const volatilityRatio=
+        volatility50
+          ? volatility20/volatility50
+          : 1;
+
+      const compression=
+        clamp(
+          1-volatilityRatio,
+          0,
+          1
+        );
+
+      const dist20=digitDistribution(d20);
+      const dist50=digitDistribution(d50);
+      const dist100=digitDistribution(d100);
+
+      const even20=
+        d20.length
+          ? d20.filter(d=>d%2===0).length/d20.length
+          : .5;
+
+      const odd20=
+        d20.length
+          ? d20.filter(d=>d%2===1).length/d20.length
+          : .5;
+
+      const over8_20=
+        d20.length
+          ? d20.filter(d=>d>8).length/d20.length
+          : 0;
+
+      const over8_50=
+        d50.length
+          ? d50.filter(d=>d>8).length/d50.length
+          : 0;
+
+      const digitEntropy=
+        -dist50.probabilities
+          .filter(p=>p>0)
+          .reduce((sum,p)=>sum+p*Math.log2(p),0)/Math.log2(10);
+
+      const digitConcentration=
+        Math.max(...dist50.probabilities);
+
+      let regime='balanced';
+
+      const normalizedSlope=
+        slope20/(volatility20||1);
+
+      if(volatilityRatio>1.55){
+        regime='high_volatility';
+      }else if(compression>.55){
+        regime='compression';
+      }else if(normalizedSlope>.22 && direction20>.12){
+        regime='uptrend';
+      }else if(normalizedSlope<-.22 && direction20<-.12){
+        regime='downtrend';
+      }else{
+        regime='range';
+      }
+
+      return {
+        ready:true,
+        sample:ticks.length,
+
+        price:{
+          current:ticks[ticks.length-1].quote,
+          mean20,
+          mean50,
+          slope20,
+          slope50,
+          volatility20,
+          volatility50,
+          momentum
+        },
+
+        direction:{
+          direction20,
+          direction50,
+          persistence20,
+          negativePersistence20,
+          persistence50,
+          stability
+        },
+
+        volatility:{
+          ratio:volatilityRatio,
+          compression
+        },
+
+        digits:{
+          last:ticks[ticks.length-1].digit,
+          distribution20:dist20,
+          distribution50:dist50,
+          distribution100:dist100,
+          even20,
+          odd20,
+          over8_20,
+          over8_50,
+          digitEntropy,
+          digitConcentration
+        },
+
+        regime
+      };
+    }
+
+
+    function calculateRiseFall(features){
+
+      if(!features.ready){
+        return {
+          strategy:'Rise & Fall',
+          actionable:false,
+          direction:null,
+          confidence:0,
+          score:0,
+          reason:'insufficient_data'
+        };
+      }
+
+      const f=features;
+
+      const trend=
+        clamp(
+          .5+
+          sigmoid(
+            (f.price.slope20/(f.price.volatility20||1))*2
+          )/2-
+          .25,
+          0,
+          1
+        );
+
+      const upScore=
+        .5+
+        f.direction.direction20*.30+
+        (f.direction.persistence20-.5)*.28+
+        (f.direction.stability-.5)*.14+
+        (f.price.momentum>0?Math.min(.18,f.price.momentum*.035):Math.max(-.18,f.price.momentum*.035))+
+        (trend-.5)*.20;
+
+      const downScore=
+        .5+
+        (-f.direction.direction20)*.30+
+        (f.direction.negativePersistence20-.5)*.28+
+        (f.direction.stability-.5)*.14+
+        (f.price.momentum<0?Math.min(.18,-f.price.momentum*.035):Math.max(-.18,-f.price.momentum*.035))+
+        ((1-trend)-.5)*.20;
+
+      let direction='RISE';
+      let score=upScore;
+
+      if(downScore>upScore){
+        direction='FALL';
+        score=downScore;
+      }
+
+      let confidence=clamp(score,.5,.95);
+
+      if(f.regime==='high_volatility'){
+        confidence-=.07;
+      }
+
+      if(f.regime==='compression'){
+        confidence-=.04;
+      }
+
+      confidence=clamp(confidence,.5,.95);
+
+      const actionable=
+        confidence>=.60 &&
+        f.sample>=MIN_TICKS &&
+        f.direction.stability>=.20;
+
+      return {
+        strategy:'Rise & Fall',
+        actionable,
+        direction,
+        confidence,
+        score,
+        reason:
+          !actionable
+            ? 'edge_not_strong_enough'
+            : confidence>=.75
+              ? 'strong_trend_alignment'
+              : 'moderate_trend_alignment'
+      };
+    }
+
+
+    function calculateParity(features){
+
+      if(!features.ready){
+        return {
+          strategy:'Even & Odd',
+          actionable:false,
+          direction:null,
+          confidence:0,
+          score:0,
+          reason:'insufficient_data'
+        };
+      }
+
+      const evenBias=Math.abs(features.digits.even20-.5);
+      const oddBias=Math.abs(features.digits.odd20-.5);
+
+      const evenScore=
+        .5+
+        (features.digits.even20-.5)*.72+
+        (features.digits.even20-
+         features.digits.distribution50.probabilities.filter((_,i)=>i%2===0).reduce((a,b)=>a+b,0))*.20;
+
+      const oddScore=
+        .5+
+        (features.digits.odd20-.5)*.72;
+
+      const direction=
+        evenScore>=oddScore
+          ? 'EVEN'
+          : 'ODD';
+
+      const score=
+        Math.max(evenScore,oddScore);
+
+      let confidence=clamp(score,.5,.95);
+
+      if(features.digits.digitEntropy<.78){
+        confidence+=.025;
+      }
+
+      if(features.digits.digitConcentration>.25){
+        confidence-=.035;
+      }
+
+      confidence=clamp(confidence,.5,.95);
+
+      const actionable=
+        confidence>=.59 &&
+        Math.max(evenBias,oddBias)>=.035;
+
+      return {
+        strategy:'Even & Odd',
+        actionable,
+        direction,
+        confidence,
+        score,
+        reason:
+          !actionable
+            ? 'parity_edge_not_confirmed'
+            : 'parity_distribution_alignment'
+      };
+    }
+
+
+    function calculateOver8(features){
+
+      if(!features.ready){
+        return {
+          strategy:'Over 8',
+          actionable:false,
+          direction:null,
+          confidence:0,
+          score:0,
+          reason:'insufficient_data'
+        };
+      }
+
+      const over8=features.digits.over8_20;
+      const nine=features.digits.distribution50.probabilities[9]||0;
+
+      const score=
+        .5+
+        (over8-.10)*1.10+
+        (nine-.10)*.35;
+
+      let confidence=clamp(score,.5,.95);
+
+      if(features.digits.digitEntropy>.94){
+        confidence-=.035;
+      }
+
+      if(features.regime==='high_volatility'){
+        confidence-=.025;
+      }
+
+      confidence=clamp(confidence,.5,.95);
+
+      const actionable=
+        confidence>=.59 &&
+        over8>.105;
+
+      return {
+        strategy:'Over 8',
+        actionable,
+        direction:'OVER_8',
+        confidence,
+        score,
+        reason:
+          !actionable
+            ? 'over8_edge_not_confirmed'
+            : 'over8_distribution_alignment'
+      };
+    }
+
+
+    function calculateDigitMatch(features){
+
+      if(!features.ready){
+        return {
+          strategy:'Matches Printer',
+          actionable:false,
+          direction:null,
+          confidence:0,
+          score:0,
+          reason:'insufficient_data'
+        };
+      }
+
+      const probs=features.digits.distribution50.probabilities;
+
+      let bestDigit=0;
+      let bestProbability=0;
+
+      for(let i=0;i<10;i++){
+        if(probs[i]>bestProbability){
+          bestProbability=probs[i];
+          bestDigit=i;
+        }
+      }
+
+      let confidence=
+        clamp(
+          .5+
+          (bestProbability-.10)*1.25,
+          .5,
+          .95
+        );
+
+      if(features.digits.digitEntropy>.92){
+        confidence-=.035;
+      }
+
+      confidence=clamp(confidence,.5,.95);
+
+      return {
+        strategy:'Matches Printer',
+        actionable:
+          confidence>=.60 &&
+          bestProbability>=.115 &&
+          features.sample>=MIN_TICKS,
+        direction:`MATCH_${bestDigit}`,
+        digit:bestDigit,
+        confidence,
+        score:confidence,
+        probability:bestProbability,
+        reason:
+          bestProbability>=.115
+            ? 'digit_concentration_detected'
+            : 'digit_concentration_not_confirmed'
+      };
+    }
+
+
+    function calculateSignals(features){
+
+      return {
+        riseFall:calculateRiseFall(features),
+        parity:calculateParity(features),
+        over8:calculateOver8(features),
+        match:calculateDigitMatch(features)
+      };
+    }
+
+
+    function rankSignals(signals){
+
+      const list=[
+        signals.riseFall,
+        signals.parity,
+        signals.over8,
+        signals.match
+      ];
+
+      const usable=list.filter(x=>x.actionable);
+
+      usable.sort((a,b)=>b.confidence-a.confidence);
+
+      return usable[0]||{
+        strategy:'WAIT',
+        actionable:false,
+        confidence:0,
+        score:0,
+        reason:'no_validated_edge'
+      };
+    }
+
+
+    function dataQuality(state){
+
+      const total=
+        state.accepted+
+        state.duplicates+
+        state.outOfOrder+
+        state.invalid;
+
+      const bad=
+        state.duplicates+
+        state.outOfOrder+
+        state.invalid;
+
+      const integrity=
+        total
+          ? clamp(1-bad/total,0,1)
+          : 0;
+
+      let status='insufficient';
+
+      if(state.accepted>=MIN_TICKS){
+        status=
+          integrity>=.995
+            ? 'excellent'
+            : integrity>=.98
+              ? 'good'
+              : integrity>=.94
+                ? 'degraded'
+                : 'poor';
+      }
+
+      return {
+        status,
+        integrity,
+        accepted:state.accepted,
+        duplicates:state.duplicates,
+        outOfOrder:state.outOfOrder,
+        invalid:state.invalid
+      };
+    }
+
+
+    function resolvePredictions(state){
+
+      if(!state.ticks.length)return;
+
+      const current=state.ticks[state.ticks.length-1];
+
+      const pending=state.predictions.splice(0);
+
+      for(const p of pending){
+
+        const actualRiseFall=
+          current.quote>p.quote
+            ? 'RISE'
+            : current.quote<p.quote
+              ? 'FALL'
+              : 'FLAT';
+
+        let correct=false;
+
+        if(p.type==='riseFall'){
+          correct=actualRiseFall===p.direction;
+
+          state.strategyValidation.riseFall.total++;
+
+          if(correct){
+            state.strategyValidation.riseFall.correct++;
+          }
+        }
+
+        if(p.type==='even'){
+          const actual=current.digit%2===0?'EVEN':'ODD';
+
+          correct=actual===p.direction;
+
+          state.strategyValidation.even.total++;
+
+          if(correct){
+            state.strategyValidation.even.correct++;
+          }
+        }
+
+        if(p.type==='odd'){
+          const actual=current.digit%2===0?'EVEN':'ODD';
+
+          correct=actual===p.direction;
+
+          state.strategyValidation.odd.total++;
+
+          if(correct){
+            state.strategyValidation.odd.correct++;
+          }
+        }
+
+        if(p.type==='over8'){
+          const actual=current.digit>8?'OVER_8':'NOT_OVER_8';
+
+          correct=actual==='OVER_8';
+
+          state.strategyValidation.over8.total++;
+
+          if(correct){
+            state.strategyValidation.over8.correct++;
+          }
+        }
+
+        state.validation.total++;
+
+        if(correct){
+          state.validation.correct++;
+        }else{
+          state.validation.incorrect++;
+        }
+
+        const confidence=p.confidence;
+
+        state.validation.confidenceSum+=confidence;
+
+        state.validation.brier+=
+          (confidence-(correct?1:0))*
+          (confidence-(correct?1:0));
+
+        const bucket=
+          confidence>=.75
+            ? 'high'
+            : confidence>=.65
+              ? 'medium'
+              : 'low';
+
+        state.validation.buckets[bucket].n++;
+
+        if(correct){
+          state.validation.buckets[bucket].correct++;
+        }
       }
     }
-    $('#loginBtn').addEventListener('click',async()=>{
-      if(!signedIn){if(githubPages){showToast('Secure Deriv login needs the Node.js server deployed with this site.');return}location.assign('/auth/login');return}
-      try{const r=await fetch('/auth/logout',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'}});if(!r.ok)throw new Error();await loadSession();showToast('Signed out of Deriv.')}catch{showToast('Could not sign out. Reload and try again.')}
-    });
-    $('#accountSelect').addEventListener('change',async e=>{
-      if(!e.target.value){setAccountHeader();return}try{const r=await fetch('/auth/account',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountId:e.target.value})});const data=await r.json();if(!r.ok)throw new Error(data.error);setAccountHeader()}catch(err){showToast(err.message||'Could not change account.')}
-    });
-    if(new URLSearchParams(location.search).has('login')){showToast('Deriv sign-in did not complete. You can try again.');history.replaceState({},'',location.pathname)}
-    $('#unlockBtn').addEventListener('click',()=>showToast(premiumOwner?'Owner Premium access is active.':'Premium subscription access is not configured yet.'));
-    $('#runBtn').addEventListener('click',()=>{const vals=['#stake','#target','#maxloss'].map(s=>Number($(s).value));if(vals.some(v=>!Number.isFinite(v)||v<=0)){showToast('Enter positive stake and risk limits first.');return}if(!signedIn||!$('#accountSelect').value){showToast('Sign in and choose a Deriv demo or real account first.');return}showToast('Signals and risk controls are still under validation; no order was sent.')});
-    $('#themeBtn').addEventListener('click',()=>{document.body.classList.toggle('light');if(document.body.classList.contains('light')){document.documentElement.style.setProperty('--bg','#eef4f6');document.documentElement.style.setProperty('--panel','#fff');document.documentElement.style.setProperty('--panel2','#f6fbfc');document.documentElement.style.setProperty('--text','#142b35');document.documentElement.style.setProperty('--line','#cbdde2')}else{['--bg','--panel','--panel2','--text','--line'].forEach(k=>document.documentElement.style.removeProperty(k))}});
-    loadSession();
+
+
+    function registerPredictions(state,result){
+
+      if(!result||!result.features.ready)return;
+
+      const rf=result.signals.riseFall;
+
+      if(rf.actionable){
+
+        state.predictions.push({
+          type:'riseFall',
+          direction:rf.direction,
+          confidence:rf.confidence,
+          quote:state.lastQuote,
+          epoch:state.lastEpoch
+        });
+      }
+
+      const parity=result.signals.parity;
+
+      if(parity.actionable){
+
+        state.predictions.push({
+          type:
+            parity.direction==='EVEN'
+              ? 'even'
+              : 'odd',
+          direction:parity.direction,
+          confidence:parity.confidence,
+          quote:state.lastQuote,
+          epoch:state.lastEpoch
+        });
+      }
+
+      const over8=result.signals.over8;
+
+      if(over8.actionable){
+
+        state.predictions.push({
+          type:'over8',
+          direction:'OVER_8',
+          confidence:over8.confidence,
+          quote:state.lastQuote,
+          epoch:state.lastEpoch
+        });
+      }
+
+      if(state.predictions.length>12){
+        state.predictions=state.predictions.slice(-12);
+      }
+    }
+
+
+    function snapshot(symbol){
+
+      const state=get(symbol);
+
+      const features=calculateFeatures(state);
+
+      if(!features.ready){
+
+        return {
+          symbol,
+          ready:false,
+          ticks:state.accepted,
+          dataQuality:dataQuality(state),
+          features,
+          signals:{
+            riseFall:null,
+            parity:null,
+            over8:null,
+            match:null
+          },
+          bestSignal:{
+            strategy:'WAIT',
+            actionable:false,
+            confidence:0,
+            reason:'insufficient_data'
+          },
+          validation:getValidation(state)
+        };
+      }
+
+      const signals=calculateSignals(features);
+
+      return {
+        symbol,
+        ready:true,
+        ticks:state.accepted,
+        dataQuality:dataQuality(state),
+        features,
+        signals,
+        bestSignal:rankSignals(signals),
+        validation:getValidation(state)
+      };
+    }
+
+
+    function getValidation(state){
+
+      const total=state.validation.total;
+
+      return {
+        total,
+        correct:state.validation.correct,
+        incorrect:state.validation.incorrect,
+
+        accuracy:
+          total
+            ? state.validation.correct/total
+            : null,
+
+        brier:
+          total
+            ? state.validation.brier/total
+            : null,
+
+        averageConfidence:
+          total
+            ? state.validation.confidenceSum/total
+            : null,
+
+        buckets:Object.fromEntries(
+          Object.entries(state.validation.buckets).map(([key,b])=>[
+            key,
+            {
+              n:b.n,
+              correct:b.correct,
+              accuracy:b.n?b.correct/b.n:null
+            }
+          ])
+        ),
+
+        strategies:{
+          riseFall:{
+            total:state.strategyValidation.riseFall.total,
+            accuracy:
+              state.strategyValidation.riseFall.total
+                ? state.strategyValidation.riseFall.correct/
+                  state.strategyValidation.riseFall.total
+                : null
+          },
+
+          even:{
+            total:state.strategyValidation.even.total,
+            accuracy:
+              state.strategyValidation.even.total
+                ? state.strategyValidation.even.correct/
+                  state.strategyValidation.even.total
+                : null
+          },
+
+          odd:{
+            total:state.strategyValidation.odd.total,
+            accuracy:
+              state.strategyValidation.odd.total
+                ? state.strategyValidation.odd.correct/
+                  state.strategyValidation.odd.total
+                : null
+          },
+
+          over8:{
+            total:state.strategyValidation.over8.total,
+            accuracy:
+              state.strategyValidation.over8.total
+                ? state.strategyValidation.over8.correct/
+                  state.strategyValidation.over8.total
+                : null
+          }
+        }
+      };
+    }
+
+
+    function onTick(input){
+
+      return addTick(input);
+    }
+
+
+    function allMarkets(){
+
+      const result=[];
+
+      for(const [symbol] of markets){
+        const snap=snapshot(symbol);
+
+        result.push(snap);
+      }
+
+      result.sort((a,b)=>{
+
+        const ac=a.bestSignal?.confidence||0;
+        const bc=b.bestSignal?.confidence||0;
+
+        return bc-ac;
+      });
+
+      return result;
+    }
+
+
+    function smartAI(){
+
+      const ranked=[];
+
+      for(const snapshot of allMarkets()){
+
+        if(!snapshot.ready){
+          ranked.push({
+            symbol:snapshot.symbol,
+            eligible:false,
+            score:0,
+            reason:'insufficient_data',
+            snapshot
+          });
+
+          continue;
+        }
+
+        const quality=snapshot.dataQuality;
+
+        if(quality.integrity<.985){
+
+          ranked.push({
+            symbol:snapshot.symbol,
+            eligible:false,
+            score:0,
+            reason:'data_quality',
+            snapshot
+          });
+
+          continue;
+        }
+
+        const best=snapshot.bestSignal;
+
+        if(!best||!best.actionable){
+
+          ranked.push({
+            symbol:snapshot.symbol,
+            eligible:false,
+            score:0,
+            reason:'no_actionable_edge',
+            snapshot
+          });
+
+          continue;
+        }
+
+        const validation=snapshot.validation;
+
+        const validationFactor=
+          validation.total>=30 && validation.accuracy!==null
+            ? clamp(
+                .5+
+                (validation.accuracy-.5)*1.5,
+                .35,
+                1
+              )
+            : .70;
+
+        const stability=
+          snapshot.features.direction.stability;
+
+        const regimePenalty=
+          snapshot.features.regime==='high_volatility'
+            ? .88
+            : snapshot.features.regime==='compression'
+              ? .94
+              : 1;
+
+        const score=
+          best.confidence*
+          quality.integrity*
+          (0.75+0.25*stability)*
+          validationFactor*
+          regimePenalty;
+
+        ranked.push({
+          symbol:snapshot.symbol,
+          eligible:score>=.56,
+          score,
+          strategy:best.strategy,
+          direction:best.direction,
+          confidence:best.confidence,
+          reason:best.reason,
+          regime:snapshot.features.regime,
+          validation,
+          snapshot
+        });
+      }
+
+      ranked.sort((a,b)=>b.score-a.score);
+
+      return ranked;
+    }
+
+
+    function reset(symbol){
+
+      if(symbol){
+        markets.set(symbol,createMarketState(symbol));
+      }else{
+        markets.clear();
+      }
+    }
+
+
+    return {
+      onTick,
+      snapshot,
+      allMarkets,
+      smartAI,
+      reset,
+
+      getMarketCount:()=>markets.size,
+
+      getStats:()=>({
+        markets:markets.size,
+        samples:[...markets.values()].reduce(
+          (sum,s)=>sum+s.accepted,
+          0
+        )
+      })
+    };
+  }
+
+  return {create};
+
+})();
+
+
+/* ============================================================
+   CASPER APPLICATION
+   ============================================================ */
+
+(()=>{
+  const $=s=>document.querySelector(s);
+  const $$=s=>[...document.querySelectorAll(s)];
+
+  const names={
+    "1HZ100V":"Volatility 100 (1s)",
+    "1HZ75V":"Volatility 75 (1s)",
+    "1HZ50V":"Volatility 50 (1s)",
+    "1HZ25V":"Volatility 25 (1s)",
+    "1HZ10V":"Volatility 10 (1s)",
+    "R_100":"Volatility 100 Index",
+    "R_75":"Volatility 75 Index",
+    "R_50":"Volatility 50 Index",
+    "R_25":"Volatility 25 Index",
+    "R_10":"Volatility 10 Index"
+  };
+
+  const symbols=Object.keys(names);
+
+  let ws=null;
+  let subIds=new Map();
+  let count=0;
+  let retryTimer=null;
+  let activeStrategy='Mix Both';
+
+  const pipSizes=new Map();
+
+  const casperEngine=window.CASPER_ENGINE.create({
+    maxTicks:1800
+  });
+
+  const market=$('#market');
+  const marketPremium=$('#marketPremium');
+
+  marketPremium.innerHTML=market.innerHTML;
+
+
+  function showToast(t){
+
+    const el=$('#toast');
+
+    el.textContent=t;
+    el.classList.remove('hidden');
+
+    clearTimeout(showToast.timer);
+
+    showToast.timer=setTimeout(()=>{
+      el.classList.add('hidden');
+    },3200);
+  }
+
+
+  function state(live=false){
+
+    $('#feedStatus').textContent=
+      live
+        ? 'Market data live'
+        : 'Waiting for market data';
+
+    $('#feedDot').classList.toggle('live',live);
+    $('#connDot').classList.toggle('live',live);
+
+    $('#connLabel').textContent=
+      live
+        ? 'Live market data'
+        : 'Waiting';
+
+    $('#rowState').textContent=
+      live
+        ? 'Live'
+        : 'Waiting';
+  }
+
+
+  function decimalPlaces(value){
+
+    const n=Number(value);
+
+    if(!Number.isFinite(n)||n<=0)return null;
+
+    if(Number.isInteger(n)&&n<=10)return n;
+
+    if(n<1){
+
+      const places=Math.round(-Math.log10(n));
+
+      return places>=0&&places<=10
+        ? places
+        : null;
+    }
+
+    return null;
+  }
+
+
+  function subscribeMarkets(){
+
+    if(!ws || ws.readyState!==WebSocket.OPEN)return;
+
+    subIds.clear();
+
+    for(const symbol of symbols){
+
+      try{
+
+        ws.send(JSON.stringify({
+          ticks:symbol,
+          subscribe:1
+        }));
+
+      }catch{}
+    }
+  }
+
+
+  function connect(){
+
+    try{
+
+      if(ws){
+
+        try{
+          ws.onclose=null;
+          ws.close();
+        }catch{}
+
+        ws=null;
+      }
+
+      clearTimeout(retryTimer);
+
+      state(false);
+
+      ws=new WebSocket(
+        'wss://api.derivws.com/trading/v1/options/ws/public'
+      );
+
+
+      ws.onopen=()=>{
+
+        state(false);
+
+        try{
+
+          ws.send(JSON.stringify({
+            active_symbols:'brief',
+            req_id:1
+          }));
+
+          subscribeMarkets();
+
+        }catch{
+          state(false);
+        }
+      };
+
+
+      ws.onmessage=e=>{
+
+        let d;
+
+        try{
+          d=JSON.parse(e.data);
+        }catch{
+          return;
+        }
+
+
+        if(d.error){
+
+          console.warn(
+            'Deriv feed error:',
+            d.error
+          );
+
+          state(false);
+
+          return;
+        }
+
+
+        if(
+          d.msg_type==='active_symbols' &&
+          Array.isArray(d.active_symbols)
+        ){
+
+          for(const item of d.active_symbols){
+
+            const symbol=
+              item.underlying_symbol ||
+              item.symbol;
+
+            const places=
+              decimalPlaces(
+                item.pip_size ??
+                item.pip
+              );
+
+            if(symbol&&places!==null){
+              pipSizes.set(symbol,places);
+            }
+          }
+
+          return;
+        }
+
+
+        if(d.msg_type==='tick'&&d.tick){
+
+          const q=Number(d.tick.quote);
+
+          if(!Number.isFinite(q))return;
+
+          const symbol=
+            d.tick.symbol ||
+            market.value;
+
+          const precision=
+            decimalPlaces(d.tick.pip_size) ??
+            pipSizes.get(symbol);
+
+          const quote=
+            precision===undefined ||
+            precision===null
+              ? String(d.tick.quote)
+              : q.toFixed(precision);
+
+          const digit=
+            precision===undefined ||
+            precision===null
+              ? '—'
+              : quote.slice(-1);
+
+          const epoch=
+            Number(d.tick.epoch) ||
+            Date.now()/1000;
+
+
+          const analysis=
+            casperEngine.onTick({
+              symbol,
+              quote:q,
+              epoch,
+              pipSize:precision
+            });
+
+
+          if(symbol===market.value){
+
+            count++;
+
+            $('#quote').textContent=quote;
+            $('#rowQuote').textContent=quote;
+
+            $('#lastDigit').textContent=digit;
+            $('#rowDigit').textContent=digit;
+
+            $('#tickCount').textContent=
+              count.toLocaleString();
+
+            $('#rowMarket').textContent=
+              names[symbol]||symbol;
+
+            state(true);
+
+            /*
+              Analysis is deliberately kept in the
+              engine rather than changing the UI layout.
+              This gives us a stable backend analysis
+              layer while preserving the screenshot UI.
+            */
+
+            if(activeStrategy==='Smart AI'){
+
+              const ranked=
+                casperEngine.smartAI();
+
+              const selected=
+                ranked.find(x=>x.eligible);
+
+              if(selected){
+
+                $('#runMessage').textContent=
+                  `Smart AI analysis active · ${names[selected.symbol]||selected.symbol} · ${selected.strategy} · ${selected.direction||''} · confidence ${(selected.confidence*100).toFixed(1)}% · validation only`;
+
+              }else{
+
+                $('#runMessage').textContent=
+                  'Smart AI is scanning all markets · no sufficiently validated edge yet.';
+              }
+
+            }else{
+
+              const best=
+                analysis?.bestSignal;
+
+              if(best){
+
+                if(best.actionable){
+
+                  $('#runMessage').textContent=
+                    `${best.strategy} analysis · ${best.direction||''} · confidence ${(best.confidence*100).toFixed(1)}% · validation only`;
+
+                }else{
+
+                  $('#runMessage').textContent=
+                    `Market analysis active · ${best.reason||'waiting for stronger conditions'}`;
+                }
+
+              }else{
+
+                $('#runMessage').textContent=
+                  'Building market sample for analysis…';
+              }
+            }
+          }
+        }
+      };
+
+
+      ws.onerror=()=>{
+
+        state(false);
+
+      };
+
+
+      ws.onclose=()=>{
+
+        state(false);
+
+        clearTimeout(retryTimer);
+
+        retryTimer=setTimeout(
+          connect,
+          2200
+        );
+      };
+
+
+    }catch{
+
+      state(false);
+
+      clearTimeout(retryTimer);
+
+      retryTimer=setTimeout(
+        connect,
+        3000
+      );
+    }
+  }
+
+
+  market.addEventListener('change',()=>{
+
+    const n=names[market.value];
+
+    $('#marketName').textContent=n;
+    $('#rowMarket').textContent=n;
+
+    marketPremium.value=market.value;
+
+    count=0;
+
+    $('#tickCount').textContent='0';
+
+    $('#quote').textContent='—';
+    $('#lastDigit').textContent='—';
+
+    $('#runMessage').textContent=
+      'Building a fresh analysis sample for the selected market…';
+
     connect();
-  })();
-  </script>
+  });
+
+
+  marketPremium.addEventListener(
+    'change',
+    ()=>{
+      market.value=marketPremium.value;
+      market.dispatchEvent(
+        new Event('change')
+      );
+    }
+  );
+
+
+  $$('.risk').forEach(b=>{
+
+    b.addEventListener('click',()=>{
+
+      $$('.risk').forEach(x=>
+        x.classList.remove('active')
+      );
+
+      b.classList.add('active');
+
+      const risk=b.dataset.risk;
+      const note=$('#riskNote');
+
+      note.classList.toggle(
+        'safe',
+        risk==='Low'
+      );
+
+      note.textContent=
+        `▱  ${risk} risk preset · stake escalation disabled during validation`;
+    });
+  });
+
+
+  $$('.strategy').forEach(b=>{
+
+    b.addEventListener('click',()=>{
+
+      const p=
+        b.closest('.premiumGrid')
+          ? 'premium'
+          : 'free';
+
+      if(
+        p==='premium' &&
+        !premiumOwner
+      ){
+
+        showToast(
+          'Premium controls are available to subscribed users and the site owner.'
+        );
+
+        return;
+      }
+
+      $$(`#${p} .strategy`).forEach(x=>
+        x.classList.remove('selected')
+      );
+
+      b.classList.add('selected');
+
+      activeStrategy=b.dataset.strategy;
+
+
+      if(activeStrategy==='Smart AI'){
+
+        $('#runMessage').textContent=
+          'Smart AI is scanning every connected market and waiting for validated signal conditions.';
+
+      }else{
+
+        $('#runMessage').textContent=
+          `${activeStrategy} analysis selected · collecting live validation data.`;
+      }
+
+
+      if(
+        p==='premium' &&
+        activeStrategy==='Auto Switcher'
+      ){
+
+        showToast(
+          'Auto Switcher manages Rise / Fall direction only.'
+        );
+      }
+    });
+  });
+
+
+  $$('.tab').forEach(b=>{
+
+    b.addEventListener('click',()=>{
+
+      $$('.tab').forEach(x=>
+        x.classList.remove('active')
+      );
+
+      b.classList.add('active');
+
+      $$('.panels').forEach(x=>
+        x.classList.remove('show')
+      );
+
+      $('#'+b.dataset.panel)
+        .classList.add('show');
+    });
+  });
+
+
+  /* ==========================================================
+     AUTH / ACCOUNT SYSTEM
+     ========================================================== */
+
+  let signedIn=false;
+  let premiumOwner=false;
+
+  const balanceSockets=new Map();
+  const balanceRetry=new Map();
+  const accountBalances=new Map();
+  const accountTypes=new Map();
+
+  let balanceGeneration=0;
+
+
+  function setAccountHeader(){
+
+    const id=$('#accountSelect').value;
+
+    const type=accountTypes.get(id);
+
+    const balance=accountBalances.get(id);
+
+    if(!id){
+
+      $('#balance').textContent=
+        '— USD';
+
+      $('#accountType').textContent=
+        signedIn
+          ? 'Choose a Deriv account'
+          : 'Not signed in';
+
+      return;
+    }
+
+    $('#balance').textContent=
+      typeof balance==='number'
+        ? `${balance.toFixed(2)} ${accountTypes.get(`${id}:currency`)||'USD'}`
+        : `— ${accountTypes.get(`${id}:currency`)||'USD'}`;
+
+    $('#accountType').textContent=
+      `${type==='demo'?'Demo':'Real'} account`;
+  }
+
+
+  function closeBalanceSockets(){
+
+    balanceGeneration++;
+
+    for(
+      const [id,socket]
+      of balanceSockets
+    ){
+
+      socket.onclose=null;
+
+      try{
+        socket.close();
+      }catch{}
+
+      balanceSockets.delete(id);
+    }
+
+    for(
+      const t
+      of balanceRetry.values()
+    ){
+      clearTimeout(t);
+    }
+
+    balanceRetry.clear();
+  }
+
+
+  async function openBalanceSocket(account){
+
+    const id=account.id;
+    const generation=balanceGeneration;
+
+    try{
+
+      const response=
+        await fetch(
+          '/auth/account-otp',
+          {
+            method:'POST',
+            credentials:'same-origin',
+            headers:{
+              'Content-Type':
+                'application/json'
+            },
+            body:JSON.stringify({
+              accountId:id
+            })
+          }
+        );
+
+      const payload=
+        await response.json();
+
+      if(
+        !response.ok ||
+        !payload.url
+      ){
+        throw new Error(
+          'balance connection unavailable'
+        );
+      }
+
+      if(
+        !signedIn ||
+        generation!==balanceGeneration
+      ){
+        return;
+      }
+
+      const socket=
+        new WebSocket(payload.url);
+
+      balanceSockets.set(
+        id,
+        socket
+      );
+
+
+      socket.onopen=()=>{
+
+        socket.send(
+          JSON.stringify({
+            balance:1,
+            subscribe:1
+          })
+        );
+      };
+
+
+      socket.onmessage=event=>{
+
+        let msg;
+
+        try{
+          msg=JSON.parse(event.data);
+        }catch{
+          return;
+        }
+
+        if(msg.error)return;
+
+        const data=
+          msg.balance ||
+          msg;
+
+        const amount=
+          Number(data.balance);
+
+        if(Number.isFinite(amount)){
+
+          accountBalances.set(
+            id,
+            amount
+          );
+
+          if(data.currency){
+
+            accountTypes.set(
+              `${id}:currency`,
+              data.currency
+            );
+          }
+
+          if(
+            $('#accountSelect').value===id
+          ){
+
+            setAccountHeader();
+          }
+
+          const option=
+            $$('#accountSelect option')
+              .find(o=>o.value===id);
+
+          if(option){
+
+            option.textContent=
+              `${accountTypes.get(id)==='demo'?'Demo':'Real'} · ${accountTypes.get(`${id}:currency`)||'USD'} · ${amount.toFixed(2)}`;
+          }
+        }
+      };
+
+
+      socket.onerror=()=>{};
+
+
+      socket.onclose=()=>{
+
+        balanceSockets.delete(id);
+
+        if(
+          signedIn &&
+          accountTypes.has(id)
+        ){
+
+          clearTimeout(
+            balanceRetry.get(id)
+          );
+
+          balanceRetry.set(
+            id,
+            setTimeout(
+              ()=>openBalanceSocket(account),
+              3500
+            )
+          );
+        }
+      };
+
+
+    }catch{
+
+      if(
+        signedIn &&
+        generation===balanceGeneration &&
+        accountTypes.has(id)
+      ){
+
+        clearTimeout(
+          balanceRetry.get(id)
+        );
+
+        balanceRetry.set(
+          id,
+          setTimeout(
+            ()=>openBalanceSocket(account),
+            5000
+          )
+        );
+      }
+    }
+  }
+
+
+  const githubPages=
+    location.hostname.endsWith('.github.io');
+
+
+  async function loadSession(){
+
+    if(githubPages){
+
+      signedIn=false;
+
+      $('#loginBtn').textContent=
+        'Login with Deriv';
+
+      setAccountHeader();
+
+      return;
+    }
+
+
+    try{
+
+      const r=
+        await fetch(
+          '/auth/session',
+          {
+            credentials:'same-origin',
+            headers:{
+              Accept:
+                'application/json'
+            }
+          }
+        );
+
+      const data=
+        await r.json();
+
+      if(!r.ok){
+
+        throw new Error(
+          data.error ||
+          'Could not check your Deriv session.'
+        );
+      }
+
+
+      signedIn=
+        Boolean(
+          data.authenticated
+        );
+
+      premiumOwner=
+        Boolean(
+          data.premiumOwner
+        );
+
+
+      $('#loginBtn').textContent=
+        signedIn
+          ? 'Sign out'
+          : 'Login with Deriv';
+
+
+      $('#accountSelect').classList.toggle(
+        'hidden',
+        !signedIn ||
+        !data.accounts?.length
+      );
+
+
+      $('#ownerPanel').classList.toggle(
+        'hidden',
+        !premiumOwner
+      );
+
+
+      $('#unlockBtn').textContent=
+        premiumOwner
+          ? '♛  Owner Premium active'
+          : '♛  Premium access';
+
+
+      $('#premiumSubtitle').textContent=
+        premiumOwner
+          ? 'Owner access enabled for this Deriv account'
+          : 'Premium access for subscribed accounts';
+
+
+      $('#ownerStatus').textContent=
+        premiumOwner
+          ? 'This Deriv account is on the private owner allowlist. Premium strategy controls are unlocked; automated orders remain disabled during validation.'
+          : 'Owner access is granted only when your Deriv account ID is on the server allowlist.';
+
+
+      $$('#premium .strategy').forEach(button=>{
+
+        button.disabled=!premiumOwner;
+
+        button.classList.toggle(
+          'locked',
+          !premiumOwner
+        );
+      });
+
+
+      if(signedIn){
+
+        const accounts=
+          data.accounts||[];
+
+        closeBalanceSockets();
+
+        accountBalances.clear();
+        accountTypes.clear();
+
+        const accountSelect=
+          $('#accountSelect');
+
+        accountSelect.replaceChildren(
+          new Option(
+            'Choose account…',
+            ''
+          )
+        );
+
+
+        accounts.forEach(a=>{
+
+          accountTypes.set(
+            a.id,
+            a.type
+          );
+
+          accountTypes.set(
+            `${a.id}:currency`,
+            a.currency||'USD'
+          );
+
+          if(
+            typeof a.balance==='number'
+          ){
+
+            accountBalances.set(
+              a.id,
+              a.balance
+            );
+          }
+
+
+          accountSelect.add(
+            new Option(
+              `${a.type==='demo'?'Demo':'Real'} · ${a.currency||'USD'} · ${typeof a.balance==='number'?a.balance.toFixed(2):'—'}`,
+              a.id
+            )
+          );
+        });
+
+
+        $('#accountSelect').value=
+          data.activeAccountId||'';
+
+
+        accounts.forEach(
+          openBalanceSocket
+        );
+
+
+        setAccountHeader();
+
+
+      }else{
+
+        premiumOwner=false;
+
+        closeBalanceSockets();
+
+        $('#accountSelect').innerHTML='';
+
+        setAccountHeader();
+
+        $('#ownerPanel')
+          .classList.add('hidden');
+
+        $('#unlockBtn').textContent=
+          '♛  Premium access';
+
+        $('#premiumSubtitle').textContent=
+          'Premium access for subscribed accounts';
+
+        $$('#premium .strategy')
+          .forEach(button=>{
+
+            button.disabled=true;
+
+            button.classList.add(
+              'locked'
+            );
+          });
+      }
+
+
+    }catch(e){
+
+      signedIn=false;
+      premiumOwner=false;
+
+      closeBalanceSockets();
+
+      $('#ownerPanel')
+        .classList.add('hidden');
+
+      $$('#premium .strategy')
+        .forEach(button=>{
+
+          button.disabled=true;
+
+          button.classList.add(
+            'locked'
+          );
+        });
+
+      $('#loginBtn').textContent=
+        'Login with Deriv';
+
+      setAccountHeader();
+    }
+  }
+
+
+  $('#loginBtn').addEventListener(
+    'click',
+    async()=>{
+
+      if(!signedIn){
+
+        if(githubPages){
+
+          showToast(
+            'Secure Deriv login needs the Node.js server deployed with this site.'
+          );
+
+          return;
+        }
+
+        location.assign(
+          '/auth/login'
+        );
+
+        return;
+      }
+
+
+      try{
+
+        const r=
+          await fetch(
+            '/auth/logout',
+            {
+              method:'POST',
+              credentials:'same-origin',
+              headers:{
+                'Content-Type':
+                  'application/json'
+              }
+            }
+          );
+
+        if(!r.ok){
+          throw new Error();
+        }
+
+        await loadSession();
+
+        showToast(
+          'Signed out of Deriv.'
+        );
+
+      }catch{
+
+        showToast(
+          'Could not sign out. Reload and try again.'
+        );
+      }
+    }
+  );
+
+
+  $('#accountSelect').addEventListener(
+    'change',
+    async e=>{
+
+      if(!e.target.value){
+
+        setAccountHeader();
+
+        return;
+      }
+
+      try{
+
+        const r=
+          await fetch(
+            '/auth/account',
+            {
+              method:'POST',
+              credentials:'same-origin',
+              headers:{
+                'Content-Type':
+                  'application/json'
+              },
+              body:JSON.stringify({
+                accountId:
+                  e.target.value
+              })
+            }
+          );
+
+        const data=
+          await r.json();
+
+        if(!r.ok){
+
+          throw new Error(
+            data.error
+          );
+        }
+
+        setAccountHeader();
+
+      }catch(err){
+
+        showToast(
+          err.message ||
+          'Could not change account.'
+        );
+      }
+    }
+  );
+
+
+  if(
+    new URLSearchParams(
+      location.search
+    ).has('login')
+  ){
+
+    showToast(
+      'Deriv sign-in did not complete. You can try again.'
+    );
+
+    history.replaceState(
+      {},
+      '',
+      location.pathname
+    );
+  }
+
+
+  $('#unlockBtn').addEventListener(
+    'click',
+    ()=>{
+      showToast(
+        premiumOwner
+          ? 'Owner Premium access is active.'
+          : 'Premium subscription access is not configured yet.'
+      );
+    }
+  );
+
+
+  $('#runBtn').addEventListener(
+    'click',
+    ()=>{
+
+      const vals=[
+        '#stake',
+        '#target',
+        '#maxloss'
+      ].map(
+        s=>Number($(s).value)
+      );
+
+
+      if(
+        vals.some(
+          v=>!Number.isFinite(v)||v<=0
+        )
+      ){
+
+        showToast(
+          'Enter positive stake and risk limits first.'
+        );
+
+        return;
+      }
+
+
+      if(
+        !signedIn ||
+        !$('#accountSelect').value
+      ){
+
+        showToast(
+          'Sign in and choose a Deriv demo or real account first.'
+        );
+
+        return;
+      }
+
+
+      showToast(
+        'Analysis is active, but order execution remains disabled during validation.'
+      );
+    }
+  );
+
+
+  $('#premiumRunBtn').addEventListener(
+    'click',
+    ()=>{
+
+      if(!premiumOwner){
+
+        showToast(
+          'Premium access is not enabled for this account.'
+        );
+
+        return;
+      }
+
+      showToast(
+        'Premium analysis is running in validation mode. No order was sent.'
+      );
+    }
+  );
+
+
+  $('#themeBtn').addEventListener(
+    'click',
+    ()=>{
+
+      document.body.classList.toggle(
+        'light'
+      );
+
+      if(
+        document.body.classList.contains(
+          'light'
+        )
+      ){
+
+        document.documentElement.style.setProperty(
+          '--bg',
+          '#eef4f6'
+        );
+
+        document.documentElement.style.setProperty(
+          '--panel',
+          '#fff'
+        );
+
+        document.documentElement.style.setProperty(
+          '--panel2',
+          '#f6fbfc'
+        );
+
+        document.documentElement.style.setProperty(
+          '--text',
+          '#142b35'
+        );
+
+        document.documentElement.style.setProperty(
+          '--line',
+          '#cbdde2'
+        );
+
+      }else{
+
+        [
+          '--bg',
+          '--panel',
+          '--panel2',
+          '--text',
+          '--line'
+        ].forEach(k=>
+          document.documentElement.style.removeProperty(k)
+        );
+      }
+    }
+  );
+
+
+  /* ==========================================================
+     STARTUP
+     ========================================================== */
+
+  loadSession();
+
+  /*
+    Automatic market-data startup.
+    No Connect button is required.
+  */
+  connect();
+
+
+  /*
+    Development diagnostics.
+    These are available from the browser console:
+
+      CASPER_ENGINE_STATE()
+
+    and:
+
+      CASPER_SMART_SCAN()
+
+    They do not alter the UI or execute trades.
+  */
+
+  window.CASPER_ENGINE_STATE=()=>{
+
+    return casperEngine.getStats();
+  };
+
+
+  window.CASPER_SMART_SCAN=()=>{
+
+    return casperEngine.smartAI();
+  };
+
+
+  console.info(
+    '[CASPER] Analysis engine initialized.'
+  );
+
+  console.info(
+    '[CASPER] Live multi-market validation active.'
+  );
+
+})();
+</script>
+
 </body>
 </html>
