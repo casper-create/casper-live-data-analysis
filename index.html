@@ -95,11 +95,33 @@
       display:flex;
       align-items:center;
       gap:13px;
-      min-width:205px
+      min-width:225px;
+      position:relative;
+      padding-right:38px;
+      overflow:hidden
     }
 
-    .flag{font-size:22px}
-    .bal{color:var(--green);font-weight:800}
+    .flag{font-size:22px;line-height:1}
+    .bal{color:var(--green);font-weight:800;white-space:nowrap}
+    .accountChevron{
+      position:absolute;
+      right:13px;
+      top:50%;
+      transform:translateY(-50%);
+      color:var(--muted);
+      font-size:18px;
+      pointer-events:none
+    }
+
+    #accountSelect{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      opacity:0;
+      cursor:pointer;
+      z-index:3
+    }
 
     .account small{
       display:block;
@@ -498,6 +520,138 @@
     }
 
     .right{text-align:right}
+
+
+    .transactions{
+      margin-top:22px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      overflow:hidden;
+      background:var(--panel)
+    }
+
+    .transactionsHead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:14px 16px;
+      border-bottom:1px solid var(--line);
+      background:#0b2630
+    }
+
+    .transactionsTitle{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-weight:800
+    }
+
+    .transactionsActions{
+      display:flex;
+      gap:8px
+    }
+
+    .txbtn{
+      border:1px solid var(--line);
+      background:var(--panel2);
+      color:var(--text);
+      border-radius:9px;
+      padding:8px 12px;
+      font-size:12px;
+      font-weight:750
+    }
+
+    .txbtn.stop{
+      border-color:#7b3344;
+      color:#ff8da1
+    }
+
+    .txbtn.reset{
+      color:var(--muted)
+    }
+
+    .txlist{
+      max-height:300px;
+      overflow:auto
+    }
+
+    .txempty{
+      padding:24px 16px;
+      text-align:center;
+      color:var(--muted);
+      font-size:13px
+    }
+
+    .txrow{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:12px;
+      padding:13px 16px;
+      border-top:1px solid #12323c;
+      align-items:center
+    }
+
+    .txrow:first-child{border-top:0}
+
+    .txmarket{
+      font-weight:750;
+      font-size:14px
+    }
+
+    .txmeta{
+      color:var(--muted);
+      font-size:11px;
+      margin-top:4px
+    }
+
+    .txpl{
+      font-weight:900;
+      font-variant-numeric:tabular-nums;
+      text-align:right;
+      white-space:nowrap
+    }
+
+    .txpl.win{color:var(--green)}
+    .txpl.loss{color:var(--red)}
+    .txpl.flat{color:var(--muted)}
+
+    .txstats{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      border-top:1px solid var(--line);
+      background:#081d24
+    }
+
+    .txstat{
+      padding:12px 10px;
+      border-right:1px solid var(--line);
+      min-width:0
+    }
+
+    .txstat:nth-child(3n){border-right:0}
+
+    .txstat small{
+      display:block;
+      color:var(--muted);
+      font-size:10px;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      margin-bottom:4px
+    }
+
+    .txstat strong{
+      display:block;
+      font-size:15px;
+      font-variant-numeric:tabular-nums;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis
+    }
+
+    .txstat strong.good{color:var(--green)}
+    .txstat strong.bad{color:var(--red)}
+
     .panels{display:none}
     .panels.show{display:block}
 
@@ -589,10 +743,13 @@
       .topactions{gap:5px}
       .topbar{height:70px}
       .login{padding:10px}
-      .account .flag{display:none}
-      .account{font-size:13px}
+      .account{font-size:13px;min-width:190px;padding:9px 34px 9px 10px}
+      .flag{font-size:19px}
       .premiumGrid{grid-template-columns:1fr}
       .tab{padding:12px 6px}
+      .txstats{grid-template-columns:repeat(2,1fr)}
+      .txstat:nth-child(3n){border-right:1px solid var(--line)}
+      .txstat:nth-child(2n){border-right:0}
       .strategy{min-height:78px}
       .riskset{gap:5px}
       .risk{padding:14px 4px}
@@ -615,11 +772,12 @@
     <button class="iconbtn" id="themeBtn" aria-label="Toggle theme">☼</button>
 
     <div class="account">
-      <span class="flag">◉</span>
+      <span class="flag">🇺🇸</span>
       <div>
         <span class="bal" id="balance">— USD</span>
         <small id="accountType">Choose a Deriv account</small>
-        <select id="accountSelect" class="hidden" aria-label="Choose Deriv account"></select>
+        <select id="accountSelect" aria-label="Choose Deriv account"></select>
+        <span class="accountChevron">⌄</span>
       </div>
     </div>
 
@@ -818,6 +976,27 @@
 
   </div>
 
+  <div class="transactions" id="transactionsFree">
+    <div class="transactionsHead">
+      <div class="transactionsTitle">☷ &nbsp;Transactions</div>
+      <div class="transactionsActions">
+        <button class="txbtn stop" id="stopFree" type="button">■ Stop</button>
+        <button class="txbtn reset" id="resetFree" type="button">↻ Reset</button>
+      </div>
+    </div>
+    <div class="txlist" id="txListFree">
+      <div class="txempty">No Demo transactions yet.</div>
+    </div>
+    <div class="txstats">
+      <div class="txstat"><small>Total Stake</small><strong id="txStakeFree">0.00 USD</strong></div>
+      <div class="txstat"><small>Total Payout</small><strong id="txPayoutFree">0.00 USD</strong></div>
+      <div class="txstat"><small>No. of Runs</small><strong id="txRunsFree">0</strong></div>
+      <div class="txstat"><small>Contracts Lost</small><strong id="txLossesFree" class="bad">0</strong></div>
+      <div class="txstat"><small>Contracts Won</small><strong id="txWinsFree" class="good">0</strong></div>
+      <div class="txstat"><small>Total P/L</small><strong id="txPLFree">0.00 USD</strong></div>
+    </div>
+  </div>
+
 </section>
 
 
@@ -946,6 +1125,27 @@
 
   <div class="message" id="premiumMessage">
     Premium subscription access is not configured yet. No Premium orders are enabled.
+  </div>
+
+  <div class="transactions" id="transactionsPremium">
+    <div class="transactionsHead">
+      <div class="transactionsTitle">☷ &nbsp;Transactions</div>
+      <div class="transactionsActions">
+        <button class="txbtn stop" id="stopPremium" type="button">■ Stop</button>
+        <button class="txbtn reset" id="resetPremium" type="button">↻ Reset</button>
+      </div>
+    </div>
+    <div class="txlist" id="txListPremium">
+      <div class="txempty">No Demo transactions yet.</div>
+    </div>
+    <div class="txstats">
+      <div class="txstat"><small>Total Stake</small><strong id="txStakePremium">0.00 USD</strong></div>
+      <div class="txstat"><small>Total Payout</small><strong id="txPayoutPremium">0.00 USD</strong></div>
+      <div class="txstat"><small>No. of Runs</small><strong id="txRunsPremium">0</strong></div>
+      <div class="txstat"><small>Contracts Lost</small><strong id="txLossesPremium" class="bad">0</strong></div>
+      <div class="txstat"><small>Contracts Won</small><strong id="txWinsPremium" class="good">0</strong></div>
+      <div class="txstat"><small>Total P/L</small><strong id="txPLPremium">0.00 USD</strong></div>
+    </div>
   </div>
 
 </section>
@@ -2650,11 +2850,17 @@ window.CASPER_ENGINE = (() => {
 
   let demoSessionPL=0;
 
+  let demoSessionStake=0;
+
+  let demoSessionPayout=0;
+
   let demoSessionTrades=0;
 
   let demoSessionWins=0;
 
   let demoSessionLosses=0;
+
+  let demoTradingStopped=false;
 
   let demoSessionStarted=
     new Date().toISOString();
@@ -3082,6 +3288,13 @@ window.CASPER_ENGINE = (() => {
 
   function demoRiskStatus(){
 
+    if(demoTradingStopped){
+      return {
+        blocked:true,
+        reason:'Demo trading is stopped. Press Reset to start again.'
+      };
+    }
+
     const target=
       numericInput('#target');
 
@@ -3242,19 +3455,112 @@ window.CASPER_ENGINE = (() => {
         history.slice(0,100)
       )
     );
+
+    renderTransactions();
   }
 
 
-  function resetDemoSession(){
+  function formatMoney(value,currency='USD'){
+    const n=Number(value);
+    return `${Number.isFinite(n)?n.toFixed(2):'0.00'} ${currency}`;
+  }
+
+
+  function renderTransactionList(targetId){
+
+    const list=$(targetId);
+    if(!list)return;
+
+    const history=readDemoHistory().slice(0,12);
+
+    if(!history.length){
+      list.innerHTML='<div class="txempty">No Demo transactions yet.</div>';
+      return;
+    }
+
+    list.innerHTML=history.map(record=>{
+      const pl=Number(record.profit)||0;
+      const cls=pl>0?'win':pl<0?'loss':'flat';
+      const sign=pl>0?'+':'';
+      const time=record.timestamp
+        ? new Date(record.timestamp).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+        : '--:--';
+      const result=record.status==='won'?'WIN':record.status==='lost'?'LOSS':'CLOSED';
+      return `
+        <div class="txrow">
+          <div>
+            <div class="txmarket">${record.marketName||record.market||'Deriv market'}</div>
+            <div class="txmeta">${time} · Stake ${formatMoney(record.stake,record.currency||'USD')} · ${record.strategy||'Strategy'} · ${record.direction||''} · ${result}</div>
+          </div>
+          <div class="txpl ${cls}">${sign}${pl.toFixed(2)} ${record.currency||'USD'}</div>
+        </div>`;
+    }).join('');
+  }
+
+
+  function renderTransactionStats(prefix){
+
+    const currency=
+      accountTypes.get(`${selectedAccountId()}:currency`)||'USD';
+
+    $(`#txStake${prefix}`).textContent=
+      formatMoney(demoSessionStake,currency);
+
+    $(`#txPayout${prefix}`).textContent=
+      formatMoney(demoSessionPayout,currency);
+
+    $(`#txRuns${prefix}`).textContent=
+      String(demoSessionTrades);
+
+    $(`#txLosses${prefix}`).textContent=
+      String(demoSessionLosses);
+
+    $(`#txWins${prefix}`).textContent=
+      String(demoSessionWins);
+
+    const pl=$(`#txPL${prefix}`);
+    pl.textContent=
+      `${demoSessionPL>=0?'+':''}${demoSessionPL.toFixed(2)} ${currency}`;
+    pl.classList.toggle('good',demoSessionPL>0);
+    pl.classList.toggle('bad',demoSessionPL<0);
+  }
+
+
+  function renderTransactions(){
+    renderTransactionList('#txListFree');
+    renderTransactionList('#txListPremium');
+    renderTransactionStats('Free');
+    renderTransactionStats('Premium');
+  }
+
+
+  function resetDemoSession(clearHistory=true){
 
     demoSessionPL=0;
+    demoSessionStake=0;
+    demoSessionPayout=0;
     demoSessionTrades=0;
     demoSessionWins=0;
     demoSessionLosses=0;
     demoSessionStarted=
       new Date().toISOString();
+    demoTradingStopped=false;
 
+    if(clearHistory){
+      localStorage.removeItem(DEMO_HISTORY_KEY);
+    }
+
+    renderTransactions();
     updateRunButton();
+  }
+
+
+  function stopDemoTrading(){
+    demoTradingStopped=true;
+    updateRunButton();
+    $('#runMessage').textContent=
+      'Demo trading stopped. Press Reset to start a new session.';
+    showToast('Demo trading stopped');
   }
 
 
@@ -3956,9 +4262,19 @@ window.CASPER_ENGINE = (() => {
           ? safeProfit
           : 0;
 
-      demoSessionTrades++;
+      const payoutValue=
+        Number(finalContract.payout);
 
-      demoSessionPL+=finalPL;
+      const safePayout=
+        Number.isFinite(payoutValue)
+          ? Math.max(0,payoutValue)
+          : Math.max(0,stake+finalPL);
+
+      demoSessionTrades++;
+      demoSessionStake+=stake;
+      demoSessionPayout+=safePayout;
+      demoSessionPL=
+        demoSessionPayout-demoSessionStake;
 
       if(finalPL>0){
         demoSessionWins++;
@@ -4001,8 +4317,7 @@ window.CASPER_ENGINE = (() => {
         buyPrice:
           Number(finalContract.buy_price)||askPrice,
 
-        payout:
-          Number(finalContract.payout)||null,
+        payout:safePayout,
 
         entrySpot:
           Number(finalContract.entry_spot)||null,
@@ -4017,6 +4332,10 @@ window.CASPER_ENGINE = (() => {
           (finalPL>0?'won':'lost'),
 
         sessionPL:demoSessionPL,
+
+        sessionStake:demoSessionStake,
+
+        sessionPayout:demoSessionPayout,
 
         sessionTrades:demoSessionTrades,
 
@@ -4553,6 +4872,32 @@ window.CASPER_ENGINE = (() => {
       );
     }
   );
+
+
+  /* ==========================================================
+     SHARED TRANSACTION CONTROLS
+     ========================================================== */
+
+  $('#stopFree').addEventListener('click',stopDemoTrading);
+  $('#stopPremium').addEventListener('click',stopDemoTrading);
+
+  $('#resetFree').addEventListener('click',()=>{
+    resetDemoSession(true);
+    $('#runMessage').textContent=
+      'Demo transaction session reset · waiting for a qualifying signal.';
+    showToast('Demo transactions reset');
+  });
+
+  $('#resetPremium').addEventListener('click',()=>{
+    resetDemoSession(true);
+    $('#premiumMessage').textContent=
+      premiumOwner
+        ? 'Premium session reset · Premium execution remains disabled until configured.'
+        : 'Premium subscription access is not configured yet. No Premium orders are enabled.';
+    showToast('Demo transactions reset');
+  });
+
+  renderTransactions();
 
 
   /* ==========================================================
@@ -5359,6 +5704,10 @@ window.CASPER_ENGINE = (() => {
 
     trades:demoSessionTrades,
 
+    stake:demoSessionStake,
+
+    payout:demoSessionPayout,
+
     wins:demoSessionWins,
 
     losses:demoSessionLosses,
@@ -5392,6 +5741,8 @@ window.CASPER_ENGINE = (() => {
   console.info(
     '[CASPER] Premium execution is disabled until Premium access is configured.'
   );
+
+  renderTransactions();
 
   console.info(
     '[CASPER] Demo trade history:',
