@@ -353,6 +353,14 @@
       border-color:var(--cyan)
     }
 
+    .control select:disabled{
+      opacity:1;
+      color:#fff;
+      border-color:var(--cyan);
+      background:#0d3039;
+      cursor:not-allowed
+    }
+
     .riskset{
       display:grid;
       grid-template-columns:repeat(3,1fr);
@@ -990,22 +998,23 @@
 /* ============================================================
    CASPER / NEXORA AI ANALYSIS ENGINE
    ------------------------------------------------------------
-   Purpose:
-   - live market state
-   - feature extraction
-   - regime detection
-   - strategy signals
-   - Smart AI ranking
-   - pre-outcome validation
-   - data quality
-   - calibration buckets
-   - NO trade execution
+   Live multi-market analysis
+   Forward validation
+   Strategy-specific validation
+   Smart AI market ranking
+   NO trade execution
    ============================================================ */
 
 window.CASPER_ENGINE = (() => {
 
   const DEFAULT_MAX_TICKS = 1800;
   const MIN_TICKS = 60;
+
+  /*
+    Historical validation is only allowed to influence Smart AI
+    strongly after a meaningful number of observations exists.
+  */
+  const VALIDATION_MINIMUM = 30;
 
   const clamp = (v,min,max) =>
     Math.max(min,Math.min(max,v));
@@ -1024,7 +1033,9 @@ window.CASPER_ENGINE = (() => {
   const stdev = arr => Math.sqrt(variance(arr));
 
   const slope = arr => {
+
     const n=arr.length;
+
     if(n<3)return 0;
 
     const xMean=(n-1)/2;
@@ -1034,6 +1045,7 @@ window.CASPER_ENGINE = (() => {
     let den=0;
 
     for(let i=0;i<n;i++){
+
       num+=(i-xMean)*(arr[i]-yMean);
       den+=(i-xMean)*(i-xMean);
     }
@@ -1041,20 +1053,30 @@ window.CASPER_ENGINE = (() => {
     return den?num/den:0;
   };
 
-  const sigmoid = x => 1/(1+Math.exp(-x));
+  const sigmoid = x =>
+    1/(1+Math.exp(-x));
+
 
   function createMarketState(symbol){
 
     return {
+
       symbol,
+
       ticks:[],
+
       lastEpoch:null,
+
       lastQuote:null,
+
       lastDigit:null,
 
       accepted:0,
+
       duplicates:0,
+
       outOfOrder:0,
+
       invalid:0,
 
       predictions:[],
@@ -1065,6 +1087,7 @@ window.CASPER_ENGINE = (() => {
         incorrect:0,
         brier:0,
         confidenceSum:0,
+
         buckets:{
           low:{n:0,correct:0},
           medium:{n:0,correct:0},
@@ -1073,10 +1096,31 @@ window.CASPER_ENGINE = (() => {
       },
 
       strategyValidation:{
-        riseFall:{total:0,correct:0},
-        even:{total:0,correct:0},
-        odd:{total:0,correct:0},
-        over8:{total:0,correct:0}
+
+        riseFall:{
+          total:0,
+          correct:0
+        },
+
+        even:{
+          total:0,
+          correct:0
+        },
+
+        odd:{
+          total:0,
+          correct:0
+        },
+
+        over8:{
+          total:0,
+          correct:0
+        },
+
+        match:{
+          total:0,
+          correct:0
+        }
       }
     };
   }
@@ -1084,13 +1128,20 @@ window.CASPER_ENGINE = (() => {
 
   function create(options={}){
 
-    const maxTicks=Number(options.maxTicks)||DEFAULT_MAX_TICKS;
+    const maxTicks=
+      Number(options.maxTicks)||
+      DEFAULT_MAX_TICKS;
+
     const markets=new Map();
+
 
     function get(symbol){
 
       if(!markets.has(symbol)){
-        markets.set(symbol,createMarketState(symbol));
+        markets.set(
+          symbol,
+          createMarketState(symbol)
+        );
       }
 
       return markets.get(symbol);
@@ -1099,61 +1150,129 @@ window.CASPER_ENGINE = (() => {
 
     function addTick(input){
 
-      const symbol=String(input.symbol||'').trim();
+      const symbol=
+        String(input.symbol||'').trim();
 
-      const quote=Number(input.quote);
-      const epoch=Number(input.epoch);
+      const quote=
+        Number(input.quote);
 
-      if(!symbol || !Number.isFinite(quote)){
+      const epoch=
+        Number(input.epoch);
+
+
+      if(
+        !symbol||
+        !Number.isFinite(quote)
+      ){
         return null;
       }
 
+
       const state=get(symbol);
 
-      if(state.lastEpoch!==null && epoch===state.lastEpoch){
+
+      if(
+        state.lastEpoch!==null &&
+        epoch===state.lastEpoch
+      ){
+
         state.duplicates++;
+
         return snapshot(symbol);
       }
 
-      if(state.lastEpoch!==null && epoch<state.lastEpoch){
+
+      if(
+        state.lastEpoch!==null &&
+        epoch<state.lastEpoch
+      ){
+
         state.outOfOrder++;
+
         return snapshot(symbol);
       }
+
 
       if(!Number.isFinite(epoch)){
+
         state.invalid++;
+
         return snapshot(symbol);
       }
 
-      let precision=Number(input.pipSize);
 
-      if(!Number.isFinite(precision) || precision<0){
+      let precision=
+        Number(input.pipSize);
+
+
+      if(
+        !Number.isFinite(precision)||
+        precision<0
+      ){
         precision=2;
       }
 
+
       let text;
 
+
       if(Number.isInteger(precision)){
-        text=quote.toFixed(clamp(precision,0,10));
+
+        text=
+          quote.toFixed(
+            clamp(precision,0,10)
+          );
+
       }else{
+
         text=String(quote);
       }
 
-      const parts=text.split('.');
-      const lastChar=(parts[1]||parts[0]).slice(-1);
-      const digit=Number(lastChar);
 
-      if(!Number.isInteger(digit)||digit<0||digit>9){
+      const parts=text.split('.');
+
+      const lastChar=
+        (parts[1]||parts[0]).slice(-1);
+
+      const digit=
+        Number(lastChar);
+
+
+      if(
+        !Number.isInteger(digit)||
+        digit<0||
+        digit>9
+      ){
+
         state.invalid++;
+
         return snapshot(symbol);
       }
 
-      const previousQuote=state.lastQuote;
+
+      /*
+        Important ordering:
+
+        1. Validate old predictions against the NEW tick.
+        2. Build the NEW snapshot.
+        3. Register predictions using the NEW snapshot.
+
+        Therefore a prediction can never validate against the
+        same tick that created it.
+      */
+
+      const previousQuote=
+        state.lastQuote;
+
 
       state.ticks.push({
+
         quote,
+
         epoch,
+
         digit,
+
         direction:
           previousQuote===null
             ? 0
@@ -1164,20 +1283,35 @@ window.CASPER_ENGINE = (() => {
                 : 0
       });
 
+
       state.lastEpoch=epoch;
+
       state.lastQuote=quote;
+
       state.lastDigit=digit;
+
       state.accepted++;
 
-      while(state.ticks.length>maxTicks){
+
+      while(
+        state.ticks.length>maxTicks
+      ){
         state.ticks.shift();
       }
 
+
       resolvePredictions(state);
 
-      const result=snapshot(symbol);
 
-      registerPredictions(state,result);
+      const result=
+        snapshot(symbol);
+
+
+      registerPredictions(
+        state,
+        result
+      );
+
 
       return result;
     }
@@ -1210,90 +1344,160 @@ window.CASPER_ENGINE = (() => {
 
     function digitDistribution(digits){
 
-      const counts=Array(10).fill(0);
+      const counts=
+        Array(10).fill(0);
+
 
       for(const d of digits){
-        if(Number.isInteger(d)&&d>=0&&d<=9){
+
+        if(
+          Number.isInteger(d)&&
+          d>=0&&
+          d<=9
+        ){
           counts[d]++;
         }
       }
 
-      const total=digits.length||1;
+
+      const total=
+        digits.length||1;
+
 
       return {
+
         counts,
-        probabilities:counts.map(v=>v/total)
+
+        probabilities:
+          counts.map(
+            v=>v/total
+          )
       };
     }
 
 
     function calculateFeatures(state){
 
-      const ticks=state.ticks;
+      const ticks=
+        state.ticks;
+
 
       if(ticks.length<MIN_TICKS){
+
         return {
+
           ready:false,
+
           sample:ticks.length,
+
           minRequired:MIN_TICKS
         };
       }
 
-      const q20=windowQuotes(state,20);
-      const q50=windowQuotes(state,50);
-      const q100=windowQuotes(state,100);
 
-      const d20=windowDigits(state,20);
-      const d50=windowDigits(state,50);
-      const d100=windowDigits(state,100);
+      const q20=
+        windowQuotes(state,20);
 
-      const dir20=windowDirections(state,20);
-      const dir50=windowDirections(state,50);
+      const q50=
+        windowQuotes(state,50);
 
-      const mean20=mean(q20);
-      const mean50=mean(q50);
+      const q100=
+        windowQuotes(state,100);
 
-      const volatility20=stdev(q20);
-      const volatility50=stdev(q50);
 
-      const slope20=slope(q20);
-      const slope50=slope(q50);
+      const d20=
+        windowDigits(state,20);
 
-      const direction20=mean(dir20);
-      const direction50=mean(dir50);
+      const d50=
+        windowDigits(state,50);
+
+      const d100=
+        windowDigits(state,100);
+
+
+      const dir20=
+        windowDirections(state,20);
+
+      const dir50=
+        windowDirections(state,50);
+
+
+      const mean20=
+        mean(q20);
+
+      const mean50=
+        mean(q50);
+
+
+      const volatility20=
+        stdev(q20);
+
+      const volatility50=
+        stdev(q50);
+
+
+      const slope20=
+        slope(q20);
+
+      const slope50=
+        slope(q50);
+
+
+      const direction20=
+        mean(dir20);
+
+      const direction50=
+        mean(dir50);
+
 
       const momentum=
         q20.length>5
-          ? (q20[q20.length-1]-q20[0])/(volatility20||1)
+          ? (
+              q20[q20.length-1]-
+              q20[0]
+            )/(volatility20||1)
           : 0;
+
 
       const persistence20=
         dir20.length
-          ? dir20.filter(v=>v>0).length/dir20.length
+          ? dir20.filter(v=>v>0).length/
+            dir20.length
           : .5;
+
 
       const negativePersistence20=
         dir20.length
-          ? dir20.filter(v=>v<0).length/dir20.length
+          ? dir20.filter(v=>v<0).length/
+            dir20.length
           : .5;
+
 
       const persistence50=
         dir50.length
-          ? dir50.filter(v=>v>0).length/dir50.length
+          ? dir50.filter(v=>v>0).length/
+            dir50.length
           : .5;
+
 
       const stability=
         clamp(
           1-
-          Math.abs(direction20-direction50),
+          Math.abs(
+            direction20-
+            direction50
+          ),
           0,
           1
         );
 
+
       const volatilityRatio=
         volatility50
-          ? volatility20/volatility50
+          ? volatility20/
+            volatility50
           : 1;
+
 
       const compression=
         clamp(
@@ -1302,94 +1506,172 @@ window.CASPER_ENGINE = (() => {
           1
         );
 
-      const dist20=digitDistribution(d20);
-      const dist50=digitDistribution(d50);
-      const dist100=digitDistribution(d100);
+
+      const dist20=
+        digitDistribution(d20);
+
+      const dist50=
+        digitDistribution(d50);
+
+      const dist100=
+        digitDistribution(d100);
+
 
       const even20=
         d20.length
-          ? d20.filter(d=>d%2===0).length/d20.length
+          ? d20.filter(
+              d=>d%2===0
+            ).length/d20.length
           : .5;
+
 
       const odd20=
         d20.length
-          ? d20.filter(d=>d%2===1).length/d20.length
+          ? d20.filter(
+              d=>d%2===1
+            ).length/d20.length
           : .5;
+
 
       const over8_20=
         d20.length
-          ? d20.filter(d=>d>8).length/d20.length
+          ? d20.filter(
+              d=>d>8
+            ).length/d20.length
           : 0;
+
 
       const over8_50=
         d50.length
-          ? d50.filter(d=>d>8).length/d50.length
+          ? d50.filter(
+              d=>d>8
+            ).length/d50.length
           : 0;
+
 
       const digitEntropy=
         -dist50.probabilities
           .filter(p=>p>0)
-          .reduce((sum,p)=>sum+p*Math.log2(p),0)/Math.log2(10);
+          .reduce(
+            (sum,p)=>
+              sum+
+              p*Math.log2(p),
+            0
+          )/
+          Math.log2(10);
+
 
       const digitConcentration=
-        Math.max(...dist50.probabilities);
+        Math.max(
+          ...dist50.probabilities
+        );
+
 
       let regime='balanced';
 
+
       const normalizedSlope=
-        slope20/(volatility20||1);
+        slope20/
+        (volatility20||1);
+
 
       if(volatilityRatio>1.55){
+
         regime='high_volatility';
+
       }else if(compression>.55){
+
         regime='compression';
-      }else if(normalizedSlope>.22 && direction20>.12){
+
+      }else if(
+        normalizedSlope>.22 &&
+        direction20>.12
+      ){
+
         regime='uptrend';
-      }else if(normalizedSlope<-.22 && direction20<-.12){
+
+      }else if(
+        normalizedSlope<-.22 &&
+        direction20<-.12
+      ){
+
         regime='downtrend';
+
       }else{
+
         regime='range';
       }
 
+
       return {
+
         ready:true,
+
         sample:ticks.length,
 
         price:{
-          current:ticks[ticks.length-1].quote,
+
+          current:
+            ticks[ticks.length-1].quote,
+
           mean20,
+
           mean50,
+
           slope20,
+
           slope50,
+
           volatility20,
+
           volatility50,
+
           momentum
         },
 
         direction:{
+
           direction20,
+
           direction50,
+
           persistence20,
+
           negativePersistence20,
+
           persistence50,
+
           stability
         },
 
         volatility:{
+
           ratio:volatilityRatio,
+
           compression
         },
 
         digits:{
-          last:ticks[ticks.length-1].digit,
+
+          last:
+            ticks[ticks.length-1].digit,
+
           distribution20:dist20,
+
           distribution50:dist50,
+
           distribution100:dist100,
+
           even20,
+
           odd20,
+
           over8_20,
+
           over8_50,
+
           digitEntropy,
+
           digitConcentration
         },
 
@@ -1401,76 +1683,153 @@ window.CASPER_ENGINE = (() => {
     function calculateRiseFall(features){
 
       if(!features.ready){
+
         return {
+
           strategy:'Rise & Fall',
+
           actionable:false,
+
           direction:null,
+
           confidence:0,
+
           score:0,
+
           reason:'insufficient_data'
         };
       }
 
+
       const f=features;
+
 
       const trend=
         clamp(
           .5+
           sigmoid(
-            (f.price.slope20/(f.price.volatility20||1))*2
+            (
+              f.price.slope20/
+              (f.price.volatility20||1)
+            )*2
           )/2-
           .25,
           0,
           1
         );
 
+
       const upScore=
         .5+
         f.direction.direction20*.30+
-        (f.direction.persistence20-.5)*.28+
-        (f.direction.stability-.5)*.14+
-        (f.price.momentum>0?Math.min(.18,f.price.momentum*.035):Math.max(-.18,f.price.momentum*.035))+
+        (
+          f.direction.persistence20-
+          .5
+        )*.28+
+        (
+          f.direction.stability-
+          .5
+        )*.14+
+        (
+          f.price.momentum>0
+            ? Math.min(
+                .18,
+                f.price.momentum*.035
+              )
+            : Math.max(
+                -.18,
+                f.price.momentum*.035
+              )
+        )+
         (trend-.5)*.20;
+
 
       const downScore=
         .5+
         (-f.direction.direction20)*.30+
-        (f.direction.negativePersistence20-.5)*.28+
-        (f.direction.stability-.5)*.14+
-        (f.price.momentum<0?Math.min(.18,-f.price.momentum*.035):Math.max(-.18,-f.price.momentum*.035))+
+        (
+          f.direction.negativePersistence20-
+          .5
+        )*.28+
+        (
+          f.direction.stability-
+          .5
+        )*.14+
+        (
+          f.price.momentum<0
+            ? Math.min(
+                .18,
+                -f.price.momentum*.035
+              )
+            : Math.max(
+                -.18,
+                -f.price.momentum*.035
+              )
+        )+
         ((1-trend)-.5)*.20;
 
+
       let direction='RISE';
+
       let score=upScore;
 
+
       if(downScore>upScore){
+
         direction='FALL';
+
         score=downScore;
       }
 
-      let confidence=clamp(score,.5,.95);
 
-      if(f.regime==='high_volatility'){
+      let confidence=
+        clamp(
+          score,
+          .5,
+          .95
+        );
+
+
+      if(
+        f.regime==='high_volatility'
+      ){
         confidence-=.07;
       }
 
-      if(f.regime==='compression'){
+
+      if(
+        f.regime==='compression'
+      ){
         confidence-=.04;
       }
 
-      confidence=clamp(confidence,.5,.95);
+
+      confidence=
+        clamp(
+          confidence,
+          .5,
+          .95
+        );
+
 
       const actionable=
         confidence>=.60 &&
         f.sample>=MIN_TICKS &&
         f.direction.stability>=.20;
 
+
       return {
+
         strategy:'Rise & Fall',
+
         actionable,
+
         direction,
+
         confidence,
+
         score,
+
         reason:
           !actionable
             ? 'edge_not_strong_enough'
@@ -1484,59 +1843,134 @@ window.CASPER_ENGINE = (() => {
     function calculateParity(features){
 
       if(!features.ready){
+
         return {
+
           strategy:'Even & Odd',
+
           actionable:false,
+
           direction:null,
+
           confidence:0,
+
           score:0,
+
           reason:'insufficient_data'
         };
       }
 
-      const evenBias=Math.abs(features.digits.even20-.5);
-      const oddBias=Math.abs(features.digits.odd20-.5);
+
+      const evenBias=
+        Math.abs(
+          features.digits.even20-
+          .5
+        );
+
+
+      const oddBias=
+        Math.abs(
+          features.digits.odd20-
+          .5
+        );
+
+
+      const evenBase=
+        features.digits
+          .distribution50
+          .probabilities
+          .filter(
+            (_,i)=>i%2===0
+          )
+          .reduce(
+            (a,b)=>a+b,
+            0
+          );
+
 
       const evenScore=
         .5+
-        (features.digits.even20-.5)*.72+
-        (features.digits.even20-
-         features.digits.distribution50.probabilities.filter((_,i)=>i%2===0).reduce((a,b)=>a+b,0))*.20;
+        (
+          features.digits.even20-
+          .5
+        )*.72+
+        (
+          features.digits.even20-
+          evenBase
+        )*.20;
+
 
       const oddScore=
         .5+
-        (features.digits.odd20-.5)*.72;
+        (
+          features.digits.odd20-
+          .5
+        )*.72;
+
 
       const direction=
         evenScore>=oddScore
           ? 'EVEN'
           : 'ODD';
 
+
       const score=
-        Math.max(evenScore,oddScore);
+        Math.max(
+          evenScore,
+          oddScore
+        );
 
-      let confidence=clamp(score,.5,.95);
 
-      if(features.digits.digitEntropy<.78){
+      let confidence=
+        clamp(
+          score,
+          .5,
+          .95
+        );
+
+
+      if(
+        features.digits.digitEntropy<.78
+      ){
         confidence+=.025;
       }
 
-      if(features.digits.digitConcentration>.25){
+
+      if(
+        features.digits.digitConcentration>.25
+      ){
         confidence-=.035;
       }
 
-      confidence=clamp(confidence,.5,.95);
+
+      confidence=
+        clamp(
+          confidence,
+          .5,
+          .95
+        );
+
 
       const actionable=
         confidence>=.59 &&
-        Math.max(evenBias,oddBias)>=.035;
+        Math.max(
+          evenBias,
+          oddBias
+        )>=.035;
+
 
       return {
+
         strategy:'Even & Odd',
+
         actionable,
+
         direction,
+
         confidence,
+
         score,
+
         reason:
           !actionable
             ? 'parity_edge_not_confirmed'
@@ -1548,46 +1982,87 @@ window.CASPER_ENGINE = (() => {
     function calculateOver8(features){
 
       if(!features.ready){
+
         return {
+
           strategy:'Over 8',
+
           actionable:false,
+
           direction:null,
+
           confidence:0,
+
           score:0,
+
           reason:'insufficient_data'
         };
       }
 
-      const over8=features.digits.over8_20;
-      const nine=features.digits.distribution50.probabilities[9]||0;
+
+      const over8=
+        features.digits.over8_20;
+
+
+      const nine=
+        features.digits
+          .distribution50
+          .probabilities[9]||0;
+
 
       const score=
         .5+
         (over8-.10)*1.10+
         (nine-.10)*.35;
 
-      let confidence=clamp(score,.5,.95);
 
-      if(features.digits.digitEntropy>.94){
+      let confidence=
+        clamp(
+          score,
+          .5,
+          .95
+        );
+
+
+      if(
+        features.digits.digitEntropy>.94
+      ){
         confidence-=.035;
       }
 
-      if(features.regime==='high_volatility'){
+
+      if(
+        features.regime==='high_volatility'
+      ){
         confidence-=.025;
       }
 
-      confidence=clamp(confidence,.5,.95);
+
+      confidence=
+        clamp(
+          confidence,
+          .5,
+          .95
+        );
+
 
       const actionable=
         confidence>=.59 &&
         over8>.105;
 
+
       return {
+
         strategy:'Over 8',
+
         actionable,
+
         direction:'OVER_8',
+
         confidence,
+
         score,
+
         reason:
           !actionable
             ? 'over8_edge_not_confirmed'
@@ -1599,53 +2074,100 @@ window.CASPER_ENGINE = (() => {
     function calculateDigitMatch(features){
 
       if(!features.ready){
+
         return {
+
           strategy:'Matches Printer',
+
           actionable:false,
+
           direction:null,
+
           confidence:0,
+
           score:0,
+
           reason:'insufficient_data'
         };
       }
 
-      const probs=features.digits.distribution50.probabilities;
+
+      const probs=
+        features.digits
+          .distribution50
+          .probabilities;
+
 
       let bestDigit=0;
+
       let bestProbability=0;
 
-      for(let i=0;i<10;i++){
-        if(probs[i]>bestProbability){
-          bestProbability=probs[i];
+
+      for(
+        let i=0;
+        i<10;
+        i++
+      ){
+
+        if(
+          probs[i]>bestProbability
+        ){
+
+          bestProbability=
+            probs[i];
+
           bestDigit=i;
         }
       }
 
+
       let confidence=
         clamp(
           .5+
-          (bestProbability-.10)*1.25,
+          (
+            bestProbability-
+            .10
+          )*1.25,
           .5,
           .95
         );
 
-      if(features.digits.digitEntropy>.92){
+
+      if(
+        features.digits.digitEntropy>.92
+      ){
         confidence-=.035;
       }
 
-      confidence=clamp(confidence,.5,.95);
+
+      confidence=
+        clamp(
+          confidence,
+          .5,
+          .95
+        );
+
 
       return {
+
         strategy:'Matches Printer',
+
         actionable:
           confidence>=.60 &&
           bestProbability>=.115 &&
           features.sample>=MIN_TICKS,
-        direction:`MATCH_${bestDigit}`,
+
+        direction:
+          `MATCH_${bestDigit}`,
+
         digit:bestDigit,
+
         confidence,
+
         score:confidence,
+
         probability:bestProbability,
+
         reason:
           bestProbability>=.115
             ? 'digit_concentration_detected'
@@ -1657,10 +2179,18 @@ window.CASPER_ENGINE = (() => {
     function calculateSignals(features){
 
       return {
-        riseFall:calculateRiseFall(features),
-        parity:calculateParity(features),
-        over8:calculateOver8(features),
-        match:calculateDigitMatch(features)
+
+        riseFall:
+          calculateRiseFall(features),
+
+        parity:
+          calculateParity(features),
+
+        over8:
+          calculateOver8(features),
+
+        match:
+          calculateDigitMatch(features)
       };
     }
 
@@ -1668,21 +2198,41 @@ window.CASPER_ENGINE = (() => {
     function rankSignals(signals){
 
       const list=[
+
         signals.riseFall,
+
         signals.parity,
+
         signals.over8,
+
         signals.match
+
       ];
 
-      const usable=list.filter(x=>x.actionable);
 
-      usable.sort((a,b)=>b.confidence-a.confidence);
+      const usable=
+        list.filter(
+          x=>x.actionable
+        );
+
+
+      usable.sort(
+        (a,b)=>
+          b.confidence-
+          a.confidence
+      );
+
 
       return usable[0]||{
+
         strategy:'WAIT',
+
         actionable:false,
+
         confidence:0,
+
         score:0,
+
         reason:'no_validated_edge'
       };
     }
@@ -1696,19 +2246,30 @@ window.CASPER_ENGINE = (() => {
         state.outOfOrder+
         state.invalid;
 
+
       const bad=
         state.duplicates+
         state.outOfOrder+
         state.invalid;
 
+
       const integrity=
         total
-          ? clamp(1-bad/total,0,1)
+          ? clamp(
+              1-bad/total,
+              0,
+              1
+            )
           : 0;
+
 
       let status='insufficient';
 
-      if(state.accepted>=MIN_TICKS){
+
+      if(
+        state.accepted>=MIN_TICKS
+      ){
+
         status=
           integrity>=.995
             ? 'excellent'
@@ -1719,26 +2280,60 @@ window.CASPER_ENGINE = (() => {
                 : 'poor';
       }
 
+
       return {
+
         status,
+
         integrity,
+
         accepted:state.accepted,
+
         duplicates:state.duplicates,
+
         outOfOrder:state.outOfOrder,
+
         invalid:state.invalid
       };
     }
 
 
+    /*
+      FORWARD VALIDATION
+
+      Every prediction is created AFTER the current tick.
+      It is resolved only when a later tick arrives.
+
+      This prevents the engine from counting the same tick
+      that generated the prediction as its own outcome.
+    */
     function resolvePredictions(state){
 
       if(!state.ticks.length)return;
 
-      const current=state.ticks[state.ticks.length-1];
 
-      const pending=state.predictions.splice(0);
+      const current=
+        state.ticks[
+          state.ticks.length-1
+        ];
+
+
+      const pending=
+        state.predictions.splice(0);
+
 
       for(const p of pending){
+
+        /*
+          Ignore anything that somehow points to the same
+          epoch. This is an additional look-ahead safeguard.
+        */
+        if(
+          p.epoch>=current.epoch
+        ){
+          continue;
+        }
+
 
         const actualRiseFall=
           current.quote>p.quote
@@ -1747,69 +2342,190 @@ window.CASPER_ENGINE = (() => {
               ? 'FALL'
               : 'FLAT';
 
+
         let correct=false;
 
-        if(p.type==='riseFall'){
-          correct=actualRiseFall===p.direction;
+        let validated=false;
 
-          state.strategyValidation.riseFall.total++;
+
+        if(
+          p.type==='riseFall'
+        ){
+
+          correct=
+            actualRiseFall===
+            p.direction;
+
+          validated=true;
+
+
+          state.strategyValidation
+            .riseFall.total++;
+
 
           if(correct){
-            state.strategyValidation.riseFall.correct++;
+
+            state.strategyValidation
+              .riseFall.correct++;
           }
         }
 
-        if(p.type==='even'){
-          const actual=current.digit%2===0?'EVEN':'ODD';
 
-          correct=actual===p.direction;
+        if(
+          p.type==='even'
+        ){
 
-          state.strategyValidation.even.total++;
+          const actual=
+            current.digit%2===0
+              ? 'EVEN'
+              : 'ODD';
+
+
+          correct=
+            actual===
+            p.direction;
+
+          validated=true;
+
+
+          state.strategyValidation
+            .even.total++;
+
 
           if(correct){
-            state.strategyValidation.even.correct++;
+
+            state.strategyValidation
+              .even.correct++;
           }
         }
 
-        if(p.type==='odd'){
-          const actual=current.digit%2===0?'EVEN':'ODD';
 
-          correct=actual===p.direction;
+        if(
+          p.type==='odd'
+        ){
 
-          state.strategyValidation.odd.total++;
+          const actual=
+            current.digit%2===0
+              ? 'EVEN'
+              : 'ODD';
+
+
+          correct=
+            actual===
+            p.direction;
+
+          validated=true;
+
+
+          state.strategyValidation
+            .odd.total++;
+
 
           if(correct){
-            state.strategyValidation.odd.correct++;
+
+            state.strategyValidation
+              .odd.correct++;
           }
         }
 
-        if(p.type==='over8'){
-          const actual=current.digit>8?'OVER_8':'NOT_OVER_8';
 
-          correct=actual==='OVER_8';
+        if(
+          p.type==='over8'
+        ){
 
-          state.strategyValidation.over8.total++;
+          const actual=
+            current.digit>8
+              ? 'OVER_8'
+              : 'NOT_OVER_8';
+
+
+          correct=
+            actual==='OVER_8';
+
+          validated=true;
+
+
+          state.strategyValidation
+            .over8.total++;
+
 
           if(correct){
-            state.strategyValidation.over8.correct++;
+
+            state.strategyValidation
+              .over8.correct++;
           }
         }
+
+
+        /*
+          NEW:
+          Matches Printer is now forward validated.
+        */
+        if(
+          p.type==='match'
+        ){
+
+          correct=
+            current.digit===
+            p.digit;
+
+          validated=true;
+
+
+          state.strategyValidation
+            .match.total++;
+
+
+          if(correct){
+
+            state.strategyValidation
+              .match.correct++;
+          }
+        }
+
+
+        if(!validated){
+          continue;
+        }
+
 
         state.validation.total++;
 
+
         if(correct){
+
           state.validation.correct++;
+
         }else{
+
           state.validation.incorrect++;
         }
 
-        const confidence=p.confidence;
 
-        state.validation.confidenceSum+=confidence;
+        const confidence=
+          clamp(
+            Number(p.confidence)||0,
+            0,
+            1
+          );
 
-        state.validation.brier+=
-          (confidence-(correct?1:0))*
-          (confidence-(correct?1:0));
+
+        state.validation
+          .confidenceSum+=
+          confidence;
+
+
+        state.validation
+          .brier+=
+          (
+            confidence-
+            (correct?1:0)
+          )*
+          (
+            confidence-
+            (correct?1:0)
+          );
+
 
         const bucket=
           confidence>=.75
@@ -1818,63 +2534,152 @@ window.CASPER_ENGINE = (() => {
               ? 'medium'
               : 'low';
 
-        state.validation.buckets[bucket].n++;
+
+        state.validation
+          .buckets[bucket].n++;
+
 
         if(correct){
-          state.validation.buckets[bucket].correct++;
+
+          state.validation
+            .buckets[bucket]
+            .correct++;
         }
       }
     }
 
 
-    function registerPredictions(state,result){
+    function registerPredictions(
+      state,
+      result
+    ){
 
-      if(!result||!result.features.ready)return;
+      if(
+        !result||
+        !result.features.ready
+      ){
+        return;
+      }
 
-      const rf=result.signals.riseFall;
+
+      const rf=
+        result.signals.riseFall;
+
 
       if(rf.actionable){
 
         state.predictions.push({
+
           type:'riseFall',
-          direction:rf.direction,
-          confidence:rf.confidence,
-          quote:state.lastQuote,
-          epoch:state.lastEpoch
+
+          direction:
+            rf.direction,
+
+          confidence:
+            rf.confidence,
+
+          quote:
+            state.lastQuote,
+
+          epoch:
+            state.lastEpoch
         });
       }
 
-      const parity=result.signals.parity;
+
+      const parity=
+        result.signals.parity;
+
 
       if(parity.actionable){
 
         state.predictions.push({
+
           type:
             parity.direction==='EVEN'
               ? 'even'
               : 'odd',
-          direction:parity.direction,
-          confidence:parity.confidence,
-          quote:state.lastQuote,
-          epoch:state.lastEpoch
+
+          direction:
+            parity.direction,
+
+          confidence:
+            parity.confidence,
+
+          quote:
+            state.lastQuote,
+
+          epoch:
+            state.lastEpoch
         });
       }
 
-      const over8=result.signals.over8;
+
+      const over8=
+        result.signals.over8;
+
 
       if(over8.actionable){
 
         state.predictions.push({
+
           type:'over8',
+
           direction:'OVER_8',
-          confidence:over8.confidence,
-          quote:state.lastQuote,
-          epoch:state.lastEpoch
+
+          confidence:
+            over8.confidence,
+
+          quote:
+            state.lastQuote,
+
+          epoch:
+            state.lastEpoch
         });
       }
 
-      if(state.predictions.length>12){
-        state.predictions=state.predictions.slice(-12);
+
+      /*
+        NEW:
+        Matches Printer predictions are now registered.
+      */
+      const match=
+        result.signals.match;
+
+
+      if(match.actionable){
+
+        state.predictions.push({
+
+          type:'match',
+
+          digit:
+            match.digit,
+
+          direction:
+            match.direction,
+
+          confidence:
+            match.confidence,
+
+          quote:
+            state.lastQuote,
+
+          epoch:
+            state.lastEpoch
+        });
+      }
+
+
+      /*
+        Keep a bounded pending queue.
+      */
+      if(
+        state.predictions.length>16
+      ){
+
+        state.predictions=
+          state.predictions.slice(-16);
       }
     }
 
@@ -1883,118 +2688,326 @@ window.CASPER_ENGINE = (() => {
 
       const state=get(symbol);
 
-      const features=calculateFeatures(state);
+
+      const features=
+        calculateFeatures(state);
+
 
       if(!features.ready){
 
         return {
+
           symbol,
+
           ready:false,
-          ticks:state.accepted,
-          dataQuality:dataQuality(state),
+
+          ticks:
+            state.accepted,
+
+          dataQuality:
+            dataQuality(state),
+
           features,
+
           signals:{
+
             riseFall:null,
+
             parity:null,
+
             over8:null,
+
             match:null
           },
+
           bestSignal:{
+
             strategy:'WAIT',
+
             actionable:false,
+
             confidence:0,
+
             reason:'insufficient_data'
           },
-          validation:getValidation(state)
+
+          validation:
+            getValidation(state)
         };
       }
 
-      const signals=calculateSignals(features);
+
+      const signals=
+        calculateSignals(
+          features
+        );
+
 
       return {
+
         symbol,
+
         ready:true,
-        ticks:state.accepted,
-        dataQuality:dataQuality(state),
+
+        ticks:
+          state.accepted,
+
+        dataQuality:
+          dataQuality(state),
+
         features,
+
         signals,
-        bestSignal:rankSignals(signals),
-        validation:getValidation(state)
+
+        bestSignal:
+          rankSignals(signals),
+
+        validation:
+          getValidation(state)
+      };
+    }
+
+
+    function strategyValidationFactor(
+      validation,
+      strategy
+    ){
+
+      let record=null;
+
+
+      if(strategy==='Rise & Fall'){
+
+        record=
+          validation.strategies.riseFall;
+
+      }else if(strategy==='Even & Odd'){
+
+        /*
+          For parity Smart AI we use the actual
+          selected parity direction's validation.
+          The caller may supply the direction.
+        */
+        record=null;
+
+      }else if(strategy==='Over 8'){
+
+        record=
+          validation.strategies.over8;
+
+      }else if(strategy==='Matches Printer'){
+
+        record=
+          validation.strategies.match;
+      }
+
+
+      if(
+        !record||
+        record.total<VALIDATION_MINIMUM||
+        record.accuracy===null
+      ){
+
+        /*
+          Do not pretend there is enough history.
+          A neutral factor allows the signal to compete
+          while validation is still being collected.
+        */
+        return {
+
+          factor:.82,
+
+          mature:false,
+
+          accuracy:null,
+
+          total:
+            record?.total||0
+        };
+      }
+
+
+      /*
+        Historical accuracy is useful only when enough
+        forward observations exist.
+
+        50% = neutral.
+        Better than 50% increases the factor.
+        Worse than 50% decreases it.
+      */
+      const factor=
+        clamp(
+          .5+
+          (
+            record.accuracy-
+            .5
+          )*1.8,
+          .35,
+          1.10
+        );
+
+
+      return {
+
+        factor,
+
+        mature:true,
+
+        accuracy:
+          record.accuracy,
+
+        total:
+          record.total
+      };
+    }
+
+
+    function parityValidationFactor(
+      validation,
+      direction
+    ){
+
+      const record=
+        direction==='EVEN'
+          ? validation.strategies.even
+          : validation.strategies.odd;
+
+
+      if(
+        !record||
+        record.total<VALIDATION_MINIMUM||
+        record.accuracy===null
+      ){
+
+        return {
+
+          factor:.82,
+
+          mature:false,
+
+          accuracy:null,
+
+          total:
+            record?.total||0
+        };
+      }
+
+
+      return {
+
+        factor:
+          clamp(
+            .5+
+            (
+              record.accuracy-
+              .5
+            )*1.8,
+            .35,
+            1.10
+          ),
+
+        mature:true,
+
+        accuracy:
+          record.accuracy,
+
+        total:
+          record.total
       };
     }
 
 
     function getValidation(state){
 
-      const total=state.validation.total;
+      const total=
+        state.validation.total;
+
+
+      const strategyRecord=
+        key=>({
+
+          total:
+            state.strategyValidation[key]
+              .total,
+
+          correct:
+            state.strategyValidation[key]
+              .correct,
+
+          accuracy:
+            state.strategyValidation[key].total
+              ? state.strategyValidation[key]
+                .correct/
+                state.strategyValidation[key]
+                .total
+              : null
+        });
+
 
       return {
+
         total,
-        correct:state.validation.correct,
-        incorrect:state.validation.incorrect,
+
+        correct:
+          state.validation.correct,
+
+        incorrect:
+          state.validation.incorrect,
 
         accuracy:
           total
-            ? state.validation.correct/total
+            ? state.validation.correct/
+              total
             : null,
 
         brier:
           total
-            ? state.validation.brier/total
+            ? state.validation.brier/
+              total
             : null,
 
         averageConfidence:
           total
-            ? state.validation.confidenceSum/total
+            ? state.validation
+              .confidenceSum/
+              total
             : null,
 
-        buckets:Object.fromEntries(
-          Object.entries(state.validation.buckets).map(([key,b])=>[
-            key,
-            {
-              n:b.n,
-              correct:b.correct,
-              accuracy:b.n?b.correct/b.n:null
-            }
-          ])
-        ),
+        buckets:
+          Object.fromEntries(
+            Object.entries(
+              state.validation.buckets
+            ).map(
+              ([key,b])=>[
+                key,
+                {
+                  n:b.n,
+                  correct:b.correct,
+                  accuracy:
+                    b.n
+                      ? b.correct/b.n
+                      : null
+                }
+              ]
+            )
+          ),
 
         strategies:{
-          riseFall:{
-            total:state.strategyValidation.riseFall.total,
-            accuracy:
-              state.strategyValidation.riseFall.total
-                ? state.strategyValidation.riseFall.correct/
-                  state.strategyValidation.riseFall.total
-                : null
-          },
 
-          even:{
-            total:state.strategyValidation.even.total,
-            accuracy:
-              state.strategyValidation.even.total
-                ? state.strategyValidation.even.correct/
-                  state.strategyValidation.even.total
-                : null
-          },
+          riseFall:
+            strategyRecord('riseFall'),
 
-          odd:{
-            total:state.strategyValidation.odd.total,
-            accuracy:
-              state.strategyValidation.odd.total
-                ? state.strategyValidation.odd.correct/
-                  state.strategyValidation.odd.total
-                : null
-          },
+          even:
+            strategyRecord('even'),
 
-          over8:{
-            total:state.strategyValidation.over8.total,
-            accuracy:
-              state.strategyValidation.over8.total
-                ? state.strategyValidation.over8.correct/
-                  state.strategyValidation.over8.total
-                : null
-          }
+          odd:
+            strategyRecord('odd'),
+
+          over8:
+            strategyRecord('over8'),
+
+          match:
+            strategyRecord('match')
         }
       };
     }
@@ -2010,116 +3023,273 @@ window.CASPER_ENGINE = (() => {
 
       const result=[];
 
-      for(const [symbol] of markets){
-        const snap=snapshot(symbol);
 
-        result.push(snap);
+      for(
+        const [symbol]
+        of markets
+      ){
+
+        result.push(
+          snapshot(symbol)
+        );
       }
 
-      result.sort((a,b)=>{
 
-        const ac=a.bestSignal?.confidence||0;
-        const bc=b.bestSignal?.confidence||0;
+      result.sort(
+        (a,b)=>{
 
-        return bc-ac;
-      });
+          const ac=
+            a.bestSignal?.confidence||0;
+
+          const bc=
+            b.bestSignal?.confidence||0;
+
+          return bc-ac;
+        }
+      );
+
 
       return result;
     }
 
 
+    /*
+      Smart AI candidate selection.
+
+      FREE Smart AI is deliberately restricted to the
+      Free-tier strategy family:
+
+        Rise & Fall
+        Even & Odd
+
+      Premium-only Over 8 Killer and Matches Printer
+      are NOT silently pulled into Smart AI.
+    */
     function smartAI(){
 
       const ranked=[];
 
-      for(const snapshot of allMarkets()){
 
-        if(!snapshot.ready){
+      for(
+        const snap
+        of allMarkets()
+      ){
+
+        if(!snap.ready){
+
           ranked.push({
-            symbol:snapshot.symbol,
+
+            symbol:snap.symbol,
+
             eligible:false,
+
             score:0,
+
             reason:'insufficient_data',
-            snapshot
+
+            snapshot:snap
           });
 
           continue;
         }
 
-        const quality=snapshot.dataQuality;
 
-        if(quality.integrity<.985){
+        const quality=
+          snap.dataQuality;
+
+
+        if(
+          quality.integrity<.985
+        ){
 
           ranked.push({
-            symbol:snapshot.symbol,
+
+            symbol:snap.symbol,
+
             eligible:false,
+
             score:0,
+
             reason:'data_quality',
-            snapshot
+
+            snapshot:snap
           });
 
           continue;
         }
 
-        const best=snapshot.bestSignal;
 
-        if(!best||!best.actionable){
+        /*
+          Only Free-tier candidates.
+        */
+        const candidates=[];
+
+
+        const rf=
+          snap.signals.riseFall;
+
+
+        if(rf?.actionable){
+
+          const validation=
+            strategyValidationFactor(
+              snap.validation,
+              'Rise & Fall'
+            );
+
+
+          candidates.push({
+
+            signal:rf,
+
+            validation,
+
+            strategy:'Rise & Fall'
+          });
+        }
+
+
+        const parity=
+          snap.signals.parity;
+
+
+        if(parity?.actionable){
+
+          const validation=
+            parityValidationFactor(
+              snap.validation,
+              parity.direction
+            );
+
+
+          candidates.push({
+
+            signal:parity,
+
+            validation,
+
+            strategy:'Even & Odd'
+          });
+        }
+
+
+        if(!candidates.length){
 
           ranked.push({
-            symbol:snapshot.symbol,
+
+            symbol:snap.symbol,
+
             eligible:false,
+
             score:0,
-            reason:'no_actionable_edge',
-            snapshot
+
+            reason:'no_actionable_free_edge',
+
+            snapshot:snap
           });
 
           continue;
         }
 
-        const validation=snapshot.validation;
 
-        const validationFactor=
-          validation.total>=30 && validation.accuracy!==null
-            ? clamp(
-                .5+
-                (validation.accuracy-.5)*1.5,
-                .35,
-                1
-              )
-            : .70;
+        /*
+          Score every candidate separately.
+        */
+        const scored=
+          candidates.map(candidate=>{
 
-        const stability=
-          snapshot.features.direction.stability;
+            const signal=
+              candidate.signal;
 
-        const regimePenalty=
-          snapshot.features.regime==='high_volatility'
-            ? .88
-            : snapshot.features.regime==='compression'
-              ? .94
-              : 1;
+            const validation=
+              candidate.validation;
 
-        const score=
-          best.confidence*
-          quality.integrity*
-          (0.75+0.25*stability)*
-          validationFactor*
-          regimePenalty;
 
-        ranked.push({
-          symbol:snapshot.symbol,
-          eligible:score>=.56,
-          score,
-          strategy:best.strategy,
-          direction:best.direction,
-          confidence:best.confidence,
-          reason:best.reason,
-          regime:snapshot.features.regime,
-          validation,
-          snapshot
-        });
+            const stability=
+              snap.features
+                .direction
+                .stability;
+
+
+            const regimePenalty=
+              snap.features.regime===
+                'high_volatility'
+                ? .88
+                : snap.features.regime===
+                  'compression'
+                  ? .94
+                  : 1;
+
+
+            /*
+              Signal confidence is the starting point.
+
+              Data integrity protects against bad feeds.
+
+              Stability rewards repeatable direction.
+
+              Historical validation modifies the score
+              only after enough forward samples exist.
+            */
+            const score=
+              signal.confidence*
+              quality.integrity*
+              (
+                .75+
+                .25*stability
+              )*
+              validation.factor*
+              regimePenalty;
+
+
+            return {
+
+              symbol:snap.symbol,
+
+              eligible:
+                score>=.56,
+
+              score,
+
+              strategy:
+                candidate.strategy,
+
+              direction:
+                signal.direction,
+
+              confidence:
+                signal.confidence,
+
+              reason:
+                signal.reason,
+
+              regime:
+                snap.features.regime,
+
+              validation,
+
+              snapshot:snap
+            };
+          });
+
+
+        scored.sort(
+          (a,b)=>
+            b.score-a.score
+        );
+
+
+        ranked.push(
+          scored[0]
+        );
       }
 
-      ranked.sort((a,b)=>b.score-a.score);
+
+      ranked.sort(
+        (a,b)=>
+          b.score-a.score
+      );
+
 
       return ranked;
     }
@@ -2128,31 +3298,51 @@ window.CASPER_ENGINE = (() => {
     function reset(symbol){
 
       if(symbol){
-        markets.set(symbol,createMarketState(symbol));
+
+        markets.set(
+          symbol,
+          createMarketState(symbol)
+        );
+
       }else{
+
         markets.clear();
       }
     }
 
 
     return {
+
       onTick,
+
       snapshot,
+
       allMarkets,
+
       smartAI,
+
       reset,
 
-      getMarketCount:()=>markets.size,
+      getMarketCount:
+        ()=>markets.size,
 
-      getStats:()=>({
-        markets:markets.size,
-        samples:[...markets.values()].reduce(
-          (sum,s)=>sum+s.accepted,
-          0
-        )
-      })
+      getStats:
+        ()=>({
+
+          markets:
+            markets.size,
+
+          samples:
+            [...markets.values()]
+              .reduce(
+                (sum,s)=>
+                  sum+s.accepted,
+                0
+              )
+        })
     };
   }
+
 
   return {create};
 
@@ -2164,62 +3354,139 @@ window.CASPER_ENGINE = (() => {
    ============================================================ */
 
 (()=>{
-  const $=s=>document.querySelector(s);
-  const $$=s=>[...document.querySelectorAll(s)];
 
-  /*
-    IMPORTANT:
-    The frontend is hosted on GitHub Pages while the secure
-    Deriv OAuth/session backend is hosted on Render.
-  */
+  const $=
+    s=>document.querySelector(s);
+
+  const $$=
+    s=>[
+      ...document.querySelectorAll(s)
+    ];
+
+
   const AUTH_BASE=
     'https://casper-live-data-analysis.onrender.com';
 
+
   const names={
-    "1HZ100V":"Volatility 100 (1s)",
-    "1HZ75V":"Volatility 75 (1s)",
-    "1HZ50V":"Volatility 50 (1s)",
-    "1HZ25V":"Volatility 25 (1s)",
-    "1HZ10V":"Volatility 10 (1s)",
-    "R_100":"Volatility 100 Index",
-    "R_75":"Volatility 75 Index",
-    "R_50":"Volatility 50 Index",
-    "R_25":"Volatility 25 Index",
-    "R_10":"Volatility 10 Index"
+
+    "1HZ100V":
+      "Volatility 100 (1s)",
+
+    "1HZ75V":
+      "Volatility 75 (1s)",
+
+    "1HZ50V":
+      "Volatility 50 (1s)",
+
+    "1HZ25V":
+      "Volatility 25 (1s)",
+
+    "1HZ10V":
+      "Volatility 10 (1s)",
+
+    "R_100":
+      "Volatility 100 Index",
+
+    "R_75":
+      "Volatility 75 Index",
+
+    "R_50":
+      "Volatility 50 Index",
+
+    "R_25":
+      "Volatility 25 Index",
+
+    "R_10":
+      "Volatility 10 Index"
   };
 
-  const symbols=Object.keys(names);
+
+  const symbols=
+    Object.keys(names);
+
 
   let ws=null;
-  let subIds=new Map();
+
+  let subIds=
+    new Map();
+
   let count=0;
+
   let retryTimer=null;
-  let activeStrategy='Mix Both';
 
-  const pipSizes=new Map();
+  let activeStrategy=
+    'Mix Both';
 
-  const casperEngine=window.CASPER_ENGINE.create({
-    maxTicks:1800
-  });
 
-  const market=$('#market');
-  const marketPremium=$('#marketPremium');
+  /*
+    This is the user's last manually selected market.
 
-  marketPremium.innerHTML=market.innerHTML;
+    Smart AI does NOT destroy this selection.
+    It temporarily changes the visible field to
+    "Auto-select the best".
+  */
+  let manualMarket=
+    '1HZ100V';
+
+
+  let smartSelectedSymbol=
+    null;
+
+
+  const SMART_VALUE=
+    '__CASPER_SMART_AUTO__';
+
+
+  const pipSizes=
+    new Map();
+
+
+  const casperEngine=
+    window.CASPER_ENGINE.create({
+      maxTicks:1800
+    });
+
+
+  const market=
+    $('#market');
+
+
+  const marketPremium=
+    $('#marketPremium');
+
+
+  marketPremium.innerHTML=
+    market.innerHTML;
 
 
   function showToast(t){
 
-    const el=$('#toast');
+    const el=
+      $('#toast');
+
 
     el.textContent=t;
-    el.classList.remove('hidden');
 
-    clearTimeout(showToast.timer);
+    el.classList.remove(
+      'hidden'
+    );
 
-    showToast.timer=setTimeout(()=>{
-      el.classList.add('hidden');
-    },3200);
+
+    clearTimeout(
+      showToast.timer
+    );
+
+
+    showToast.timer=
+      setTimeout(
+        ()=>{
+          el.classList.add(
+            'hidden'
+          );
+        },
+        3200
+      );
   }
 
 
@@ -2230,13 +3497,28 @@ window.CASPER_ENGINE = (() => {
         ? 'Market data live'
         : 'Waiting for market data';
 
-    $('#feedDot').classList.toggle('live',live);
-    $('#connDot').classList.toggle('live',live);
+
+    $('#feedDot')
+      .classList
+      .toggle(
+        'live',
+        live
+      );
+
+
+    $('#connDot')
+      .classList
+      .toggle(
+        'live',
+        live
+      );
+
 
     $('#connLabel').textContent=
       live
         ? 'Live market data'
         : 'Waiting';
+
 
     $('#rowState').textContent=
       live
@@ -2247,39 +3529,421 @@ window.CASPER_ENGINE = (() => {
 
   function decimalPlaces(value){
 
-    const n=Number(value);
+    const n=
+      Number(value);
 
-    if(!Number.isFinite(n)||n<=0)return null;
 
-    if(Number.isInteger(n)&&n<=10)return n;
+    if(
+      !Number.isFinite(n)||
+      n<=0
+    ){
+      return null;
+    }
+
+
+    if(
+      Number.isInteger(n)&&
+      n<=10
+    ){
+      return n;
+    }
+
 
     if(n<1){
 
-      const places=Math.round(-Math.log10(n));
+      const places=
+        Math.round(
+          -Math.log10(n)
+        );
 
-      return places>=0&&places<=10
-        ? places
-        : null;
+
+      return
+        places>=0&&
+        places<=10
+          ? places
+          : null;
     }
+
 
     return null;
   }
 
 
+  function formatQuote(
+    symbol,
+    quote
+  ){
+
+    const precision=
+      pipSizes.get(symbol);
+
+
+    if(
+      Number.isFinite(
+        precision
+      )
+    ){
+
+      return Number(
+        quote
+      ).toFixed(
+        precision
+      );
+    }
+
+
+    return String(
+      quote
+    );
+  }
+
+
+  function digitFromQuote(
+    symbol,
+    quote
+  ){
+
+    const formatted=
+      formatQuote(
+        symbol,
+        quote
+      );
+
+
+    return formatted.slice(-1);
+  }
+
+
+  function ensureSmartOption(){
+
+    let option=
+      [...market.options]
+        .find(
+          o=>o.value===SMART_VALUE
+        );
+
+
+    if(!option){
+
+      option=
+        new Option(
+          'Auto-select the best',
+          SMART_VALUE
+        );
+
+      market.add(
+        option,
+        market.options[0]
+      );
+    }
+
+
+    return option;
+  }
+
+
+  function enterSmartMode(){
+
+    /*
+      Preserve the user's actual market before
+      changing the visible control.
+    */
+    if(
+      market.value!==SMART_VALUE
+    ){
+      manualMarket=
+        market.value;
+    }
+
+
+    ensureSmartOption();
+
+
+    market.value=
+      SMART_VALUE;
+
+
+    market.disabled=
+      true;
+
+
+    smartSelectedSymbol=
+      null;
+
+
+    $('#marketName').textContent=
+      'Auto-selecting the best';
+
+
+    $('#rowMarket').textContent=
+      'Scanning all markets';
+
+
+    $('#quote').textContent='—';
+
+    $('#rowQuote').textContent='—';
+
+    $('#lastDigit').textContent='—';
+
+    $('#tickCount').textContent='0';
+
+
+    $('#runMessage').textContent=
+      'Smart AI is scanning every connected market and waiting for a validated Free-tier signal.';
+  }
+
+
+  function leaveSmartMode(){
+
+    market.disabled=
+      false;
+
+
+    const old=
+      manualMarket&&
+      names[manualMarket]
+        ? manualMarket
+        : symbols[0];
+
+
+    /*
+      Remove the temporary Smart AI option.
+    */
+    const autoOption=
+      [...market.options]
+        .find(
+          o=>o.value===SMART_VALUE
+        );
+
+
+    if(autoOption){
+
+      autoOption.remove();
+    }
+
+
+    market.value=
+      old;
+
+
+    smartSelectedSymbol=
+      null;
+
+
+    updateSelectedMarketDisplay(
+      old,
+      casperEngine.snapshot(old)
+    );
+  }
+
+
+  function updateSelectedMarketDisplay(
+    symbol,
+    analysis
+  ){
+
+    if(!symbol||!names[symbol]){
+      return;
+    }
+
+
+    $('#marketName').textContent=
+      names[symbol];
+
+
+    $('#rowMarket').textContent=
+      names[symbol];
+
+
+    if(
+      analysis?.features?.ready
+    ){
+
+      const quote=
+        analysis.features
+          .price.current;
+
+
+      const formatted=
+        formatQuote(
+          symbol,
+          quote
+        );
+
+
+      $('#quote').textContent=
+        formatted;
+
+
+      $('#rowQuote').textContent=
+        formatted;
+
+
+      $('#lastDigit').textContent=
+        String(
+          analysis.features
+            .digits.last
+        );
+
+
+      $('#rowDigit').textContent=
+        String(
+          analysis.features
+            .digits.last
+        );
+
+
+      $('#tickCount').textContent=
+        Number(
+          analysis.ticks||0
+        ).toLocaleString();
+
+    }else{
+
+      $('#quote').textContent='—';
+
+      $('#rowQuote').textContent='—';
+
+      $('#lastDigit').textContent='—';
+
+      $('#rowDigit').textContent='—';
+
+      $('#tickCount').textContent=
+        Number(
+          analysis?.ticks||0
+        ).toLocaleString();
+    }
+  }
+
+
+  /*
+    Update the visible Smart AI result without changing
+    the visible Market field.
+  */
+  function refreshSmartAI(){
+
+    const ranked=
+      casperEngine.smartAI();
+
+
+    const selected=
+      ranked.find(
+        x=>x.eligible
+      );
+
+
+    if(!selected){
+
+      smartSelectedSymbol=
+        null;
+
+
+      $('#marketName').textContent=
+        'Auto-selecting the best';
+
+
+      $('#rowMarket').textContent=
+        'Scanning all markets';
+
+
+      $('#quote').textContent='—';
+
+      $('#rowQuote').textContent='—';
+
+      $('#lastDigit').textContent='—';
+
+      $('#rowDigit').textContent='—';
+
+      $('#tickCount').textContent='0';
+
+
+      $('#runMessage').textContent=
+        'Smart AI is scanning all markets · no sufficiently validated Free-tier edge yet.';
+
+
+      return null;
+    }
+
+
+    smartSelectedSymbol=
+      selected.symbol;
+
+
+    updateSelectedMarketDisplay(
+      selected.symbol,
+      selected.snapshot
+    );
+
+
+    const validation=
+      selected.validation;
+
+
+    let validationText=
+      'validation collecting';
+
+
+    if(
+      validation.mature &&
+      validation.accuracy!==null
+    ){
+
+      validationText=
+        `${(
+          validation.accuracy*100
+        ).toFixed(1)}% historical · ${validation.total} samples`;
+
+    }else{
+
+      validationText=
+        `${validation.total} validation samples`;
+    }
+
+
+    $('#runMessage').textContent=
+      `Smart AI selected ${names[selected.symbol]||selected.symbol} · ${selected.strategy} · ${selected.direction||''} · confidence ${(selected.confidence*100).toFixed(1)}% · ${validationText} · validation only`;
+
+
+    return selected;
+  }
+
+
   function subscribeMarkets(){
 
-    if(!ws || ws.readyState!==WebSocket.OPEN)return;
+    if(
+      !ws||
+      ws.readyState!==WebSocket.OPEN
+    ){
+      return;
+    }
+
 
     subIds.clear();
 
-    for(const symbol of symbols){
+
+    /*
+      IMPORTANT:
+
+      Smart AI does NOT subscribe to one market.
+
+      Every supported market remains subscribed so the
+      engine continuously learns and validates every market.
+    */
+    for(
+      const symbol
+      of symbols
+    ){
 
       try{
 
-        ws.send(JSON.stringify({
-          ticks:symbol,
-          subscribe:1
-        }));
+        ws.send(
+          JSON.stringify({
+
+            ticks:symbol,
+
+            subscribe:1
+          })
+        );
 
       }catch{}
     }
@@ -2293,36 +3957,52 @@ window.CASPER_ENGINE = (() => {
       if(ws){
 
         try{
+
           ws.onclose=null;
+
           ws.close();
+
         }catch{}
 
         ws=null;
       }
 
-      clearTimeout(retryTimer);
+
+      clearTimeout(
+        retryTimer
+      );
+
 
       state(false);
 
-      ws=new WebSocket(
-        'wss://api.derivws.com/trading/v1/options/ws/public'
-      );
+
+      ws=
+        new WebSocket(
+          'wss://api.derivws.com/trading/v1/options/ws/public'
+        );
 
 
       ws.onopen=()=>{
 
         state(false);
 
+
         try{
 
-          ws.send(JSON.stringify({
-            active_symbols:'brief',
-            req_id:1
-          }));
+          ws.send(
+            JSON.stringify({
+
+              active_symbols:'brief',
+
+              req_id:1
+            })
+          );
+
 
           subscribeMarkets();
 
         }catch{
+
           state(false);
         }
       };
@@ -2332,9 +4012,16 @@ window.CASPER_ENGINE = (() => {
 
         let d;
 
+
         try{
-          d=JSON.parse(e.data);
+
+          d=
+            JSON.parse(
+              e.data
+            );
+
         }catch{
+
           return;
         }
 
@@ -2346,6 +4033,7 @@ window.CASPER_ENGINE = (() => {
             d.error
           );
 
+
           state(false);
 
           return;
@@ -2353,132 +4041,199 @@ window.CASPER_ENGINE = (() => {
 
 
         if(
-          d.msg_type==='active_symbols' &&
-          Array.isArray(d.active_symbols)
+          d.msg_type===
+            'active_symbols'&&
+          Array.isArray(
+            d.active_symbols
+          )
         ){
 
-          for(const item of d.active_symbols){
+          for(
+            const item
+            of d.active_symbols
+          ){
 
             const symbol=
-              item.underlying_symbol ||
+              item.underlying_symbol||
               item.symbol;
+
 
             const places=
               decimalPlaces(
-                item.pip_size ??
+                item.pip_size??
                 item.pip
               );
 
-            if(symbol&&places!==null){
-              pipSizes.set(symbol,places);
+
+            if(
+              symbol&&
+              places!==null
+            ){
+
+              pipSizes.set(
+                symbol,
+                places
+              );
             }
           }
+
 
           return;
         }
 
 
-        if(d.msg_type==='tick'&&d.tick){
+        if(
+          d.msg_type==='tick'&&
+          d.tick
+        ){
 
-          const q=Number(d.tick.quote);
+          const q=
+            Number(
+              d.tick.quote
+            );
 
-          if(!Number.isFinite(q))return;
+
+          if(
+            !Number.isFinite(q)
+          ){
+            return;
+          }
+
 
           const symbol=
-            d.tick.symbol ||
+            d.tick.symbol||
             market.value;
 
+
+          if(
+            !names[symbol]
+          ){
+            return;
+          }
+
+
           const precision=
-            decimalPlaces(d.tick.pip_size) ??
+            decimalPlaces(
+              d.tick.pip_size
+            )??
             pipSizes.get(symbol);
 
+
           const quote=
-            precision===undefined ||
-            precision===null
-              ? String(d.tick.quote)
-              : q.toFixed(precision);
+            formatQuote(
+              symbol,
+              q
+            );
+
 
           const digit=
-            precision===undefined ||
+            precision===undefined||
             precision===null
-              ? '—'
+              ? quote.slice(-1)
               : quote.slice(-1);
 
+
           const epoch=
-            Number(d.tick.epoch) ||
+            Number(
+              d.tick.epoch
+            )||
             Date.now()/1000;
 
 
           const analysis=
             casperEngine.onTick({
+
               symbol,
+
               quote:q,
+
               epoch,
+
               pipSize:precision
             });
 
 
-          if(symbol===market.value){
+          /*
+            Smart AI mode:
+            every tick from every market is used.
+
+            We do NOT require symbol === market.value
+            because market.value is the temporary
+            Auto-select option.
+          */
+          if(
+            activeStrategy==='Smart AI'
+          ){
+
+            state(true);
+
+            refreshSmartAI();
+
+            return;
+          }
+
+
+          /*
+            Normal manual/free/premium display mode.
+            Only the currently selected market updates
+            the visible market statistics.
+          */
+          if(
+            symbol===market.value
+          ){
 
             count++;
 
-            $('#quote').textContent=quote;
-            $('#rowQuote').textContent=quote;
 
-            $('#lastDigit').textContent=digit;
-            $('#rowDigit').textContent=digit;
+            $('#quote').textContent=
+              quote;
+
+
+            $('#rowQuote').textContent=
+              quote;
+
+
+            $('#lastDigit').textContent=
+              digit;
+
+
+            $('#rowDigit').textContent=
+              digit;
+
 
             $('#tickCount').textContent=
               count.toLocaleString();
 
+
             $('#rowMarket').textContent=
-              names[symbol]||symbol;
+              names[symbol]||
+              symbol;
+
 
             state(true);
 
 
-            if(activeStrategy==='Smart AI'){
+            const best=
+              analysis?.bestSignal;
 
-              const ranked=
-                casperEngine.smartAI();
 
-              const selected=
-                ranked.find(x=>x.eligible);
+            if(best){
 
-              if(selected){
+              if(best.actionable){
 
                 $('#runMessage').textContent=
-                  `Smart AI analysis active · ${names[selected.symbol]||selected.symbol} · ${selected.strategy} · ${selected.direction||''} · confidence ${(selected.confidence*100).toFixed(1)}% · validation only`;
+                  `${best.strategy} analysis · ${best.direction||''} · confidence ${(best.confidence*100).toFixed(1)}% · validation only`;
 
               }else{
 
                 $('#runMessage').textContent=
-                  'Smart AI is scanning all markets · no sufficiently validated edge yet.';
+                  `Market analysis active · ${best.reason||'waiting for stronger conditions'}`;
               }
 
             }else{
 
-              const best=
-                analysis?.bestSignal;
-
-              if(best){
-
-                if(best.actionable){
-
-                  $('#runMessage').textContent=
-                    `${best.strategy} analysis · ${best.direction||''} · confidence ${(best.confidence*100).toFixed(1)}% · validation only`;
-
-                }else{
-
-                  $('#runMessage').textContent=
-                    `Market analysis active · ${best.reason||'waiting for stronger conditions'}`;
-                }
-
-              }else{
-
-                $('#runMessage').textContent=
-                  'Building market sample for analysis…';
-              }
+              $('#runMessage').textContent=
+                'Building market sample for analysis…';
             }
           }
         }
@@ -2488,7 +4243,6 @@ window.CASPER_ENGINE = (() => {
       ws.onerror=()=>{
 
         state(false);
-
       };
 
 
@@ -2496,12 +4250,17 @@ window.CASPER_ENGINE = (() => {
 
         state(false);
 
-        clearTimeout(retryTimer);
 
-        retryTimer=setTimeout(
-          connect,
-          2200
+        clearTimeout(
+          retryTimer
         );
+
+
+        retryTimer=
+          setTimeout(
+            connect,
+            2200
+          );
       };
 
 
@@ -2509,43 +4268,98 @@ window.CASPER_ENGINE = (() => {
 
       state(false);
 
-      clearTimeout(retryTimer);
 
-      retryTimer=setTimeout(
-        connect,
-        3000
+      clearTimeout(
+        retryTimer
       );
+
+
+      retryTimer=
+        setTimeout(
+          connect,
+          3000
+        );
     }
   }
 
 
-  market.addEventListener('change',()=>{
+  market.addEventListener(
+    'change',
+    ()=>{
 
-    const n=names[market.value];
+      /*
+        Smart mode owns this control.
+        It should never reach this branch because
+        the select is disabled.
+      */
+      if(
+        market.value===SMART_VALUE
+      ){
+        return;
+      }
 
-    $('#marketName').textContent=n;
-    $('#rowMarket').textContent=n;
 
-    marketPremium.value=market.value;
+      manualMarket=
+        market.value;
 
-    count=0;
 
-    $('#tickCount').textContent='0';
+      const n=
+        names[market.value];
 
-    $('#quote').textContent='—';
-    $('#lastDigit').textContent='—';
 
-    $('#runMessage').textContent=
-      'Building a fresh analysis sample for the selected market…';
+      $('#marketName').textContent=n;
 
-    connect();
-  });
+      $('#rowMarket').textContent=n;
+
+
+      marketPremium.value=
+        market.value;
+
+
+      count=0;
+
+
+      $('#tickCount').textContent='0';
+
+      $('#quote').textContent='—';
+
+      $('#lastDigit').textContent='—';
+
+
+      $('#runMessage').textContent=
+        'Building a fresh analysis sample for the selected market…';
+
+
+      /*
+        The WebSocket already subscribes to all markets.
+        Reconnecting is retained here to preserve the
+        current working behavior.
+      */
+      connect();
+    }
+  );
 
 
   marketPremium.addEventListener(
     'change',
     ()=>{
-      market.value=marketPremium.value;
+
+      if(
+        activeStrategy==='Smart AI'
+      ){
+
+        showToast(
+          'Smart AI is selecting the market automatically.'
+        );
+
+        return;
+      }
+
+
+      market.value=
+        marketPremium.value;
+
+
       market.dispatchEvent(
         new Event('change')
       );
@@ -2553,103 +4367,183 @@ window.CASPER_ENGINE = (() => {
   );
 
 
-  $$('.risk').forEach(b=>{
+  $$('.risk').forEach(
+    b=>{
 
-    b.addEventListener('click',()=>{
+      b.addEventListener(
+        'click',
+        ()=>{
 
-      $$('.risk').forEach(x=>
-        x.classList.remove('active')
+          $$('.risk').forEach(
+            x=>
+              x.classList.remove(
+                'active'
+              )
+          );
+
+
+          b.classList.add(
+            'active'
+          );
+
+
+          const risk=
+            b.dataset.risk;
+
+
+          const note=
+            $('#riskNote');
+
+
+          note.classList.toggle(
+            'safe',
+            risk==='Low'
+          );
+
+
+          note.textContent=
+            `▱  ${risk} risk preset · stake escalation disabled during validation`;
+        }
       );
+    }
+  );
 
-      b.classList.add('active');
 
-      const risk=b.dataset.risk;
-      const note=$('#riskNote');
+  $$('.strategy').forEach(
+    b=>{
 
-      note.classList.toggle(
-        'safe',
-        risk==='Low'
+      b.addEventListener(
+        'click',
+        ()=>{
+
+          const p=
+            b.closest('.premiumGrid')
+              ? 'premium'
+              : 'free';
+
+
+          if(
+            p==='premium'&&
+            !premiumOwner
+          ){
+
+            showToast(
+              'Premium controls are available to subscribed users and the site owner.'
+            );
+
+            return;
+          }
+
+
+          $$(`#${p} .strategy`)
+            .forEach(
+              x=>
+                x.classList.remove(
+                  'selected'
+                )
+            );
+
+
+          b.classList.add(
+            'selected'
+          );
+
+
+          const newStrategy=
+            b.dataset.strategy;
+
+
+          /*
+            Smart AI has special market-control
+            behavior.
+          */
+          if(
+            newStrategy==='Smart AI'
+          ){
+
+            activeStrategy=
+              'Smart AI';
+
+
+            enterSmartMode();
+
+
+            return;
+          }
+
+
+          /*
+            If Smart AI was previously active,
+            restore the manual market before
+            switching to another strategy.
+          */
+          if(
+            activeStrategy==='Smart AI'
+          ){
+
+            leaveSmartMode();
+          }
+
+
+          activeStrategy=
+            newStrategy;
+
+
+          $('#runMessage').textContent=
+            `${activeStrategy} analysis selected · collecting live validation data.`;
+
+
+          if(
+            p==='premium'&&
+            activeStrategy==='Auto Switcher'
+          ){
+
+            showToast(
+              'Auto Switcher manages Rise / Fall direction only.'
+            );
+          }
+        }
       );
-
-      note.textContent=
-        `▱  ${risk} risk preset · stake escalation disabled during validation`;
-    });
-  });
+    }
+  );
 
 
-  $$('.strategy').forEach(b=>{
+  $$('.tab').forEach(
+    b=>{
 
-    b.addEventListener('click',()=>{
+      b.addEventListener(
+        'click',
+        ()=>{
 
-      const p=
-        b.closest('.premiumGrid')
-          ? 'premium'
-          : 'free';
+          $$('.tab').forEach(
+            x=>
+              x.classList.remove(
+                'active'
+              )
+          );
 
-      if(
-        p==='premium' &&
-        !premiumOwner
-      ){
 
-        showToast(
-          'Premium controls are available to subscribed users and the site owner.'
-        );
+          b.classList.add(
+            'active'
+          );
 
-        return;
-      }
 
-      $$(`#${p} .strategy`).forEach(x=>
-        x.classList.remove('selected')
+          $$('.panels').forEach(
+            x=>
+              x.classList.remove(
+                'show'
+              )
+          );
+
+
+          $('#'+b.dataset.panel)
+            .classList.add(
+              'show'
+            );
+        }
       );
-
-      b.classList.add('selected');
-
-      activeStrategy=b.dataset.strategy;
-
-
-      if(activeStrategy==='Smart AI'){
-
-        $('#runMessage').textContent=
-          'Smart AI is scanning every connected market and waiting for validated signal conditions.';
-
-      }else{
-
-        $('#runMessage').textContent=
-          `${activeStrategy} analysis selected · collecting live validation data.`;
-      }
-
-
-      if(
-        p==='premium' &&
-        activeStrategy==='Auto Switcher'
-      ){
-
-        showToast(
-          'Auto Switcher manages Rise / Fall direction only.'
-        );
-      }
-    });
-  });
-
-
-  $$('.tab').forEach(b=>{
-
-    b.addEventListener('click',()=>{
-
-      $$('.tab').forEach(x=>
-        x.classList.remove('active')
-      );
-
-      b.classList.add('active');
-
-      $$('.panels').forEach(x=>
-        x.classList.remove('show')
-      );
-
-      $('#'+b.dataset.panel)
-        .classList.add('show');
-    });
-  });
+    }
+  );
 
 
   /* ==========================================================
@@ -2657,41 +4551,61 @@ window.CASPER_ENGINE = (() => {
      ========================================================== */
 
   let signedIn=false;
+
   let premiumOwner=false;
 
-  const balanceSockets=new Map();
-  const balanceRetry=new Map();
-  const accountBalances=new Map();
-  const accountTypes=new Map();
+
+  const balanceSockets=
+    new Map();
+
+  const balanceRetry=
+    new Map();
+
+  const accountBalances=
+    new Map();
+
+  const accountTypes=
+    new Map();
+
 
   let balanceGeneration=0;
 
 
   function setAccountHeader(){
 
-    const id=$('#accountSelect').value;
+    const id=
+      $('#accountSelect').value;
 
-    const type=accountTypes.get(id);
 
-    const balance=accountBalances.get(id);
+    const type=
+      accountTypes.get(id);
+
+
+    const balance=
+      accountBalances.get(id);
+
 
     if(!id){
 
       $('#balance').textContent=
         '— USD';
 
+
       $('#accountType').textContent=
         signedIn
           ? 'Choose a Deriv account'
           : 'Not signed in';
 
+
       return;
     }
+
 
     $('#balance').textContent=
       typeof balance==='number'
         ? `${balance.toFixed(2)} ${accountTypes.get(`${id}:currency`)||'USD'}`
         : `— ${accountTypes.get(`${id}:currency`)||'USD'}`;
+
 
     $('#accountType').textContent=
       `${type==='demo'?'Demo':'Real'} account`;
@@ -2702,6 +4616,7 @@ window.CASPER_ENGINE = (() => {
 
     balanceGeneration++;
 
+
     for(
       const [id,socket]
       of balanceSockets
@@ -2709,28 +4624,42 @@ window.CASPER_ENGINE = (() => {
 
       socket.onclose=null;
 
+
       try{
         socket.close();
       }catch{}
 
-      balanceSockets.delete(id);
+
+      balanceSockets.delete(
+        id
+      );
     }
+
 
     for(
       const t
       of balanceRetry.values()
     ){
+
       clearTimeout(t);
     }
+
 
     balanceRetry.clear();
   }
 
 
-  async function openBalanceSocket(account){
+  async function openBalanceSocket(
+    account
+  ){
 
-    const id=account.id;
-    const generation=balanceGeneration;
+    const id=
+      account.id;
+
+
+    const generation=
+      balanceGeneration;
+
 
     try{
 
@@ -2746,33 +4675,43 @@ window.CASPER_ENGINE = (() => {
               'Accept':
                 'application/json'
             },
-            body:JSON.stringify({
-              accountId:id
-            })
+            body:
+              JSON.stringify({
+                accountId:id
+              })
           }
         );
+
 
       const payload=
         await response.json();
 
+
       if(
-        !response.ok ||
+        !response.ok||
         !payload.url
       ){
+
         throw new Error(
           'balance connection unavailable'
         );
       }
 
+
       if(
-        !signedIn ||
+        !signedIn||
         generation!==balanceGeneration
       ){
+
         return;
       }
 
+
       const socket=
-        new WebSocket(payload.url);
+        new WebSocket(
+          payload.url
+        );
+
 
       balanceSockets.set(
         id,
@@ -2795,27 +4734,43 @@ window.CASPER_ENGINE = (() => {
 
         let msg;
 
+
         try{
-          msg=JSON.parse(event.data);
+
+          msg=
+            JSON.parse(
+              event.data
+            );
+
         }catch{
+
           return;
         }
 
+
         if(msg.error)return;
 
+
         const data=
-          msg.balance ||
+          msg.balance||
           msg;
 
-        const amount=
-          Number(data.balance);
 
-        if(Number.isFinite(amount)){
+        const amount=
+          Number(
+            data.balance
+          );
+
+
+        if(
+          Number.isFinite(amount)
+        ){
 
           accountBalances.set(
             id,
             amount
           );
+
 
           if(data.currency){
 
@@ -2825,16 +4780,22 @@ window.CASPER_ENGINE = (() => {
             );
           }
 
+
           if(
-            $('#accountSelect').value===id
+            $('#accountSelect').value===
+            id
           ){
 
             setAccountHeader();
           }
 
+
           const option=
             $$('#accountSelect option')
-              .find(o=>o.value===id);
+              .find(
+                o=>o.value===id
+              );
+
 
           if(option){
 
@@ -2852,14 +4813,16 @@ window.CASPER_ENGINE = (() => {
 
         balanceSockets.delete(id);
 
+
         if(
-          signedIn &&
+          signedIn&&
           accountTypes.has(id)
         ){
 
           clearTimeout(
             balanceRetry.get(id)
           );
+
 
           balanceRetry.set(
             id,
@@ -2875,14 +4838,15 @@ window.CASPER_ENGINE = (() => {
     }catch{
 
       if(
-        signedIn &&
-        generation===balanceGeneration &&
+        signedIn&&
+        generation===balanceGeneration&&
         accountTypes.has(id)
       ){
 
         clearTimeout(
           balanceRetry.get(id)
         );
+
 
         balanceRetry.set(
           id,
@@ -2896,10 +4860,6 @@ window.CASPER_ENGINE = (() => {
   }
 
 
-  /*
-    GitHub Pages hosts the frontend.
-    Render hosts the secure OAuth/session backend.
-  */
   async function loadSession(){
 
     try{
@@ -2917,13 +4877,15 @@ window.CASPER_ENGINE = (() => {
           }
         );
 
+
       const data=
         await r.json();
+
 
       if(!r.ok){
 
         throw new Error(
-          data.error ||
+          data.error||
           'Could not check your Deriv session.'
         );
       }
@@ -2933,6 +4895,7 @@ window.CASPER_ENGINE = (() => {
         Boolean(
           data.authenticated
         );
+
 
       premiumOwner=
         Boolean(
@@ -2946,17 +4909,21 @@ window.CASPER_ENGINE = (() => {
           : 'Login with Deriv';
 
 
-      $('#accountSelect').classList.toggle(
-        'hidden',
-        !signedIn ||
-        !data.accounts?.length
-      );
+      $('#accountSelect')
+        .classList
+        .toggle(
+          'hidden',
+          !signedIn||
+          !data.accounts?.length
+        );
 
 
-      $('#ownerPanel').classList.toggle(
-        'hidden',
-        !premiumOwner
-      );
+      $('#ownerPanel')
+        .classList
+        .toggle(
+          'hidden',
+          !premiumOwner
+        );
 
 
       $('#unlockBtn').textContent=
@@ -2977,15 +4944,20 @@ window.CASPER_ENGINE = (() => {
           : 'Owner access is granted only when your Deriv account ID is on the server allowlist.';
 
 
-      $$('#premium .strategy').forEach(button=>{
+      $$('#premium .strategy')
+        .forEach(
+          button=>{
 
-        button.disabled=!premiumOwner;
+            button.disabled=
+              !premiumOwner;
 
-        button.classList.toggle(
-          'locked',
-          !premiumOwner
+
+            button.classList.toggle(
+              'locked',
+              !premiumOwner
+            );
+          }
         );
-      });
 
 
       if(signedIn){
@@ -2993,13 +4965,18 @@ window.CASPER_ENGINE = (() => {
         const accounts=
           data.accounts||[];
 
+
         closeBalanceSockets();
 
+
         accountBalances.clear();
+
         accountTypes.clear();
+
 
         const accountSelect=
           $('#accountSelect');
+
 
         accountSelect.replaceChildren(
           new Option(
@@ -3009,36 +4986,40 @@ window.CASPER_ENGINE = (() => {
         );
 
 
-        accounts.forEach(a=>{
+        accounts.forEach(
+          a=>{
 
-          accountTypes.set(
-            a.id,
-            a.type
-          );
-
-          accountTypes.set(
-            `${a.id}:currency`,
-            a.currency||'USD'
-          );
-
-          if(
-            typeof a.balance==='number'
-          ){
-
-            accountBalances.set(
+            accountTypes.set(
               a.id,
-              a.balance
+              a.type
+            );
+
+
+            accountTypes.set(
+              `${a.id}:currency`,
+              a.currency||'USD'
+            );
+
+
+            if(
+              typeof a.balance==='number'
+            ){
+
+              accountBalances.set(
+                a.id,
+                a.balance
+              );
+            }
+
+
+            accountSelect.add(
+              new Option(
+                `${a.type==='demo'?'Demo':'Real'} · ${a.currency||'USD'} · ${typeof a.balance==='number'?a.balance.toFixed(2):'—'}`,
+                a.id
+              )
             );
           }
-
-
-          accountSelect.add(
-            new Option(
-              `${a.type==='demo'?'Demo':'Real'} · ${a.currency||'USD'} · ${typeof a.balance==='number'?a.balance.toFixed(2):'—'}`,
-              a.id
-            )
-          );
-        });
+        );
 
 
         $('#accountSelect').value=
@@ -3057,55 +5038,79 @@ window.CASPER_ENGINE = (() => {
 
         premiumOwner=false;
 
+
         closeBalanceSockets();
 
-        $('#accountSelect').innerHTML='';
+
+        $('#accountSelect')
+          .innerHTML='';
+
 
         setAccountHeader();
 
+
         $('#ownerPanel')
-          .classList.add('hidden');
+          .classList
+          .add(
+            'hidden'
+          );
+
 
         $('#unlockBtn').textContent=
           '♛  Premium access';
 
+
         $('#premiumSubtitle').textContent=
           'Premium access for subscribed accounts';
 
+
         $$('#premium .strategy')
-          .forEach(button=>{
+          .forEach(
+            button=>{
 
-            button.disabled=true;
+              button.disabled=true;
 
-            button.classList.add(
-              'locked'
-            );
-          });
+              button.classList.add(
+                'locked'
+              );
+            }
+          );
       }
 
 
     }catch(e){
 
       signedIn=false;
+
       premiumOwner=false;
+
 
       closeBalanceSockets();
 
+
       $('#ownerPanel')
-        .classList.add('hidden');
+        .classList
+        .add(
+          'hidden'
+        );
+
 
       $$('#premium .strategy')
-        .forEach(button=>{
+        .forEach(
+          button=>{
 
-          button.disabled=true;
+            button.disabled=true;
 
-          button.classList.add(
-            'locked'
-          );
-        });
+            button.classList.add(
+              'locked'
+            );
+          }
+        );
+
 
       $('#loginBtn').textContent=
         'Login with Deriv';
+
 
       setAccountHeader();
     }
@@ -3118,11 +5123,6 @@ window.CASPER_ENGINE = (() => {
 
       if(!signedIn){
 
-        /*
-          Always send the user to the Render OAuth backend.
-          This works even though the frontend itself is on
-          GitHub Pages.
-        */
         location.assign(
           `${AUTH_BASE}/auth/login`
         );
@@ -3148,15 +5148,19 @@ window.CASPER_ENGINE = (() => {
             }
           );
 
+
         if(!r.ok){
           throw new Error();
         }
 
+
         await loadSession();
+
 
         showToast(
           'Signed out of Deriv.'
         );
+
 
       }catch{
 
@@ -3179,6 +5183,7 @@ window.CASPER_ENGINE = (() => {
         return;
       }
 
+
       try{
 
         const r=
@@ -3193,30 +5198,35 @@ window.CASPER_ENGINE = (() => {
                 'Accept':
                   'application/json'
               },
-              body:JSON.stringify({
-                accountId:
-                  e.target.value
-              })
+              body:
+                JSON.stringify({
+                  accountId:
+                    e.target.value
+                })
             }
           );
+
 
         const data=
           await r.json();
 
+
         if(!r.ok){
 
           throw new Error(
-            data.error ||
+            data.error||
             'Could not change account.'
           );
         }
 
+
         setAccountHeader();
+
 
       }catch(err){
 
         showToast(
-          err.message ||
+          err.message||
           'Could not change account.'
         );
       }
@@ -3224,19 +5234,11 @@ window.CASPER_ENGINE = (() => {
   );
 
 
-  /*
-    OAuth callback handling.
-
-    The backend may return the browser to the GitHub Pages
-    frontend with ?login=... .
-
-    We do NOT assume success or failure from the query alone.
-    The real session is checked against Render using /auth/session.
-  */
   const loginParams=
     new URLSearchParams(
       location.search
     );
+
 
   if(
     loginParams.has('login')
@@ -3245,7 +5247,10 @@ window.CASPER_ENGINE = (() => {
     const loginStatus=
       loginParams.get('login');
 
-    if(loginStatus==='error'){
+
+    if(
+      loginStatus==='error'
+    ){
 
       showToast(
         'Deriv sign-in did not complete. You can try again.'
@@ -3258,6 +5263,7 @@ window.CASPER_ENGINE = (() => {
       );
     }
 
+
     history.replaceState(
       {},
       '',
@@ -3269,6 +5275,7 @@ window.CASPER_ENGINE = (() => {
   $('#unlockBtn').addEventListener(
     'click',
     ()=>{
+
       showToast(
         premiumOwner
           ? 'Owner Premium access is active.'
@@ -3283,17 +5290,25 @@ window.CASPER_ENGINE = (() => {
     ()=>{
 
       const vals=[
+
         '#stake',
+
         '#target',
+
         '#maxloss'
+
       ].map(
-        s=>Number($(s).value)
+        s=>Number(
+          $(s).value
+        )
       );
 
 
       if(
         vals.some(
-          v=>!Number.isFinite(v)||v<=0
+          v=>
+            !Number.isFinite(v)||
+            v<=0
         )
       ){
 
@@ -3306,7 +5321,7 @@ window.CASPER_ENGINE = (() => {
 
 
       if(
-        !signedIn ||
+        !signedIn||
         !$('#accountSelect').value
       ){
 
@@ -3338,6 +5353,7 @@ window.CASPER_ENGINE = (() => {
         return;
       }
 
+
       showToast(
         'Premium analysis is running in validation mode. No order was sent.'
       );
@@ -3353,6 +5369,7 @@ window.CASPER_ENGINE = (() => {
         'light'
       );
 
+
       if(
         document.body.classList.contains(
           'light'
@@ -3364,20 +5381,24 @@ window.CASPER_ENGINE = (() => {
           '#eef4f6'
         );
 
+
         document.documentElement.style.setProperty(
           '--panel',
           '#fff'
         );
+
 
         document.documentElement.style.setProperty(
           '--panel2',
           '#f6fbfc'
         );
 
+
         document.documentElement.style.setProperty(
           '--text',
           '#142b35'
         );
+
 
         document.documentElement.style.setProperty(
           '--line',
@@ -3387,13 +5408,22 @@ window.CASPER_ENGINE = (() => {
       }else{
 
         [
+
           '--bg',
+
           '--panel',
+
           '--panel2',
+
           '--text',
+
           '--line'
-        ].forEach(k=>
-          document.documentElement.style.removeProperty(k)
+
+        ].forEach(
+          k=>
+            document.documentElement
+              .style
+              .removeProperty(k)
         );
       }
     }
@@ -3405,30 +5435,18 @@ window.CASPER_ENGINE = (() => {
      ========================================================== */
 
   /*
-    Authentication is checked automatically against Render.
-    No manual connection button is required.
+    Authentication automatically checks Render.
   */
   loadSession();
 
+
   /*
-    Automatic market-data startup.
-    No Connect button is required.
+    Market feed automatically starts.
+
+    All ten markets are subscribed immediately.
   */
   connect();
 
-
-  /*
-    Development diagnostics.
-    These are available from the browser console:
-
-      CASPER_ENGINE_STATE()
-
-    and:
-
-      CASPER_SMART_SCAN()
-
-    They do not alter the UI or execute trades.
-  */
 
   window.CASPER_ENGINE_STATE=()=>{
 
@@ -3446,9 +5464,26 @@ window.CASPER_ENGINE = (() => {
     '[CASPER] Analysis engine initialized.'
   );
 
+
   console.info(
-    '[CASPER] Live multi-market validation active.'
+    '[CASPER] All supported Volatility markets are being monitored.'
   );
+
+
+  console.info(
+    '[CASPER] Forward validation engine active.'
+  );
+
+
+  console.info(
+    '[CASPER] Smart AI uses Free-tier Rise/Fall and Even/Odd candidates.'
+  );
+
+
+  console.info(
+    '[CASPER] Matches Printer forward validation active.'
+  );
+
 
   console.info(
     '[CASPER] Render authentication backend:',
