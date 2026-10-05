@@ -4262,17 +4262,27 @@ window.CASPER_ENGINE = (() => {
           ? safeProfit
           : 0;
 
-      const payoutValue=
-        Number(finalContract.payout);
+      /*
+        IMPORTANT: Deriv's final-contract `payout` can represent the
+        contract's quoted/gross payout and must NOT be added to the
+        session total for a losing contract.
 
-      const safePayout=
-        Number.isFinite(payoutValue)
-          ? Math.max(0,payoutValue)
-          : Math.max(0,stake+finalPL);
+        For the transaction ledger, payout means the ACTUAL amount
+        returned/realized by the completed trade:
+          WIN  = stake + profit
+          LOSS = 0
+
+        This keeps Total P/L mathematically consistent with the
+        individual transaction results.
+      */
+      const realizedPayout=
+        finalPL>0
+          ? stake+finalPL
+          : 0;
 
       demoSessionTrades++;
       demoSessionStake+=stake;
-      demoSessionPayout+=safePayout;
+      demoSessionPayout+=realizedPayout;
       demoSessionPL=
         demoSessionPayout-demoSessionStake;
 
@@ -4317,7 +4327,7 @@ window.CASPER_ENGINE = (() => {
         buyPrice:
           Number(finalContract.buy_price)||askPrice,
 
-        payout:safePayout,
+        payout:realizedPayout,
 
         entrySpot:
           Number(finalContract.entry_spot)||null,
