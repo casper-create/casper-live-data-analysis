@@ -2560,7 +2560,10 @@ window.CASPER_ENGINE = (() => {
           const regimePenalty=f.regime==='high_volatility'?.84:f.regime==='compression'?.91:f.regime==='range'?.95:1;
           const validationStrength=v.mature?clamp(v.factor,.35,1.10):.72;
           const validationBonus=v.mature?clamp(.80+Math.max(0,(v.accuracy||.5)-.5)*2.4,.70,1.12):.82;
-          const agreement=c.strategy==='Mix Both'?.94:(rf?.actionable&&parity?.actionable?.92:.80);
+          const agreement=
+            c.strategy==='Mix Both'
+              ? .94
+              : (rf?.actionable&&parity?.actionable ? .92 : .80);
           const entropyPenalty=entropy>.985?.86:entropy>.95?.93:1;
           const concentrationPenalty=concentration>.32?.88:concentration>.25?.94:1;
           const score=c.signal.confidence*q.integrity*(.70+.30*clamp(f.direction.stability,.2,1))*validationStrength*validationBonus*agreement*regimePenalty*entropyPenalty*concentrationPenalty;
@@ -3239,50 +3242,239 @@ window.CASPER_ENGINE = (() => {
 
 
   function updateRunButton(){
-    const button=$('#runBtn'); if(!button)return;
-    if(demoAutoRun){ button.disabled=true; button.textContent=demoTradeInProgress?'⟳ &nbsp;Trading &amp; rescanning…':'● &nbsp;Smart session running'; return; }
-    if(!signedIn){ button.disabled=true; button.textContent='▷ &nbsp;Sign in with Deriv first'; return; }
-    if(!selectedAccountIsDemo()){ button.disabled=true; button.textContent='▷ &nbsp;Choose a Demo account'; return; }
+    const button=$('#runBtn');
+    if(!button)return;
+
+    if(demoAutoRun){
+      button.disabled=true;
+      button.textContent=
+        demoTradeInProgress
+          ? '⟳ &nbsp;Trading &amp; waiting for next setup…'
+          : '● &nbsp;Continuous session running';
+      return;
+    }
+
+    if(!signedIn){
+      button.disabled=true;
+      button.textContent='▷ &nbsp;Sign in with Deriv first';
+      return;
+    }
+
+    if(!selectedAccountIsDemo()){
+      button.disabled=true;
+      button.textContent='▷ &nbsp;Choose a Demo account';
+      return;
+    }
+
     const risk=demoRiskStatus();
-    if(risk.blocked){ button.disabled=true; button.textContent='✓ &nbsp;Demo risk limit reached'; return; }
-    button.disabled=false; button.textContent='▷ &nbsp;Start Continuous Demo Run';
+
+    if(risk.blocked){
+      button.disabled=true;
+      button.textContent='✓ &nbsp;Demo risk limit reached';
+      return;
+    }
+
+    button.disabled=false;
+    button.textContent='▷ &nbsp;Start Continuous Demo Run';
   }
 
-  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const sleep=ms=>
+    new Promise(resolve=>setTimeout(resolve,ms));
 
   function stopDemoRun(reason='user'){
-    demoAutoRun=false; demoRunSerial++;
-    $('#runMessage').textContent=reason==='risk'?demoRiskStatus().reason:reason==='error'?'Demo session stopped safely after an execution error.':'Demo session stopped. Press RUN to start a new session.';
+    demoAutoRun=false;
+    demoRunSerial++;
+
+    $('#runMessage').textContent=
+      reason==='risk'
+        ? demoRiskStatus().reason
+        : reason==='error'
+          ? 'Demo session stopped safely after an execution error. Press RUN to start again.'
+          : 'Demo session stopped. Press RUN to start a new session.';
+
     updateRunButton();
   }
 
+  function continuousScanMessage(){
+    if(activeStrategy==='Smart AI'){
+      return 'Smart AI is continuously scanning all 10 markets × Rise/Fall × Even/Odd × Mix Both for the next validated setup.';
+    }
+
+    const marketLabel=
+      names[market.value]||
+      market.value||
+      'selected market';
+
+    return `${activeStrategy} is continuously scanning ${marketLabel} for the next validated setup.`;
+  }
+
   async function demoRunLoop(serial){
-    while(demoAutoRun&&serial===demoRunSerial){
+
+    let scansWithoutCandidate=0;
+
+    while(
+      demoAutoRun&&
+      serial===demoRunSerial
+    ){
+
       const risk=demoRiskStatus();
-      if(risk.blocked){stopDemoRun('risk');break;}
-      if(!signedIn||!selectedAccountIsDemo()){stopDemoRun('error');break;}
-      const candidate=getFreeCandidate();
-      if(!candidate){
-        $('#runMessage').textContent='Smart AI is scanning all 10 markets × Rise/Fall × Even/Odd × Mix Both · no qualifying edge yet.';
-        await sleep(1200); continue;
+
+      if(risk.blocked){
+        stopDemoRun('risk');
+        break;
       }
-      $('#runMessage').textContent=`Smart AI qualified ${names[candidate.symbol]||candidate.symbol} · ${candidate.strategy} · ${candidate.direction||''} · confidence ${(candidate.confidence*100).toFixed(1)}% · executing Demo trade`;
-      const result=await executeDemoTradeOnce(candidate);
-      if(!result||result.error){stopDemoRun('error');break;}
+
+      if(
+        !signedIn||
+        !selectedAccountIsDemo()
+      ){
+        stopDemoRun('error');
+        break;
+      }
+
+      /*
+        IMPORTANT:
+        A missing candidate is NOT an execution error.
+        It simply means the market has not produced the next
+        qualifying setup yet. Keep the session alive.
+      */
+      const candidate=getFreeCandidate();
+
+      if(!candidate){
+
+        scansWithoutCandidate++;
+
+        $('#runMessage').textContent=
+          `${continuousScanMessage()} · waiting for a qualifying edge…`;
+
+        /*
+          Use a short polling interval so the next live tick
+          can produce a trade without making the UI appear stuck.
+        */
+        await sleep(
+          scansWithoutCandidate<5
+            ? 350
+            : 650
+        );
+
+        continue;
+      }
+
+      scansWithoutCandidate=0;
+
+      $('#runMessage').textContent=
+        `${activeStrategy==='Smart AI'?'Smart AI':'Nexora'} qualified ${names[candidate.symbol]||candidate.symbol} · ${candidate.strategy} · ${candidate.direction||''} · confidence ${(candidate.confidence*100).toFixed(1)}% · executing Demo trade`;
+
+      const result=
+        await executeDemoTradeOnce(candidate);
+
+      /*
+        The execution function can return undefined only when
+        another trade is already in progress or a safety guard
+        returned early. Never kill a continuous session for that.
+      */
+      if(
+        result===undefined
+      ){
+        await sleep(250);
+        continue;
+      }
+
+      if(result.error){
+
+        /*
+          A closed/expired trading socket can happen between
+          contracts. Give the authenticated Demo connection one
+          clean recovery attempt instead of permanently killing
+          the continuous session.
+        */
+        if(
+          demoAutoRun&&
+          serial===demoRunSerial&&
+          /connection|WebSocket|socket/i.test(
+            result.message||result.reason||''
+          )
+        ){
+
+          $('#runMessage').textContent=
+            'Demo trading connection interrupted · reconnecting and resuming the session…';
+
+          closeTradeSocket();
+          await sleep(900);
+          continue;
+        }
+
+        stopDemoRun('error');
+        break;
+      }
+
       const after=demoRiskStatus();
-      if(after.blocked){stopDemoRun('risk');break;}
-      await sleep(result.profit<0?1400:700);
+
+      if(after.blocked){
+        stopDemoRun('risk');
+        break;
+      }
+
+      /*
+        Trade completed successfully.
+        Return to the scanner automatically. No second RUN click.
+      */
+      $('#runMessage').textContent=
+        `${result.profit>=0?'Trade completed':'Trade completed'} · ${result.profit>=0?'+':''}${Number(result.profit||0).toFixed(2)} USD · ${demoSessionTrades} run${demoSessionTrades===1?'':'s'} · ${continuousScanMessage()}`;
+
+      await sleep(
+        result.profit<0
+          ? 900
+          : 450
+      );
     }
   }
 
   function startDemoRun(){
     if(demoAutoRun)return;
-    const risk=demoRiskStatus(); if(risk.blocked){$('#runMessage').textContent=risk.reason;updateRunButton();return;}
-    if(!signedIn||!selectedAccountIsDemo()){updateRunButton();return;}
-    demoAutoRun=true; demoRunSerial++; const serial=demoRunSerial;
-    $('#runMessage').textContent='Continuous Demo session started · Smart AI scanning all markets and all Free strategies.';
+
+    /*
+      Reset only the stop flag here. We do NOT reset the
+      transaction ledger; a continuous session keeps its
+      accumulated P/L until Reset is pressed.
+    */
+    demoTradingStopped=false;
+
+    const risk=demoRiskStatus();
+
+    if(risk.blocked){
+      $('#runMessage').textContent=risk.reason;
+      updateRunButton();
+      return;
+    }
+
+    if(
+      !signedIn||
+      !selectedAccountIsDemo()
+    ){
+      updateRunButton();
+      return;
+    }
+
+    demoAutoRun=true;
+    demoRunSerial++;
+
+    const serial=demoRunSerial;
+
+    $('#runMessage').textContent=
+      'Continuous Demo session started · scanning live data for the next qualified setup.';
+
     updateRunButton();
-    demoRunLoop(serial).catch(error=>{console.error('[CASPER] continuous loop',error);stopDemoRun('error');});
+
+    demoRunLoop(serial).catch(
+      error=>{
+        console.error(
+          '[CASPER] continuous loop',
+          error
+        );
+        stopDemoRun('error');
+      }
+    );
   }
 
 
@@ -4244,10 +4436,12 @@ window.CASPER_ENGINE = (() => {
       }
 
       /*
-        Ask the balance socket for the current balance
-        again on its normal subscription cycle.
+        Do NOT call loadSession() here.
+        loadSession() closes and rebuilds the authenticated trading
+        socket. That is unnecessary between continuous trades and
+        can interrupt the next execution cycle. The existing live
+        balance socket already refreshes the selected account balance.
       */
-      await loadSession();
       return {ok:true,profit:finalPL,record:resultRecord};
 
     }catch(error){
