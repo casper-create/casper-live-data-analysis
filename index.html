@@ -706,6 +706,10 @@
       line-height:1.45
     }
 
+    .aiScanBadge{display:inline-flex;align-items:center;gap:7px;margin-top:10px;padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--muted);font-size:11px;font-weight:800}
+    .aiScanBadge .pulse{width:7px;height:7px;border-radius:50%;background:var(--cyan);animation:casperPulse 1.6s infinite}
+    @keyframes casperPulse{0%{opacity:.45}50%{opacity:1}100%{opacity:.45}}
+
     @media(max-width:850px){
       .topbar{padding:10px 14px}
       .brand{font-size:17px}
@@ -737,6 +741,10 @@
       .feedhead,.tickrow{grid-template-columns:1fr 1fr}
       .feedhead span:nth-child(n+3),
       .tickrow span:nth-child(n+3){display:none}
+      .run{min-height:52px}
+      .transactionsHead{align-items:flex-start;flex-direction:column}
+      .transactionsActions{width:100%}
+      .txbtn{flex:1;min-height:42px}
     }
 
     @media(max-width:480px){
@@ -920,6 +928,8 @@
   <button class="run" id="runBtn" disabled>
     ▷ &nbsp;Demo account required
   </button>
+
+  <div class="aiScanBadge"><span class="pulse"></span> Smart AI: all markets · Rise/Fall · Even/Odd · Mix Both</div>
 
   <div class="message" id="runMessage">
     Sign in and choose a Demo account. Nexora will wait for a qualifying signal before requesting a proposal.
@@ -1868,18 +1878,22 @@ window.CASPER_ENGINE = (() => {
     }
 
 
+    function calculateMixBoth(features){
+      const rf=calculateRiseFall(features);
+      const parity=calculateParity(features);
+      const options=[rf,parity].filter(x=>x&&x.actionable);
+      if(!options.length) return {strategy:'Mix Both',actionable:false,direction:null,confidence:0,score:0,reason:'no_free_strategy_edge'};
+      options.sort((a,b)=>b.confidence-a.confidence);
+      const best=options[0], second=options[1];
+      const agreement=second ? clamp(1-Math.abs(best.confidence-second.confidence)*1.5,.72,1) : .78;
+      const confidence=clamp(best.confidence*.72+agreement*.18+Math.min(1,best.score)*.10,.5,.95);
+      return {strategy:'Mix Both',baseStrategy:best.strategy,actionable:confidence>=.61,direction:best.direction,confidence,score:confidence,reason:'cross_strategy_free_comparison',component:best};
+    }
+
     function calculateSignals(features){
-
-      return {
-
-        riseFall:calculateRiseFall(features),
-
-        parity:calculateParity(features),
-
-        over8:calculateOver8(features),
-
-        match:calculateDigitMatch(features)
-      };
+      const riseFall=calculateRiseFall(features);
+      const parity=calculateParity(features);
+      return {riseFall,parity,mixBoth:calculateMixBoth(features),over8:calculateOver8(features),match:calculateDigitMatch(features)};
     }
 
 
@@ -1888,6 +1902,7 @@ window.CASPER_ENGINE = (() => {
       const usable=[
         signals.riseFall,
         signals.parity,
+        signals.mixBoth,
         signals.over8,
         signals.match
       ].filter(x=>x.actionable);
@@ -2396,6 +2411,7 @@ window.CASPER_ENGINE = (() => {
           signals:{
             riseFall:null,
             parity:null,
+            mixBoth:null,
             over8:null,
             match:null
           },
@@ -2528,154 +2544,35 @@ window.CASPER_ENGINE = (() => {
 
 
     function smartAI(){
-
       const ranked=[];
-
       for(const snap of allMarkets()){
-
-        if(!snap.ready){
-
-          ranked.push({
-
-            symbol:snap.symbol,
-            eligible:false,
-            score:0,
-            reason:'insufficient_data',
-            snapshot:snap
-          });
-
-          continue;
-        }
-
-        const quality=snap.dataQuality;
-
-        if(quality.integrity<.985){
-
-          ranked.push({
-
-            symbol:snap.symbol,
-            eligible:false,
-            score:0,
-            reason:'data_quality',
-            snapshot:snap
-          });
-
-          continue;
-        }
-
+        if(!snap.ready){ ranked.push({symbol:snap.symbol,eligible:false,score:0,reason:'insufficient_data',snapshot:snap}); continue; }
+        const q=snap.dataQuality;
+        if(q.integrity<.995 || snap.ticks<MIN_TICKS){ ranked.push({symbol:snap.symbol,eligible:false,score:0,reason:'data_quality_or_sample',snapshot:snap}); continue; }
+        const rf=snap.signals.riseFall, parity=snap.signals.parity, mix=snap.signals.mixBoth;
         const candidates=[];
-
-        const rf=snap.signals.riseFall;
-
-        if(rf?.actionable){
-
-          const validation=
-            strategyValidationFactor(
-              snap.validation,
-              'Rise & Fall'
-            );
-
-          candidates.push({
-
-            signal:rf,
-            validation,
-            strategy:'Rise & Fall'
-          });
-        }
-
-        const parity=snap.signals.parity;
-
-        if(parity?.actionable){
-
-          const validation=
-            parityValidationFactor(
-              snap.validation,
-              parity.direction
-            );
-
-          candidates.push({
-
-            signal:parity,
-            validation,
-            strategy:'Even & Odd'
-          });
-        }
-
-        if(!candidates.length){
-
-          ranked.push({
-
-            symbol:snap.symbol,
-            eligible:false,
-            score:0,
-            reason:'no_actionable_free_edge',
-            snapshot:snap
-          });
-
-          continue;
-        }
-
-        const scored=
-          candidates.map(candidate=>{
-
-            const signal=candidate.signal;
-            const validation=candidate.validation;
-
-            const stability=
-              snap.features.direction.stability;
-
-            const regimePenalty=
-              snap.features.regime==='high_volatility'
-                ? .88
-                : snap.features.regime==='compression'
-                  ? .94
-                  : 1;
-
-            const score=
-              signal.confidence*
-              quality.integrity*
-              (.75+.25*stability)*
-              validation.factor*
-              regimePenalty;
-
-            return {
-
-              symbol:snap.symbol,
-
-              eligible:score>=.56,
-
-              score,
-
-              strategy:candidate.strategy,
-
-              direction:signal.direction,
-
-              confidence:signal.confidence,
-
-              reason:signal.reason,
-
-              regime:snap.features.regime,
-
-              validation,
-
-              snapshot:snap
-            };
-          });
-
-        scored.sort(
-          (a,b)=>b.score-a.score
-        );
-
-        ranked.push(scored[0]);
+        if(rf?.actionable) candidates.push({signal:rf,strategy:'Rise & Fall',baseStrategy:'Rise & Fall',validation:strategyValidationFactor(snap.validation,'Rise & Fall')});
+        if(parity?.actionable) candidates.push({signal:parity,strategy:'Even & Odd',baseStrategy:'Even & Odd',validation:parityValidationFactor(snap.validation,parity.direction)});
+        if(mix?.actionable){ const base=mix.baseStrategy; const v=base==='Rise & Fall'?strategyValidationFactor(snap.validation,'Rise & Fall'):parityValidationFactor(snap.validation,mix.direction); candidates.push({signal:mix,strategy:'Mix Both',baseStrategy:base,validation:v}); }
+        if(!candidates.length){ ranked.push({symbol:snap.symbol,eligible:false,score:0,reason:'no_free_strategy_edge',snapshot:snap}); continue; }
+        const scored=candidates.map(c=>{
+          const f=snap.features, v=c.validation, entropy=f.digits.digitEntropy, concentration=f.digits.digitConcentration;
+          const regimePenalty=f.regime==='high_volatility'?.84:f.regime==='compression'?.91:f.regime==='range'?.95:1;
+          const validationStrength=v.mature?clamp(v.factor,.35,1.10):.72;
+          const validationBonus=v.mature?clamp(.80+Math.max(0,(v.accuracy||.5)-.5)*2.4,.70,1.12):.82;
+          const agreement=c.strategy==='Mix Both'?.94:(rf?.actionable&&parity?.actionable?.92:.80);
+          const entropyPenalty=entropy>.985?.86:entropy>.95?.93:1;
+          const concentrationPenalty=concentration>.32?.88:concentration>.25?.94:1;
+          const score=c.signal.confidence*q.integrity*(.70+.30*clamp(f.direction.stability,.2,1))*validationStrength*validationBonus*agreement*regimePenalty*entropyPenalty*concentrationPenalty;
+          const eligible=score>=.60&&c.signal.confidence>=.61&&v.total>=VALIDATION_MINIMUM&&f.regime!=='high_volatility'&&entropy<.99;
+          return {symbol:snap.symbol,eligible,score,strategy:c.strategy,baseStrategy:c.baseStrategy,direction:c.signal.direction,confidence:c.signal.confidence,reason:eligible?'multi_strategy_validated_edge':'edge_filter_rejected',regime:f.regime,validation:v,snapshot:snap};
+        });
+        scored.sort((a,b)=>b.score-a.score);
+        ranked.push({...scored[0],alternatives:scored.slice(1,3)});
       }
-
-      ranked.sort(
-        (a,b)=>b.score-a.score
-      );
-
+      ranked.sort((a,b)=>b.score-a.score);
       return ranked;
     }
-
 
     function onTick(input){
       return addTick(input);
@@ -2847,6 +2744,8 @@ window.CASPER_ENGINE = (() => {
   const contractWatchers=new Map();
 
   let demoTradeInProgress=false;
+  let demoAutoRun=false;
+  let demoRunSerial=0;
 
   let demoSessionPL=0;
 
@@ -3220,19 +3119,7 @@ window.CASPER_ENGINE = (() => {
       signal=snap.signals.parity;
 
     }else if(activeStrategy==='Mix Both'){
-
-      const candidates=[
-        snap.signals.riseFall,
-        snap.signals.parity
-      ].filter(
-        x=>x&&x.actionable
-      );
-
-      candidates.sort(
-        (a,b)=>b.confidence-a.confidence
-      );
-
-      signal=candidates[0]||null;
+      signal=snap.signals.mixBoth;
     }
 
     if(!signal?.actionable){
@@ -3245,6 +3132,8 @@ window.CASPER_ENGINE = (() => {
 
       strategy:signal.strategy,
 
+      baseStrategy:signal.baseStrategy||signal.strategy,
+
       direction:signal.direction,
 
       confidence:signal.confidence,
@@ -3256,14 +3145,14 @@ window.CASPER_ENGINE = (() => {
       snapshot:snap,
 
       validation:
-        activeStrategy==='Even & Odd'
+        (activeStrategy==='Even & Odd' || (activeStrategy==='Mix Both' && signal.baseStrategy==='Even & Odd'))
           ? (
               signal.direction==='EVEN'
                 ? snap.validation.strategies.even
                 : snap.validation.strategies.odd
             )
           : (
-              signal.strategy==='Rise & Fall'
+              (activeStrategy==='Rise & Fall' || (activeStrategy==='Mix Both' && signal.baseStrategy==='Rise & Fall'))
                 ? snap.validation.strategies.riseFall
                 : null
             )
@@ -3350,70 +3239,52 @@ window.CASPER_ENGINE = (() => {
 
 
   function updateRunButton(){
-
-    const button=$('#runBtn');
-
-    if(demoTradeInProgress){
-
-      button.disabled=true;
-
-      button.textContent=
-        '⟳ &nbsp;Demo trade in progress';
-
-      return;
-    }
-
-    if(!signedIn){
-
-      button.disabled=true;
-
-      button.textContent=
-        '▷ &nbsp;Sign in with Deriv first';
-
-      return;
-    }
-
-    if(!selectedAccountIsDemo()){
-
-      button.disabled=true;
-
-      button.textContent=
-        '▷ &nbsp;Choose a Demo account';
-
-      return;
-    }
-
-    const risk=
-      demoRiskStatus();
-
-    if(risk.blocked){
-
-      button.disabled=true;
-
-      button.textContent=
-        '✓ &nbsp;Demo risk limit reached';
-
-      return;
-    }
-
-    const candidate=
-      getFreeCandidate();
-
-    if(!candidate){
-
-      button.disabled=true;
-
-      button.textContent=
-        '▷ &nbsp;Waiting for a qualifying signal';
-
-      return;
-    }
-
-    button.disabled=false;
-
-    button.textContent=
-      '▷ &nbsp;Run Demo Trade';
+    const button=$('#runBtn'); if(!button)return;
+    if(demoAutoRun){ button.disabled=true; button.textContent=demoTradeInProgress?'⟳ &nbsp;Trading &amp; rescanning…':'● &nbsp;Smart session running'; return; }
+    if(!signedIn){ button.disabled=true; button.textContent='▷ &nbsp;Sign in with Deriv first'; return; }
+    if(!selectedAccountIsDemo()){ button.disabled=true; button.textContent='▷ &nbsp;Choose a Demo account'; return; }
+    const risk=demoRiskStatus();
+    if(risk.blocked){ button.disabled=true; button.textContent='✓ &nbsp;Demo risk limit reached'; return; }
+    button.disabled=false; button.textContent='▷ &nbsp;Start Continuous Demo Run';
   }
+
+  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+
+  function stopDemoRun(reason='user'){
+    demoAutoRun=false; demoRunSerial++;
+    $('#runMessage').textContent=reason==='risk'?demoRiskStatus().reason:reason==='error'?'Demo session stopped safely after an execution error.':'Demo session stopped. Press RUN to start a new session.';
+    updateRunButton();
+  }
+
+  async function demoRunLoop(serial){
+    while(demoAutoRun&&serial===demoRunSerial){
+      const risk=demoRiskStatus();
+      if(risk.blocked){stopDemoRun('risk');break;}
+      if(!signedIn||!selectedAccountIsDemo()){stopDemoRun('error');break;}
+      const candidate=getFreeCandidate();
+      if(!candidate){
+        $('#runMessage').textContent='Smart AI is scanning all 10 markets × Rise/Fall × Even/Odd × Mix Both · no qualifying edge yet.';
+        await sleep(1200); continue;
+      }
+      $('#runMessage').textContent=`Smart AI qualified ${names[candidate.symbol]||candidate.symbol} · ${candidate.strategy} · ${candidate.direction||''} · confidence ${(candidate.confidence*100).toFixed(1)}% · executing Demo trade`;
+      const result=await executeDemoTradeOnce(candidate);
+      if(!result||result.error){stopDemoRun('error');break;}
+      const after=demoRiskStatus();
+      if(after.blocked){stopDemoRun('risk');break;}
+      await sleep(result.profit<0?1400:700);
+    }
+  }
+
+  function startDemoRun(){
+    if(demoAutoRun)return;
+    const risk=demoRiskStatus(); if(risk.blocked){$('#runMessage').textContent=risk.reason;updateRunButton();return;}
+    if(!signedIn||!selectedAccountIsDemo()){updateRunButton();return;}
+    demoAutoRun=true; demoRunSerial++; const serial=demoRunSerial;
+    $('#runMessage').textContent='Continuous Demo session started · Smart AI scanning all markets and all Free strategies.';
+    updateRunButton();
+    demoRunLoop(serial).catch(error=>{console.error('[CASPER] continuous loop',error);stopDemoRun('error');});
+  }
+
 
 
   /* ==========================================================
@@ -3536,6 +3407,7 @@ window.CASPER_ENGINE = (() => {
 
   function resetDemoSession(clearHistory=true){
 
+    demoAutoRun=false; demoRunSerial++;
     demoSessionPL=0;
     demoSessionStake=0;
     demoSessionPayout=0;
@@ -3557,6 +3429,7 @@ window.CASPER_ENGINE = (() => {
 
   function stopDemoTrading(){
     demoTradingStopped=true;
+    stopDemoRun('user');
     updateRunButton();
     $('#runMessage').textContent=
       'Demo trading stopped. Press Reset to start a new session.';
@@ -4044,7 +3917,8 @@ window.CASPER_ENGINE = (() => {
     }
 
     if(
-      candidate.strategy==='Even & Odd'
+      candidate.strategy==='Even & Odd' ||
+      (candidate.strategy==='Mix Both' && candidate.baseStrategy==='Even & Odd')
     ){
 
       return candidate.direction==='EVEN'
@@ -4052,11 +3926,15 @@ window.CASPER_ENGINE = (() => {
         : 'DIGITODD';
     }
 
+    if(candidate.strategy==='Mix Both' && candidate.baseStrategy==='Rise & Fall'){
+      return candidate.direction==='RISE'?'CALL':'PUT';
+    }
+
     return null;
   }
 
 
-  async function executeDemoTrade(){
+  async function executeDemoTradeOnce(candidateOverride=null){
 
     if(demoTradeInProgress){
       return;
@@ -4108,19 +3986,8 @@ window.CASPER_ENGINE = (() => {
       return;
     }
 
-    const candidate=
-      getFreeCandidate();
-
-    if(!candidate){
-
-      showToast(
-        'No qualifying Free-tier signal is available yet.'
-      );
-
-      updateRunButton();
-
-      return;
-    }
+    const candidate=candidateOverride||getFreeCandidate();
+    if(!candidate){ return {error:true,reason:'no_candidate'}; }
 
     const contractType=
       strategyToContract(candidate);
@@ -4381,6 +4248,7 @@ window.CASPER_ENGINE = (() => {
         again on its normal subscription cycle.
       */
       await loadSession();
+      return {ok:true,profit:finalPL,record:resultRecord};
 
     }catch(error){
 
@@ -4396,6 +4264,7 @@ window.CASPER_ENGINE = (() => {
         error.message||
         'Demo trade could not be completed.'
       );
+      return {error:true,message:error.message||'Demo trade could not be completed.'};
 
     }finally{
 
@@ -5603,7 +5472,7 @@ window.CASPER_ENGINE = (() => {
 
   $('#runBtn').addEventListener(
     'click',
-    executeDemoTrade
+    startDemoRun
   );
 
 
