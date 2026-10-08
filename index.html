@@ -3841,6 +3841,43 @@ window.CASPER_ENGINE = (() => {
   }
 
 
+  /*
+    Hard risk gate. This is deliberately separate from the button state:
+    the trading engine must stop even when a trade is already in flight or
+    the user changes Target/Max Loss while the session is running.
+  */
+  function enforceDemoRiskStop(){
+
+    if(demoTradingStopped){
+      return true;
+    }
+
+    const target=numericInput('#target');
+    const maxLoss=numericInput('#maxloss');
+
+    let reason='';
+
+    if(target>0 && demoSessionPL>=target){
+      reason=`Demo profit target reached: ${demoSessionPL.toFixed(2)} USD`;
+    }else if(maxLoss>0 && demoSessionPL<=-maxLoss){
+      reason=`Demo max loss reached: ${demoSessionPL.toFixed(2)} USD`;
+    }
+
+    if(!reason){
+      return false;
+    }
+
+    demoTradingStopped=true;
+    demoAutoRun=false;
+    demoRunSerial++;
+
+    $('#runMessage').textContent=reason+' · Demo trading stopped.';
+    updateRunButton();
+
+    return true;
+  }
+
+
   function selectedAccountId(){
     return $('#accountSelect').value;
   }
@@ -4246,8 +4283,9 @@ window.CASPER_ENGINE = (() => {
 
   function stopDemoTrading(){
     demoTradingStopped=true;
+    demoAutoRun=false;
+    demoRunSerial++;
     hideCasperOverlay();
-    stopDemoRun('user');
     updateRunButton();
     $('#runMessage').textContent=
       'Demo trading stopped. Press Reset to start a new session.';
@@ -4789,6 +4827,10 @@ window.CASPER_ENGINE = (() => {
       return;
     }
 
+    if(enforceDemoRiskStop()){
+      return {error:true,reason:'risk'};
+    }
+
     const stake=
       numericInput('#stake');
 
@@ -4908,6 +4950,14 @@ window.CASPER_ENGINE = (() => {
         `Demo proposal received · ${candidate.strategy} · ${candidate.direction||''} · stake ${stake.toFixed(2)} ${currency} · buying...`;
 
       /*
+        Re-check risk immediately before BUY. This closes the race where
+        Target/Max Loss is changed while a proposal is being prepared.
+      */
+      if(enforceDemoRiskStop()){
+        throw new Error('Demo risk limit reached before contract purchase.');
+      }
+
+      /*
         Buy only on the authenticated Demo socket.
       */
       const buyResponse=
@@ -5005,6 +5055,13 @@ window.CASPER_ENGINE = (() => {
       demoSessionPayout+=realizedPayout;
       demoSessionPL=
         demoSessionPayout-demoSessionStake;
+
+      /*
+        Evaluate the completed trade against the live session limits
+        immediately. Do not wait for another scan cycle to decide whether
+        another trade is allowed.
+      */
+      const riskHitAfterResult=enforceDemoRiskStop();
 
       if(finalPL>0){
         demoSessionWins++;
@@ -6381,7 +6438,13 @@ window.CASPER_ENGINE = (() => {
       $(selector).addEventListener(
         'input',
         ()=>{
-          updateRunButton();
+          /* Changing Target/Max Loss during a live session must be a real
+             risk event, not merely a button/UI refresh. */
+          if(demoAutoRun){
+            enforceDemoRiskStop();
+          }else{
+            updateRunButton();
+          }
         }
       );
     }
