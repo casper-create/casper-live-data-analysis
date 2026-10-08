@@ -937,13 +937,13 @@
       <p>Last-digit parity contracts</p>
     </button>
 
-    <button class="strategy selected" data-strategy="Mix Both">
+    <button class="strategy" data-strategy="Mix Both">
       <span class="ico">⤨</span>
       <b>Mix Both</b>
       <p>Compare direction and parity signals</p>
     </button>
 
-    <button class="strategy" data-strategy="Smart AI">
+    <button class="strategy selected" data-strategy="Smart AI">
       <span class="ico">♧</span>
       <b>Smart AI</b>
       <p>Ranks markets and strategies from validated live data</p>
@@ -3064,7 +3064,7 @@ window.CASPER_ENGINE = (() => {
 
   let retryTimer=null;
 
-  let activeStrategy='Mix Both';
+  let activeStrategy='Smart AI';
 
   let manualMarket='1HZ100V';
 
