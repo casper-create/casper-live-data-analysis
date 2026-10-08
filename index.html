@@ -1376,7 +1376,7 @@
 window.CASPER_ENGINE = (() => {
 
   const DEFAULT_MAX_TICKS = 1800;
-  const MIN_TICKS = 60;
+  const MIN_TICKS = 40;
   const VALIDATION_MINIMUM = 30;
 
   const clamp = (v,min,max) =>
@@ -2995,6 +2995,19 @@ window.CASPER_ENGINE = (() => {
 
   const pipSizes=new Map();
 
+  /*
+    HISTORICAL WARM-UP
+    ------------------
+    A live scanner must not wait 40-60 seconds just to build its
+    first feature window. We seed every one of the 10 configured
+    Volatility markets with recent public tick history, then keep
+    the live subscription running for forward validation.
+  */
+  let historyWarmupPending=new Set();
+  let historyWarmupCompleted=new Set();
+  let lastScanHeartbeat=0;
+  let scanCycles=0;
+
   const casperEngine=
     window.CASPER_ENGINE.create({
       maxTicks:1800
@@ -3760,6 +3773,14 @@ window.CASPER_ENGINE = (() => {
       lastTickSeen=liveTickRevision;
 
       if(!demoAutoRun||serial!==demoRunSerial)break;
+
+      /* Keep the visible scan state alive instead of leaving the initial
+         message on screen for minutes. */
+      showScanOverlay(
+        activeStrategy==='Smart AI'
+          ? `Scanning all 10 live Volatility markets · validating the newest tick`
+          : continuousScanMessage()
+      );
 
       const candidate=getFreeCandidate();
 
@@ -4942,32 +4963,75 @@ window.CASPER_ENGINE = (() => {
 
   function subscribeMarkets(){
 
-    if(
-      !ws||
-      ws.readyState!==WebSocket.OPEN
-    ){
+    if(!ws||ws.readyState!==WebSocket.OPEN){
       return;
     }
 
     subIds.clear();
+    historyWarmupPending=new Set(symbols);
+    historyWarmupCompleted.clear();
 
-    for(
-      const symbol
-      of symbols
-    ){
-
+    /* Seed the engine immediately. This removes the long cold-start
+       where Smart AI could appear frozen while waiting for 40 ticks. */
+    for(const symbol of symbols){
       try{
-
-        ws.send(
-          JSON.stringify({
-
-            ticks:symbol,
-
-            subscribe:1
-          })
-        );
-
+        ws.send(JSON.stringify({
+          ticks_history:symbol,
+          count:120,
+          end:'latest',
+          style:'ticks',
+          req_id:1000+symbols.indexOf(symbol)
+        }));
       }catch{}
+    }
+
+    /* Keep the live stream active while history is loading. */
+    for(const symbol of symbols){
+      try{
+        ws.send(JSON.stringify({
+          ticks:symbol,
+          subscribe:1,
+          req_id:2000+symbols.indexOf(symbol)
+        }));
+      }catch{}
+    }
+  }
+
+
+  function warmHistory(symbol,d){
+
+    if(!symbol||!d?.history)return;
+
+    const prices=Array.isArray(d.history.prices)
+      ? d.history.prices
+      : [];
+    const times=Array.isArray(d.history.times)
+      ? d.history.times
+      : [];
+
+    const n=Math.min(prices.length,times.length);
+
+    for(let i=0;i<n;i++){
+      const quote=Number(prices[i]);
+      const epoch=Number(times[i]);
+      if(!Number.isFinite(quote)||!Number.isFinite(epoch))continue;
+
+      casperEngine.onTick({
+        symbol,
+        quote,
+        epoch,
+        pipSize:pipSizes.get(symbol)
+      });
+    }
+
+    historyWarmupPending.delete(symbol);
+    historyWarmupCompleted.add(symbol);
+
+    signalLiveTick();
+
+    if(activeStrategy==='Smart AI'){
+      state(true);
+      refreshSmartAI();
     }
   }
 
@@ -5040,6 +5104,24 @@ window.CASPER_ENGINE = (() => {
 
           state(false);
 
+          return;
+        }
+
+
+        /* Historical seed response: populate the same engine used by
+           live ticks so Smart AI can evaluate immediately. */
+        if(
+          d.msg_type==='history'&&
+          d.history
+        ){
+          const symbol=
+            d.echo_req?.ticks||
+            d.echo_req?.ticks_history||
+            d.symbol;
+
+          if(symbol&&names[symbol]){
+            warmHistory(symbol,d);
+          }
           return;
         }
 
@@ -5136,6 +5218,16 @@ window.CASPER_ENGINE = (() => {
           if(activeStrategy==='Smart AI'){
 
             state(true);
+
+            scanCycles++;
+            const now=Date.now();
+            if(now-lastScanHeartbeat>1200){
+              lastScanHeartbeat=now;
+              const warm=historyWarmupPending.size;
+              const ready=historyWarmupCompleted.size;
+              $('#runMessage').textContent=
+                `Smart AI scanning 10 Volatility markets · ${ready}/10 warmed · ${warm} loading · analysing newest live tick`;
+            }
 
             refreshSmartAI();
 
@@ -6306,4 +6398,4 @@ window.CASPER_ENGINE = (() => {
 </script>
 
 </body>
-</html>
+</html>s
