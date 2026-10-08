@@ -1376,7 +1376,7 @@
 window.CASPER_ENGINE = (() => {
 
   const DEFAULT_MAX_TICKS = 1800;
-  const MIN_TICKS = 60;
+  const MIN_TICKS = 40;
   const VALIDATION_MINIMUM = 30;
 
   const clamp = (v,min,max) =>
@@ -2815,6 +2815,26 @@ window.CASPER_ENGINE = (() => {
           const mature=
             v.total>=VALIDATION_MINIMUM;
 
+          /*
+            BALANCED SMART AI GATE
+            ----------------------
+            A 30-sample validation requirement is retained for the
+            mature statistics tier, but it is NOT required before the
+            scanner can take a strong live Demo opportunity. The old
+            gate could leave the scanner silent for many minutes.
+
+            The live tier requires:
+              - enough real ticks to calculate the features
+              - high feed integrity
+              - a meaningful signal confidence
+              - at least a small forward-validation sample when one exists
+              - no extreme/high-volatility regime
+              - entropy/concentration checks
+
+            This is deliberately a quality floor, not a promise of profit.
+          */
+          const liveValidationReady=v.total>=8;
+
           const strictEligible=
             score>=.60&&
             c.signal.confidence>=.61&&
@@ -2822,28 +2842,37 @@ window.CASPER_ENGINE = (() => {
             f.regime!=='high_volatility'&&
             entropy<.99;
 
-          /*
-            Bounded execution tier: this is NOT a low-quality fallback.
-            It still requires excellent data, a strong signal, no high
-            volatility regime, and a meaningful forward-validation sample.
-            Its purpose is to prevent a healthy live system from waiting
-            indefinitely for one counter to reach 30 while the other
-            evidence is already strong.
-          */
-          const fastValidated=
-            score>=.655&&
-            c.signal.confidence>=.68&&
-            v.total>=12&&
-            q.integrity>=.997&&
+          const balancedEligible=
+            score>=.575&&
+            c.signal.confidence>=.585&&
+            liveValidationReady&&
+            q.integrity>=.995&&
             f.regime!=='high_volatility'&&
-            entropy<.985;
+            entropy<.985&&
+            concentration<.34;
 
-          const eligible=strictEligible||fastValidated;
+          const earlyLiveEligible=
+            score>=.605&&
+            c.signal.confidence>=.625&&
+            v.total>=4&&
+            q.integrity>=.998&&
+            f.regime!=='high_volatility'&&
+            entropy<.97&&
+            concentration<.30;
+
+          const eligible=strictEligible||balancedEligible||earlyLiveEligible;
 
           return {
             symbol:snap.symbol,
             eligible,
-            executionTier:strictEligible?'validated':'fast_validated',
+            executionTier:
+              strictEligible
+                ? 'validated'
+                : earlyLiveEligible
+                  ? 'early_live'
+                  : balancedEligible
+                    ? 'balanced_live'
+                    : 'filtered',
             score,
             strategy:c.strategy,
             baseStrategy:c.baseStrategy,
@@ -2851,9 +2880,11 @@ window.CASPER_ENGINE = (() => {
             confidence:c.signal.confidence,
             reason:strictEligible
               ? 'multi_strategy_validated_edge'
-              : fastValidated
-                ? 'strong_live_edge_with_forward_validation'
-                : 'edge_filter_rejected',
+              : earlyLiveEligible
+                ? 'strong_fresh_live_edge'
+                : balancedEligible
+                  ? 'balanced_live_edge_with_forward_validation'
+                  : 'edge_filter_rejected',
             regime:f.regime,
             validation:v,
             snapshot:snap
@@ -2990,10 +3021,11 @@ window.CASPER_ENGINE = (() => {
 
   let smartSelectedSymbol=null;
 
-  /* Smart AI candidate synchronization.  The candidate shown in the UI
-     is the exact candidate that the Demo executor must trade. */
+  /* Smart AI candidate lock: the candidate shown in the dashboard is the
+     exact candidate that the execution loop must trade. */
   let smartLockedCandidate=null;
-  const smartExecutedKeys=new Set();
+  let smartLastCandidateKey='';
+  const smartComboCooldown=new Map();
 
   const SMART_VALUE=
     '__CASPER_SMART_AUTO__';
@@ -3412,25 +3444,76 @@ window.CASPER_ENGINE = (() => {
   }
 
 
-  function refreshSmartAI(){
+  function smartCandidateKey(candidate){
+    if(!candidate)return '';
+    const epoch=
+      Number(candidate.snapshot?.features?.epoch)||
+      Number(candidate.snapshot?.features?.lastEpoch)||
+      Number(candidate.snapshot?.lastEpoch)||0;
+    return [candidate.symbol,candidate.strategy,candidate.direction,epoch].join('|');
+  }
 
-    /* Never replace the displayed Smart AI setup while a transaction is
-       being prepared or monitored. This was the source of the UI/execution
-       mismatch: refreshSmartAI() could select B while the executor traded A. */
-    if(activeStrategy==='Smart AI' && smartLockedCandidate){
-      smartSelectedSymbol=smartLockedCandidate.symbol;
-      updateSelectedMarketDisplay(
-        smartLockedCandidate.symbol,
-        smartLockedCandidate.snapshot
-      );
-      return smartLockedCandidate;
+  function smartComboKey(candidate){
+    if(!candidate)return '';
+    return [candidate.symbol,candidate.strategy,candidate.direction].join('|');
+  }
+
+  function smartHistoryPenalty(candidate){
+    try{
+      const history=readDemoHistory()
+        .filter(x=>x&&x.source==='SMART AI')
+        .filter(x=>x.market===candidate.symbol&&x.strategy===candidate.strategy&&x.direction===candidate.direction)
+        .slice(0,8);
+      if(history.length<3)return {blocked:false,penalty:1,losses:0,wins:0};
+      const losses=history.filter(x=>x.status==='lost').length;
+      const wins=history.filter(x=>x.status==='won').length;
+      if(losses>=3&&losses>wins)return {blocked:true,penalty:.65,losses,wins};
+      if(losses>wins)return {blocked:false,penalty:.82,losses,wins};
+      return {blocked:false,penalty:1,losses,wins};
+    }catch{
+      return {blocked:false,penalty:1,losses:0,wins:0};
     }
+  }
+
+  function lockSmartCandidate(candidate){
+    if(!candidate)return null;
+    const key=smartCandidateKey(candidate);
+    const combo=smartComboKey(candidate);
+    const now=Date.now();
+    const until=Number(smartComboCooldown.get(combo)||0);
+    if(until>now)return null;
+    const perf=smartHistoryPenalty(candidate);
+    if(perf.blocked)return null;
+    const locked={...candidate,source:'SMART AI',candidateKey:key,lockedAt:now};
+    smartLockedCandidate=locked;
+    smartLastCandidateKey=key;
+    return locked;
+  }
+
+  function clearSmartCandidateLock(candidate){
+    if(candidate){
+      smartComboCooldown.set(smartComboKey(candidate),Date.now()+3500);
+    }
+    smartLockedCandidate=null;
+  }
+
+
+  function refreshSmartAI(){
 
     const ranked=
       casperEngine.smartAI();
 
-    const selected=
-      ranked.find(x=>x.eligible);
+    const rankedEligible=
+      ranked.filter(x=>x.eligible);
+
+    let selected=null;
+    for(const option of rankedEligible){
+      const perf=smartHistoryPenalty(option);
+      if(!perf.blocked){
+        selected=option;
+        break;
+      }
+    }
 
     if(!selected){
 
@@ -3455,6 +3538,16 @@ window.CASPER_ENGINE = (() => {
 
       return null;
     }
+
+    const locked=
+      lockSmartCandidate(selected);
+
+    if(!locked){
+      smartSelectedSymbol=null;
+      return null;
+    }
+
+    selected=locked;
 
     smartSelectedSymbol=
       selected.symbol;
@@ -3503,39 +3596,14 @@ window.CASPER_ENGINE = (() => {
 
     if(activeStrategy==='Smart AI'){
 
-      const ranked=
-        casperEngine.smartAI();
-
-      /* Highest-ranked eligible market wins.  Smart AI is deliberately
-         market-wide: it never locks itself to the selected manual market. */
-      const candidate=ranked.find(x=>x.eligible)||null;
-      if(!candidate)return null;
-
-      const snapshot=candidate.snapshot;
-      const epoch=Number(snapshot?.lastEpoch)||0;
-      const candidateKey=
-        `${candidate.symbol}|${candidate.strategy}|${candidate.direction||''}|${epoch}`;
-
-      /* A signal is a one-tick event. Never return an already executed
-         candidate, even if another market's tick advanced the global clock. */
-      if(epoch && smartExecutedKeys.has(candidateKey)){
-        return null;
+      /* Never recompute a different candidate between the Smart AI card and
+         execution. The displayed candidate is the execution candidate. */
+      if(smartLockedCandidate){
+        return smartLockedCandidate;
       }
 
-      return {
-        symbol:candidate.symbol,
-        strategy:candidate.strategy,
-        baseStrategy:candidate.baseStrategy||candidate.strategy,
-        direction:candidate.direction,
-        confidence:candidate.confidence,
-        score:candidate.score,
-        reason:candidate.reason,
-        executionTier:candidate.executionTier,
-        snapshot:candidate.snapshot,
-        validation:candidate.validation,
-        source:'SMART AI',
-        candidateKey
-      };
+      const selected=refreshSmartAI();
+      return selected||null;
     }
 
     const symbol=
@@ -3726,7 +3794,6 @@ window.CASPER_ENGINE = (() => {
 
   function stopDemoRun(reason='user'){
     demoAutoRun=false;
-    smartLockedCandidate=null;
     if(reason==='risk'||reason==='error') hideCasperOverlay();
     demoRunSerial++;
 
@@ -3762,6 +3829,7 @@ window.CASPER_ENGINE = (() => {
 
     let lastTickSeen=liveTickRevision;
     let executionRecoveryAttempts=0;
+    let lastExecutedCandidateKey='';
 
     while(
       demoAutoRun&&
@@ -3805,25 +3873,15 @@ window.CASPER_ENGINE = (() => {
       }
 
       const candidateEpoch=
-        Number(candidate.snapshot?.lastEpoch)||0;
+        Number(candidate.snapshot?.features?.epoch)||
+        Number(candidate.snapshot?.features?.lastEpoch)||
+        Number(candidate.snapshot?.lastEpoch)||
+        0;
+      const candidateKey=smartCandidateKey(candidate);
 
-      const candidateKey=
-        candidate.candidateKey||
-        `${candidate.symbol}|${candidate.strategy}|${candidate.direction||''}|${candidateEpoch}`;
-
-      if(candidateEpoch && smartExecutedKeys.has(candidateKey)){
+      if(candidateKey&&candidateKey===lastExecutedCandidateKey){
+        if(activeStrategy==='Smart AI')clearSmartCandidateLock(candidate);
         continue;
-      }
-
-      /* Freeze exactly what the scanner selected. UI refreshes are now
-         read-only until this transaction finishes. */
-      smartLockedCandidate=activeStrategy==='Smart AI'
-        ? candidate
-        : null;
-
-      if(activeStrategy==='Smart AI'){
-        smartSelectedSymbol=candidate.symbol;
-        updateSelectedMarketDisplay(candidate.symbol,candidate.snapshot);
       }
 
       $('#runMessage').textContent=
@@ -3832,10 +3890,12 @@ window.CASPER_ENGINE = (() => {
       const result=await executeDemoTradeOnce(candidate);
 
       if(result===undefined){
+        if(activeStrategy==='Smart AI')clearSmartCandidateLock(candidate);
         continue;
       }
 
       if(result.error){
+        if(activeStrategy==='Smart AI')clearSmartCandidateLock(candidate);
         if(demoAutoRun&&serial===demoRunSerial&&isRecoverableDemoError(result.message||result.reason||'')){
           executionRecoveryAttempts++;
           $('#runMessage').textContent=
@@ -3856,16 +3916,9 @@ window.CASPER_ENGINE = (() => {
 
       executionRecoveryAttempts=0;
 
-      if(candidateEpoch){
-        smartExecutedKeys.add(candidateKey);
-        /* Keep the set bounded during a long session. */
-        if(smartExecutedKeys.size>2000){
-          const first=smartExecutedKeys.values().next().value;
-          if(first)smartExecutedKeys.delete(first);
-        }
+      if(candidateKey){
+        lastExecutedCandidateKey=candidateKey;
       }
-
-      smartLockedCandidate=null;
 
       const after=demoRiskStatus();
 
@@ -3909,7 +3962,6 @@ window.CASPER_ENGINE = (() => {
     }
 
     demoAutoRun=true;
-    smartLockedCandidate=null;
     demoRunSerial++;
 
     const serial=demoRunSerial;
@@ -4856,6 +4908,22 @@ window.CASPER_ENGINE = (() => {
 
       const resultRecord={
 
+        source:
+          candidate.source||
+          (activeStrategy==='Smart AI'?'SMART AI':'MANUAL'),
+
+        market:
+          symbol,
+
+        marketName:
+          names[symbol]||symbol,
+
+        strategy:
+          candidate.strategy,
+
+        direction:
+          candidate.direction||'',
+
         timestamp:
           new Date().toISOString(),
 
@@ -4869,10 +4937,6 @@ window.CASPER_ENGINE = (() => {
         marketName:names[symbol],
 
         strategy:candidate.strategy,
-
-        source:candidate.source|| (activeStrategy==='Smart AI' ? 'SMART AI' : 'FREE'),
-
-        candidateKey:candidate.candidateKey||'',
 
         direction:candidate.direction,
 
@@ -4919,6 +4983,12 @@ window.CASPER_ENGINE = (() => {
       };
 
       saveDemoTrade(resultRecord);
+
+      /* Feed the real Demo outcome into the Smart AI cooldown. A completed
+         candidate is unlocked only after its result is recorded. */
+      if(activeStrategy==='Smart AI'){
+        clearSmartCandidateLock(candidate);
+      }
 
       const riskAfter=
         demoRiskStatus();
