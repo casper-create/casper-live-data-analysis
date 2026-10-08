@@ -1790,9 +1790,9 @@ window.CASPER_ENGINE = (() => {
       confidence=clamp(confidence,.5,.95);
 
       const actionable=
-        confidence>=.64 &&
+        confidence>=.60 &&
         features.sample>=MIN_TICKS &&
-        features.direction.stability>=.34;
+        features.direction.stability>=.20;
 
       return {
 
@@ -1876,9 +1876,8 @@ window.CASPER_ENGINE = (() => {
       confidence=clamp(confidence,.5,.95);
 
       const actionable=
-        confidence>=.64 &&
-        Math.max(evenBias,oddBias)>=.065 &&
-        features.digits.digitEntropy<.985;
+        confidence>=.59 &&
+        Math.max(evenBias,oddBias)>=.035;
 
       return {
 
@@ -2043,7 +2042,7 @@ window.CASPER_ENGINE = (() => {
       const best=options[0], second=options[1];
       const agreement=second ? clamp(1-Math.abs(best.confidence-second.confidence)*1.5,.72,1) : .78;
       const confidence=clamp(best.confidence*.72+agreement*.18+Math.min(1,best.score)*.10,.5,.95);
-      return {strategy:'Mix Both',baseStrategy:best.strategy,actionable:confidence>=.64,direction:best.direction,confidence,score:confidence,reason:'cross_strategy_free_comparison',component:best};
+      return {strategy:'Mix Both',baseStrategy:best.strategy,actionable:confidence>=.61,direction:best.direction,confidence,score:confidence,reason:'cross_strategy_free_comparison',component:best};
     }
 
     function calculateSignals(features){
@@ -2802,30 +2801,23 @@ window.CASPER_ENGINE = (() => {
             concentration>.32 ? .88 :
             concentration>.25 ? .94 : 1;
 
-          /*
-            Composite Smart-AI score.  The previous multiplicative model
-            could drive a perfectly usable signal below every execution
-            threshold because several modest penalties were multiplied
-            together.  Smart AI now uses a weighted evidence score so one
-            weak secondary feature cannot silence every market.
-          */
           const score=
-            c.signal.confidence*.35+
-            q.integrity*.15+
-            clamp(f.direction.stability,.2,1)*.15+
-            validationStrength*.15+
-            validationBonus*.10+
-            agreement*.04+
-            regimePenalty*.03+
-            entropyPenalty*.02+
-            concentrationPenalty*.01;
+            c.signal.confidence*
+            q.integrity*
+            (.70+.30*clamp(f.direction.stability,.2,1))*
+            validationStrength*
+            validationBonus*
+            agreement*
+            regimePenalty*
+            entropyPenalty*
+            concentrationPenalty;
 
           const mature=
             v.total>=VALIDATION_MINIMUM;
 
           const strictEligible=
-            score>=.64&&
-            c.signal.confidence>=.64&&
+            score>=.60&&
+            c.signal.confidence>=.61&&
             mature&&
             f.regime!=='high_volatility'&&
             entropy<.99;
@@ -2839,36 +2831,19 @@ window.CASPER_ENGINE = (() => {
             evidence is already strong.
           */
           const fastValidated=
-            score>=.675&&
+            score>=.655&&
             c.signal.confidence>=.68&&
             v.total>=12&&
             q.integrity>=.997&&
             f.regime!=='high_volatility'&&
             entropy<.985;
 
-          /*
-            Bootstrap tier: the scanner must not deadlock waiting for 30
-            forward-validation samples before it can ever make its first
-            Demo trade. Historical ticks provide the initial context, then
-            this tier requires a stronger live score and at least 6 genuine
-            forward-validation samples. It is still Demo-only and remains
-            below the fully validated tier.
-          */
-          const bootstrapValidated=
-            score>=.665&&
-            c.signal.confidence>=.68&&
-            v.total>=4&&
-            q.integrity>=.998&&
-            f.regime!=='high_volatility'&&
-            entropy<.985&&
-            snap.ticks>=60;
-
-          const eligible=strictEligible||fastValidated||bootstrapValidated;
+          const eligible=strictEligible||fastValidated;
 
           return {
             symbol:snap.symbol,
             eligible,
-            executionTier:strictEligible?'validated':fastValidated?'fast_validated':'bootstrap_validated',
+            executionTier:strictEligible?'validated':'fast_validated',
             score,
             strategy:c.strategy,
             baseStrategy:c.baseStrategy,
@@ -2878,9 +2853,7 @@ window.CASPER_ENGINE = (() => {
               ? 'multi_strategy_validated_edge'
               : fastValidated
                 ? 'strong_live_edge_with_forward_validation'
-                : bootstrapValidated
-                  ? 'strong_live_edge_after_market_warmup'
-                  : 'edge_filter_rejected',
+                : 'edge_filter_rejected',
             regime:f.regime,
             validation:v,
             snapshot:snap
@@ -3017,39 +2990,10 @@ window.CASPER_ENGINE = (() => {
 
   let smartSelectedSymbol=null;
 
-  /* Short adaptive quarantine: if one market/strategy repeatedly loses,
-     Smart AI temporarily removes that exact combination from the ranking
-     instead of immediately firing the same setup again. */
-  const smartQuarantine=new Map();
-  const SMART_QUARANTINE_LOSSES=2;
-  const SMART_QUARANTINE_TICKS=12;
-
-  function smartPairKey(candidate){
-    return `${candidate?.symbol||''}|${candidate?.baseStrategy||candidate?.strategy||''}`;
-  }
-
-  function isSmartPairQuarantined(candidate){
-    const key=smartPairKey(candidate);
-    const until=Number(smartQuarantine.get(key)||0);
-    return until>liveTickRevision;
-  }
-
-  function noteSmartTradeResult(candidate,profit){
-    if(!candidate)return;
-    const key=smartPairKey(candidate);
-    const current=smartQuarantine.get(`${key}:losses`)||0;
-    if(Number(profit)<0){
-      const losses=current+1;
-      smartQuarantine.set(`${key}:losses`,losses);
-      if(losses>=SMART_QUARANTINE_LOSSES){
-        smartQuarantine.set(key,liveTickRevision+SMART_QUARANTINE_TICKS);
-      }
-    }else if(Number(profit)>0){
-      smartQuarantine.delete(`${key}:losses`);
-      smartQuarantine.delete(key);
-    }
-  }
-
+  /* Smart AI candidate synchronization.  The candidate shown in the UI
+     is the exact candidate that the Demo executor must trade. */
+  let smartLockedCandidate=null;
+  const smartExecutedKeys=new Set();
 
   const SMART_VALUE=
     '__CASPER_SMART_AUTO__';
@@ -3072,9 +3016,6 @@ window.CASPER_ENGINE = (() => {
   */
   let liveTickRevision=0;
   const liveTickWaiters=[];
-  const historyRequestSymbols=new Map();
-  let scanHeartbeatTimer=null;
-  let scanHeartbeatStep=0;
 
   function signalLiveTick(){
     liveTickRevision++;
@@ -3200,68 +3141,21 @@ window.CASPER_ENGINE = (() => {
   const scanView=$('#scanView');
   const transactionView=$('#transactionView');
 
-  const scanStages=[
-    'Connecting to live market stream',
-    'Reading fresh tick data',
-    'Comparing all 10 Volatility markets',
-    'Measuring momentum and direction',
-    'Checking Rise / Fall probability',
-    'Checking Even / Odd probability',
-    'Testing Mix Both agreement',
-    'Filtering weak market conditions',
-    'Validating the strongest opportunity',
-    'Ranking live opportunities',
-    'Waiting for the cleanest entry'
-  ];
-
-  function scanEngineStatus(){
-    const stats=casperEngine.getStats();
-    const ready=symbols.filter(symbol=>{
-      const snap=casperEngine.snapshot(symbol);
-      return snap.ready;
-    }).length;
-    return `${ready}/${symbols.length} markets ready · ${Number(stats.samples||0).toLocaleString()} ticks analysed`;
-  }
-
-  function renderScanHeartbeat(reason='Scanning live markets'){
-    if(!overlay||overlay.classList.contains('hidden')||scanView.classList.contains('hidden'))return;
-    $('#scanSub').textContent=`${reason} · ${scanEngineStatus()}`;
-    const logs=$('#scanLogs');
-    if(!logs)return;
-    const lines=logs.querySelectorAll('div');
-    scanHeartbeatStep=(scanHeartbeatStep+1)%scanStages.length;
-    const stage=scanStages[scanHeartbeatStep];
-    if(lines.length){
-      lines.forEach((el,i)=>el.style.opacity=i<3?'1':'.72');
-      lines[0].textContent=`[AI] ${stage}…`;
-      if(lines[1])lines[1].textContent=`[DATA] ${scanEngineStatus()}`;
-      if(lines[2])lines[2].textContent=`[FILTER] ${activeStrategy==='Smart AI'?'Rise/Fall + Even/Odd + Mix Both':'Strategy '+activeStrategy} · live scoring`;
-      if(lines[3])lines[3].textContent='[AI] Weak setups skipped automatically';
-      if(lines[4])lines[4].textContent='[AI] Next qualified opportunity will open directly';
-    }
-  }
-
-  function startScanHeartbeat(reason='Scanning live markets'){
-    if(scanHeartbeatTimer)clearInterval(scanHeartbeatTimer);
-    scanHeartbeatStep=0;
-    renderScanHeartbeat(reason);
-    scanHeartbeatTimer=setInterval(()=>renderScanHeartbeat(reason),650);
-  }
-
-  function stopScanHeartbeat(){
-    if(scanHeartbeatTimer){clearInterval(scanHeartbeatTimer);scanHeartbeatTimer=null;}
-  }
-
   function showScanOverlay(reason='Scanning live markets'){
     if(!overlay)return;
     overlay.classList.remove('hidden');
     scanView.classList.remove('hidden');
     transactionView.classList.add('hidden');
-    startScanHeartbeat(reason);
+    $('#scanSub').textContent=reason;
+    const logs=$('#scanLogs');
+    if(logs){
+      logs.querySelectorAll('div').forEach((el,i)=>{
+        el.style.opacity=i<3?'1':'.78';
+      });
+    }
   }
 
   function showTransactionOverlay(candidate,stake,currency){
-    stopScanHeartbeat();
     if(!overlay)return;
     overlay.classList.remove('hidden');
     scanView.classList.add('hidden');
@@ -3297,7 +3191,7 @@ window.CASPER_ENGINE = (() => {
   }
 
   function hideCasperOverlay(delay=0){
-    const close=()=>{ stopScanHeartbeat(); if(overlay)overlay.classList.add('hidden'); };
+    const close=()=>overlay&&overlay.classList.add('hidden');
     if(delay>0)setTimeout(close,delay);else close();
   }
 
@@ -3520,6 +3414,18 @@ window.CASPER_ENGINE = (() => {
 
   function refreshSmartAI(){
 
+    /* Never replace the displayed Smart AI setup while a transaction is
+       being prepared or monitored. This was the source of the UI/execution
+       mismatch: refreshSmartAI() could select B while the executor traded A. */
+    if(activeStrategy==='Smart AI' && smartLockedCandidate){
+      smartSelectedSymbol=smartLockedCandidate.symbol;
+      updateSelectedMarketDisplay(
+        smartLockedCandidate.symbol,
+        smartLockedCandidate.snapshot
+      );
+      return smartLockedCandidate;
+    }
+
     const ranked=
       casperEngine.smartAI();
 
@@ -3602,8 +3508,19 @@ window.CASPER_ENGINE = (() => {
 
       /* Highest-ranked eligible market wins.  Smart AI is deliberately
          market-wide: it never locks itself to the selected manual market. */
-      const candidate=ranked.find(x=>x.eligible&&!isSmartPairQuarantined(x))||null;
+      const candidate=ranked.find(x=>x.eligible)||null;
       if(!candidate)return null;
+
+      const snapshot=candidate.snapshot;
+      const epoch=Number(snapshot?.lastEpoch)||0;
+      const candidateKey=
+        `${candidate.symbol}|${candidate.strategy}|${candidate.direction||''}|${epoch}`;
+
+      /* A signal is a one-tick event. Never return an already executed
+         candidate, even if another market's tick advanced the global clock. */
+      if(epoch && smartExecutedKeys.has(candidateKey)){
+        return null;
+      }
 
       return {
         symbol:candidate.symbol,
@@ -3615,7 +3532,9 @@ window.CASPER_ENGINE = (() => {
         reason:candidate.reason,
         executionTier:candidate.executionTier,
         snapshot:candidate.snapshot,
-        validation:candidate.validation
+        validation:candidate.validation,
+        source:'SMART AI',
+        candidateKey
       };
     }
 
@@ -3807,6 +3726,7 @@ window.CASPER_ENGINE = (() => {
 
   function stopDemoRun(reason='user'){
     demoAutoRun=false;
+    smartLockedCandidate=null;
     if(reason==='risk'||reason==='error') hideCasperOverlay();
     demoRunSerial++;
 
@@ -3842,7 +3762,6 @@ window.CASPER_ENGINE = (() => {
 
     let lastTickSeen=liveTickRevision;
     let executionRecoveryAttempts=0;
-    let lastExecutedEpochBySymbol=new Map();
 
     while(
       demoAutoRun&&
@@ -3862,48 +3781,49 @@ window.CASPER_ENGINE = (() => {
       }
 
       /*
-        Evaluate immediately when a fresh snapshot already exists. Only
-        wait when nothing new has arrived. This removes the artificial
-        feeling of a frozen scanner while still preventing duplicate
-        trades on the same tick.
+        Always evaluate the freshest market state. After a completed
+        contract, wait for a NEW real tick rather than sleeping for an
+        arbitrary 450/900 ms. This makes the run cycle follow Deriv's
+        live feed and prevents duplicate entries on one snapshot.
       */
-      if(liveTickRevision===lastTickSeen){
-        await waitForLiveTick(lastTickSeen,900);
-      }
+      await waitForLiveTick(lastTickSeen,2500);
       lastTickSeen=liveTickRevision;
 
       if(!demoAutoRun||serial!==demoRunSerial)break;
 
-      showScanOverlay(
-        activeStrategy==='Smart AI'
-          ? `Scanning all ${symbols.length} live Volatility markets`
-          : continuousScanMessage()
-      );
-
       const candidate=getFreeCandidate();
 
       if(!candidate){
-        const engineStats=casperEngine.getStats();
-        $('#runMessage').textContent=
+        showScanOverlay(
           activeStrategy==='Smart AI'
-            ? `Smart AI scanning all ${symbols.length} markets · ${engineStats.markets}/${symbols.length} active · ${Number(engineStats.samples||0).toLocaleString()} ticks analysed · filtering for the strongest live edge…`
-            : continuousScanMessage();
+            ? `Scanning all ${symbols.length} live Volatility markets · validating the newest tick`
+            : continuousScanMessage()
+        );
+        $('#runMessage').textContent=
+          continuousScanMessage();
         continue;
       }
 
-      hideCasperOverlay();
-
       const candidateEpoch=
-        Number(candidate.snapshot?.features?.epoch)||
-        Number(candidate.snapshot?.features?.lastEpoch)||
-        Number(candidate.snapshot?.lastEpoch)||
-        0;
+        Number(candidate.snapshot?.lastEpoch)||0;
 
-      const previousEpoch=
-        Number(lastExecutedEpochBySymbol.get(candidate.symbol)||0);
+      const candidateKey=
+        candidate.candidateKey||
+        `${candidate.symbol}|${candidate.strategy}|${candidate.direction||''}|${candidateEpoch}`;
 
-      if(candidateEpoch&&candidateEpoch<=previousEpoch){
+      if(candidateEpoch && smartExecutedKeys.has(candidateKey)){
         continue;
+      }
+
+      /* Freeze exactly what the scanner selected. UI refreshes are now
+         read-only until this transaction finishes. */
+      smartLockedCandidate=activeStrategy==='Smart AI'
+        ? candidate
+        : null;
+
+      if(activeStrategy==='Smart AI'){
+        smartSelectedSymbol=candidate.symbol;
+        updateSelectedMarketDisplay(candidate.symbol,candidate.snapshot);
       }
 
       $('#runMessage').textContent=
@@ -3936,11 +3856,16 @@ window.CASPER_ENGINE = (() => {
 
       executionRecoveryAttempts=0;
 
-      noteSmartTradeResult(candidate,result.profit);
-
       if(candidateEpoch){
-        lastExecutedEpochBySymbol.set(candidate.symbol,candidateEpoch);
+        smartExecutedKeys.add(candidateKey);
+        /* Keep the set bounded during a long session. */
+        if(smartExecutedKeys.size>2000){
+          const first=smartExecutedKeys.values().next().value;
+          if(first)smartExecutedKeys.delete(first);
+        }
       }
+
+      smartLockedCandidate=null;
 
       const after=demoRiskStatus();
 
@@ -3984,6 +3909,7 @@ window.CASPER_ENGINE = (() => {
     }
 
     demoAutoRun=true;
+    smartLockedCandidate=null;
     demoRunSerial++;
 
     const serial=demoRunSerial;
@@ -4944,6 +4870,10 @@ window.CASPER_ENGINE = (() => {
 
         strategy:candidate.strategy,
 
+        source:candidate.source|| (activeStrategy==='Smart AI' ? 'SMART AI' : 'FREE'),
+
+        candidateKey:candidate.candidateKey||'',
+
         direction:candidate.direction,
 
         contractType,
@@ -5093,38 +5023,6 @@ window.CASPER_ENGINE = (() => {
   }
 
 
-  function requestHistoricalWarmup(){
-    if(!ws||ws.readyState!==WebSocket.OPEN)return;
-    historyRequestSymbols.clear();
-    symbols.forEach((symbol,index)=>{
-      const reqId=1000+index;
-      historyRequestSymbols.set(reqId,symbol);
-      try{
-        ws.send(JSON.stringify({
-          ticks_history:symbol,
-          end:'latest',
-          count:120,
-          style:'ticks',
-          subscribe:0,
-          req_id:reqId
-        }));
-      }catch{}
-    });
-  }
-
-  function seedHistoricalTicks(symbol,history){
-    if(!symbol||!history)return;
-    const prices=Array.isArray(history.prices)?history.prices:[];
-    const times=Array.isArray(history.times)?history.times:[];
-    const count=Math.min(prices.length,times.length);
-    for(let i=0;i<count;i++){
-      const quote=Number(prices[i]);
-      const epoch=Number(times[i]);
-      if(!Number.isFinite(quote)||!Number.isFinite(epoch))continue;
-      casperEngine.onTick({symbol,quote,epoch,pipSize:pipSizes.get(symbol)});
-    }
-  }
-
   function connect(){
 
     try{
@@ -5166,7 +5064,6 @@ window.CASPER_ENGINE = (() => {
           );
 
           subscribeMarkets();
-          requestHistoricalWarmup();
 
         }catch{
 
@@ -5232,17 +5129,6 @@ window.CASPER_ENGINE = (() => {
           return;
         }
 
-
-        if(d.msg_type==='history'&&d.history){
-          const reqId=Number(d.echo_req?.req_id??d.req_id);
-          const symbol=historyRequestSymbols.get(reqId)||d.echo_req?.ticks_history;
-          if(symbol&&names[symbol]){
-            seedHistoricalTicks(symbol,d.history);
-            signalLiveTick();
-            if(activeStrategy==='Smart AI')refreshSmartAI();
-          }
-          return;
-        }
 
         if(
           d.msg_type==='tick'&&
