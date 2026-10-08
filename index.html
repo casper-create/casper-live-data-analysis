@@ -1464,6 +1464,17 @@ window.CASPER_ENGINE = (() => {
         odd:{total:0,correct:0},
         over8:{total:0,correct:0},
         match:{total:0,correct:0}
+      },
+
+      /* Rolling walk-forward accuracy.  These samples are deliberately
+         short and recent so Smart AI reacts to regime changes instead of
+         trusting old wins forever. */
+      recentValidation:{
+        riseFall:[],
+        even:[],
+        odd:[],
+        over8:[],
+        match:[]
       }
     };
   }
@@ -2155,6 +2166,7 @@ window.CASPER_ENGINE = (() => {
           if(correct){
             state.strategyValidation.riseFall.correct++;
           }
+          state.recentValidation.riseFall.push(correct);
         }
 
         if(p.type==='even'){
@@ -2172,6 +2184,7 @@ window.CASPER_ENGINE = (() => {
           if(correct){
             state.strategyValidation.even.correct++;
           }
+          state.recentValidation.even.push(correct);
         }
 
         if(p.type==='odd'){
@@ -2189,6 +2202,7 @@ window.CASPER_ENGINE = (() => {
           if(correct){
             state.strategyValidation.odd.correct++;
           }
+          state.recentValidation.odd.push(correct);
         }
 
         if(p.type==='over8'){
@@ -2206,6 +2220,7 @@ window.CASPER_ENGINE = (() => {
           if(correct){
             state.strategyValidation.over8.correct++;
           }
+          state.recentValidation.over8.push(correct);
         }
 
         if(p.type==='match'){
@@ -2218,6 +2233,7 @@ window.CASPER_ENGINE = (() => {
           if(correct){
             state.strategyValidation.match.correct++;
           }
+          state.recentValidation.match.push(correct);
         }
 
         if(!validated){
@@ -2256,6 +2272,12 @@ window.CASPER_ENGINE = (() => {
 
         if(correct){
           state.validation.buckets[bucket].correct++;
+        }
+      }
+
+      for(const key of Object.keys(state.recentValidation)){
+        if(state.recentValidation[key].length>20){
+          state.recentValidation[key]=state.recentValidation[key].slice(-20);
         }
       }
     }
@@ -2352,18 +2374,24 @@ window.CASPER_ENGINE = (() => {
 
       const total=state.validation.total;
 
-      const strategyRecord=key=>({
-
-        total:state.strategyValidation[key].total,
-
-        correct:state.strategyValidation[key].correct,
-
-        accuracy:
-          state.strategyValidation[key].total
-            ? state.strategyValidation[key].correct/
-              state.strategyValidation[key].total
+      const strategyRecord=key=>{
+        const recent=state.recentValidation[key]||[];
+        const recentCorrect=recent.filter(Boolean).length;
+        return {
+          total:state.strategyValidation[key].total,
+          correct:state.strategyValidation[key].correct,
+          accuracy:
+            state.strategyValidation[key].total
+              ? state.strategyValidation[key].correct/
+                state.strategyValidation[key].total
+              : null,
+          recentTotal:recent.length,
+          recentCorrect,
+          recentAccuracy:recent.length>=4
+            ? recentCorrect/recent.length
             : null
-      });
+        };
+      };
 
       return {
 
@@ -2612,35 +2640,30 @@ window.CASPER_ENGINE = (() => {
 
     function validationFactor(record){
 
-      if(
-        !record||
-        record.total<VALIDATION_MINIMUM||
-        record.accuracy===null
-      ){
-
-        return {
-          factor:.82,
-          mature:false,
-          accuracy:null,
-          total:record?.total||0
-        };
+      if(!record){
+        return {factor:.82,mature:false,accuracy:null,total:0,recentAccuracy:null,recentTotal:0};
       }
 
+      const mature=record.total>=VALIDATION_MINIMUM&&record.accuracy!==null;
+      const recentReady=record.recentTotal>=4&&record.recentAccuracy!==null;
+      const blended=
+        mature&&recentReady
+          ? record.accuracy*.40+record.recentAccuracy*.60
+          : recentReady
+            ? record.recentAccuracy
+            : mature
+              ? record.accuracy
+              : .50;
+
       return {
-
-        factor:
-          clamp(
-            .5+
-            (record.accuracy-.5)*1.8,
-            .35,
-            1.10
-          ),
-
-        mature:true,
-
+        factor:recentReady||mature
+          ? clamp(.5+(blended-.5)*1.8,.35,1.10)
+          : .82,
+        mature,
         accuracy:record.accuracy,
-
-        total:record.total
+        total:record.total,
+        recentAccuracy:record.recentAccuracy??null,
+        recentTotal:record.recentTotal||0
       };
     }
 
@@ -2788,6 +2811,22 @@ window.CASPER_ENGINE = (() => {
             ? clamp(.80+Math.max(0,(v.accuracy||.5)-.5)*2.4,.70,1.12)
             : .88;
 
+          /* Recent walk-forward accuracy is the strongest feedback signal.
+             A cold/immature market stays neutral; a repeatedly losing setup
+             is downgraded before it can become the next trade. */
+          const recentFactor=
+            v.recentTotal>=4 && v.recentAccuracy!==null
+              ? (v.recentAccuracy>=.62
+                  ? 1.08
+                  : v.recentAccuracy>=.56
+                    ? 1.03
+                    : v.recentAccuracy>=.50
+                      ? .98
+                      : v.recentAccuracy>=.45
+                        ? .88
+                        : .72)
+              : 1;
+
           const agreement=
             c.strategy==='Mix Both'
               ? .96
@@ -2807,6 +2846,7 @@ window.CASPER_ENGINE = (() => {
             (.70+.30*clamp(f.direction.stability,.2,1))*
             validationStrength*
             validationBonus*
+            recentFactor*
             agreement*
             regimePenalty*
             entropyPenalty*
@@ -2887,6 +2927,8 @@ window.CASPER_ENGINE = (() => {
                   : 'edge_filter_rejected',
             regime:f.regime,
             validation:v,
+            recentAccuracy:v.recentAccuracy,
+            recentTotal:v.recentTotal,
             snapshot:snap
           };
         });
