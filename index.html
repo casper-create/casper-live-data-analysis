@@ -3505,15 +3505,55 @@ window.CASPER_ENGINE = (() => {
       const history=readDemoHistory()
         .filter(x=>x&&x.source==='SMART AI')
         .filter(x=>x.market===candidate.symbol&&x.strategy===candidate.strategy&&x.direction===candidate.direction)
-        .slice(0,8);
-      if(history.length<3)return {blocked:false,penalty:1,losses:0,wins:0};
+        .slice(0,10);
+      if(history.length<3)return {blocked:false,penalty:1,losses:0,wins:0,total:history.length,accuracy:null};
       const losses=history.filter(x=>x.status==='lost').length;
       const wins=history.filter(x=>x.status==='won').length;
-      if(losses>=3&&losses>wins)return {blocked:true,penalty:.65,losses,wins};
-      if(losses>wins)return {blocked:false,penalty:.82,losses,wins};
-      return {blocked:false,penalty:1,losses,wins};
+      const accuracy=wins/history.length;
+      if(losses>=4&&losses>wins)return {blocked:true,penalty:.60,losses,wins,total:history.length,accuracy};
+      if(accuracy<.40)return {blocked:false,penalty:.72,losses,wins,total:history.length,accuracy};
+      if(accuracy<.50)return {blocked:false,penalty:.84,losses,wins,total:history.length,accuracy};
+      if(accuracy>=.70&&history.length>=6)return {blocked:false,penalty:1.06,losses,wins,total:history.length,accuracy};
+      if(accuracy>=.60)return {blocked:false,penalty:1.03,losses,wins,total:history.length,accuracy};
+      return {blocked:false,penalty:1,losses,wins,total:history.length,accuracy};
     }catch{
-      return {blocked:false,penalty:1,losses:0,wins:0};
+      return {blocked:false,penalty:1,losses:0,wins:0,total:0,accuracy:null};
+    }
+  }
+
+  /* Compare the candidate against the ACTUAL recent Smart AI market history.
+     This prevents CASPER from repeatedly choosing the same market merely
+     because its raw signal score remains high. It is a soft penalty, not a
+     forced rotation: a clearly superior fresh opportunity can still win. */
+  function smartMarketSelectionPenalty(candidate){
+    try{
+      const history=readDemoHistory()
+        .filter(x=>x&&x.source==='SMART AI')
+        .slice(0,12);
+      const sameMarket=history.filter(x=>x.market===candidate.symbol);
+      const recent=sameMarket.slice(0,4);
+      if(!sameMarket.length)return {penalty:1,recentTrades:0,recentLosses:0};
+
+      const recentLosses=recent.filter(x=>x.status==='lost').length;
+      const recentWins=recent.filter(x=>x.status==='won').length;
+      let penalty=1;
+
+      /* Give other markets room to compete after a recent trade. */
+      if(recent.length>=1) penalty*=.90;
+      if(recent.length>=2) penalty*=.90;
+      if(recent.length>=3) penalty*=.94;
+
+      /* Recent losses matter more than simple repetition. */
+      if(recentLosses>=2) penalty*=.72;
+      else if(recentLosses===1&&recentWins===0) penalty*=.84;
+
+      /* A market that has recently performed well is allowed back in, but
+         the bonus is deliberately smaller than the repetition penalty. */
+      if(recent.length>=3&&recentWins>=3) penalty*=1.04;
+
+      return {penalty:Math.max(.52,Math.min(1.04,penalty)),recentTrades:recent.length,recentLosses};
+    }catch{
+      return {penalty:1,recentTrades:0,recentLosses:0};
     }
   }
 
@@ -3542,20 +3582,41 @@ window.CASPER_ENGINE = (() => {
 
   function refreshSmartAI(){
 
+    /* Never replace an active locked candidate. The dashboard and execution
+       must continue to refer to exactly the same opportunity. */
+    if(smartLockedCandidate){
+      return smartLockedCandidate;
+    }
+
     const ranked=
       casperEngine.smartAI();
 
     const rankedEligible=
       ranked.filter(x=>x.eligible);
 
-    let selected=null;
-    for(const option of rankedEligible){
-      const perf=smartHistoryPenalty(option);
-      if(!perf.blocked){
-        selected=option;
-        break;
-      }
-    }
+    /* Raw engine ranking is only the first stage. Re-rank ALL eligible
+       markets using real Smart AI results and recent-market exposure, then
+       choose the single highest-quality candidate. */
+    const scoredOptions=rankedEligible
+      .map(option=>{
+        const combo=smartHistoryPenalty(option);
+        const marketPerf=smartMarketSelectionPenalty(option);
+        return {
+          option,
+          combo,
+          marketPerf,
+          selectionScore:
+            Number(option.score||0)*
+            combo.penalty*
+            marketPerf.penalty
+        };
+      })
+      .filter(x=>!x.combo.blocked)
+      .sort((a,b)=>b.selectionScore-a.selectionScore);
+
+    let selected=scoredOptions.length
+      ? scoredOptions[0].option
+      : null;
 
     if(!selected){
 
@@ -3620,6 +3681,9 @@ window.CASPER_ENGINE = (() => {
       validationText=
         `${validation.total} validation samples`;
     }
+
+    const selectedPerf=smartHistoryPenalty(selected);
+    const selectedMarketPerf=smartMarketSelectionPenalty(selected);
 
     $('#runMessage').textContent=
       `Smart AI selected ${names[selected.symbol]||selected.symbol} · ${selected.strategy} · ${selected.direction||''} · confidence ${(selected.confidence*100).toFixed(1)}% · ${validationText}`;
