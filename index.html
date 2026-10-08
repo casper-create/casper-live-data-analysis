@@ -2934,7 +2934,14 @@ window.CASPER_ENGINE = (() => {
         });
 
         scored.sort((a,b)=>b.score-a.score);
-        ranked.push({...scored[0],alternatives:scored.slice(1,3)});
+        /* Keep EVERY strategy candidate. Previously only scored[0] was
+           returned for each market; if that single strategy failed the
+           eligibility gate, another valid Free strategy on the same market
+           was silently discarded. That can make Smart AI appear unresponsive. */
+        ranked.push(...scored.map((candidate,index)=>({
+          ...candidate,
+          alternatives:index===0?scored.slice(1,3):[]
+        })));
       }
 
       ranked.sort((a,b)=>{
@@ -3688,8 +3695,19 @@ window.CASPER_ENGINE = (() => {
       return null;
     }
 
-    const top=scored[0];
-    const second=scored[1];
+    /* Compare markets first, not two strategies from the SAME market.
+       Strategy candidates compete within each market; then each market's
+       best candidate competes against the other market leaders. */
+    const bestByMarket=new Map();
+    for(const item of scored){
+      const key=String(item.option.symbol||'');
+      if(!key)continue;
+      if(!bestByMarket.has(key))bestByMarket.set(key,item);
+    }
+    const marketLeaders=[...bestByMarket.values()]
+      .sort((a,b)=>b.selectionScore-a.selectionScore);
+    const top=marketLeaders[0];
+    const second=marketLeaders[1];
     const margin=second?top.selectionScore-second.selectionScore:Infinity;
     const relativeGap=second&&second.selectionScore>0
       ? margin/second.selectionScore
@@ -3715,10 +3733,20 @@ window.CASPER_ENGINE = (() => {
       return null;
     }
 
-    const selected=top.option;
-    const locked=lockSmartCandidate(selected);
+    let locked=null;
+    let selected=null;
+    for(const item of marketLeaders){
+      if(!item.option || !item.option.eligible)continue;
+      if(Number(item.option.confidence||0)<.625 || Number(item.selectionScore||0)<.575)continue;
+      const itemPerf=smartHistoryPenalty(item.option);
+      if(itemPerf.blocked)continue;
+      locked=lockSmartCandidate(item.option);
+      if(locked){ selected=item.option; break; }
+    }
     if(!locked){
       smartSelectedSymbol=null;
+      $('#runMessage').textContent='Smart AI is refreshing live candidates across all markets…';
+      updateRunButton();
       return null;
     }
 
@@ -3731,7 +3759,7 @@ window.CASPER_ENGINE = (() => {
       : `${validation?.total||0} validation samples`;
 
     $('#runMessage').textContent=
-      `Smart AI selected ${names[locked.symbol]||locked.symbol} · ${locked.strategy} · ${locked.direction||''} · confidence ${(locked.confidence*100).toFixed(1)}% · ${validationText} · strongest of ${scored.length} candidates`;
+      `Smart AI selected ${names[locked.symbol]||locked.symbol} · ${locked.strategy} · ${locked.direction||''} · confidence ${(locked.confidence*100).toFixed(1)}% · ${validationText} · best of ${marketLeaders.length} market leaders`;
 
     updateRunButton();
     return locked;
