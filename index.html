@@ -3574,7 +3574,7 @@ window.CASPER_ENGINE = (() => {
 
   function clearSmartCandidateLock(candidate){
     if(candidate){
-      smartComboCooldown.set(smartComboKey(candidate),Date.now()+3500);
+      smartComboCooldown.set(smartComboKey(candidate),Date.now()+1200);
     }
     smartLockedCandidate=null;
   }
@@ -3582,117 +3582,160 @@ window.CASPER_ENGINE = (() => {
 
   function refreshSmartAI(){
 
-    /* Never replace an active locked candidate. The dashboard and execution
-       must continue to refer to exactly the same opportunity. */
+    /* Keep the displayed candidate and execution candidate identical. */
     if(smartLockedCandidate){
       return smartLockedCandidate;
     }
 
-    const ranked=
-      casperEngine.smartAI();
+    const ranked=casperEngine.smartAI();
+    const rankedEligible=ranked.filter(x=>x&&x.eligible);
 
-    const rankedEligible=
-      ranked.filter(x=>x.eligible);
+    /*
+      Smart AI does NOT simply take the engine's first row anymore.
+      Every eligible candidate competes again using:
+        - exact setup history
+        - market history
+        - freshness
+        - recent execution repetition
+        - confidence
+        - separation from the next-best candidate
+    */
+    const now=Date.now();
+    const recentSmart=readDemoHistory()
+      .filter(x=>x&&x.source==='SMART AI')
+      .slice(0,20);
 
-    /* Raw engine ranking is only the first stage. Re-rank ALL eligible
-       markets using real Smart AI results and recent-market exposure, then
-       choose the single highest-quality candidate. */
-    const scoredOptions=rankedEligible
-      .map(option=>{
-        const combo=smartHistoryPenalty(option);
-        const marketPerf=smartMarketSelectionPenalty(option);
-        return {
-          option,
-          combo,
-          marketPerf,
-          selectionScore:
-            Number(option.score||0)*
-            combo.penalty*
-            marketPerf.penalty
-        };
-      })
-      .filter(x=>!x.combo.blocked)
-      .sort((a,b)=>b.selectionScore-a.selectionScore);
+    const marketStats=new Map();
+    for(const row of recentSmart){
+      const m=String(row.market||'');
+      if(!m)continue;
+      const st=marketStats.get(m)||{wins:0,losses:0,total:0,lastTime:0};
+      st.total++;
+      if(row.status==='won')st.wins++;
+      if(row.status==='lost')st.losses++;
+      st.lastTime=Math.max(st.lastTime,Date.parse(row.timestamp)||0);
+      marketStats.set(m,st);
+    }
 
-    let selected=scoredOptions.length
-      ? scoredOptions[0].option
-      : null;
+    const scored=rankedEligible.map(option=>{
+      const exact=smartHistoryPenalty(option);
+      const ms=marketStats.get(option.symbol)||{wins:0,losses:0,total:0,lastTime:0};
+      const total=ms.total;
+      const winRate=total?ms.wins/total:null;
 
-    if(!selected){
+      let historyFactor=1;
+      if(exact.losses>=3 && exact.losses>exact.wins) historyFactor=.58;
+      else if(exact.losses>exact.wins) historyFactor=.78;
+      else if(exact.wins>=3 && exact.wins>exact.losses) historyFactor=1.06;
 
+      let marketFactor=1;
+      if(total>=3 && winRate!==null){
+        if(winRate<.40) marketFactor=.68;
+        else if(winRate<.50) marketFactor=.84;
+        else if(winRate>=.67) marketFactor=1.05;
+      }
+
+      /* Avoid repeatedly choosing the same market unless it is clearly best. */
+      const age=ms.lastTime?now-ms.lastTime:Infinity;
+      const recentMarketFactor=
+        age<8000 ? .72 :
+        age<16000 ? .84 :
+        age<30000 ? .93 : 1;
+
+      const epoch=
+        Number(option.snapshot?.features?.epoch)||
+        Number(option.snapshot?.features?.lastEpoch)||
+        Number(option.snapshot?.lastEpoch)||0;
+      const previousEpoch=Number(lastExecutedEpochBySymbol.get(option.symbol)||0);
+      const freshFactor=epoch&&previousEpoch
+        ? (epoch>previousEpoch ? 1.04 : .72)
+        : 1;
+
+      const confidenceFactor=1+Math.max(0,Number(option.confidence||0)-.60)*.55;
+
+      const selectionScore=
+        Number(option.score||0)*
+        historyFactor*
+        marketFactor*
+        recentMarketFactor*
+        freshFactor*
+        confidenceFactor;
+
+      return {
+        option,
+        exact,
+        selectionScore,
+        marketFactor,
+        recentMarketFactor,
+        freshFactor,
+        confidenceFactor
+      };
+    })
+    .filter(x=>!x.exact.blocked)
+    .sort((a,b)=>b.selectionScore-a.selectionScore);
+
+    if(!scored.length){
       smartSelectedSymbol=null;
-
-      $('#marketName').textContent=
-        'Auto-selecting the best';
-
-      $('#rowMarket').textContent=
-        'Scanning all markets';
-
+      $('#marketName').textContent='Auto-selecting the best';
+      $('#rowMarket').textContent='Scanning all markets';
       $('#quote').textContent='—';
       $('#rowQuote').textContent='—';
       $('#lastDigit').textContent='—';
       $('#rowDigit').textContent='—';
       $('#tickCount').textContent='0';
-
-      $('#runMessage').textContent=
-        continuousScanMessage();
-
+      $('#runMessage').textContent=continuousScanMessage();
       updateRunButton();
-
       return null;
     }
 
-    const locked=
-      lockSmartCandidate(selected);
+    const top=scored[0];
+    const second=scored[1];
+    const margin=second?top.selectionScore-second.selectionScore:Infinity;
+    const relativeGap=second&&second.selectionScore>0
+      ? margin/second.selectionScore
+      : Infinity;
 
+    /*
+      If the top two are essentially tied, do not gamble on a coin flip.
+      Keep scanning for a fresh tick that creates a real leader.
+    */
+    const strongEnough=
+      Number(top.option.confidence||0)>=.625 &&
+      Number(top.selectionScore||0)>=.575;
+    const clearLeader=
+      !second || relativeGap>=.025 || Number(top.option.confidence||0)>=.70;
+
+    if(!strongEnough || !clearLeader){
+      smartSelectedSymbol=null;
+      $('#marketName').textContent='Auto-selecting the best';
+      $('#rowMarket').textContent='Comparing all markets';
+      $('#runMessage').textContent=
+        'Smart AI is comparing the strongest live opportunities before entering…';
+      updateRunButton();
+      return null;
+    }
+
+    const selected=top.option;
+    const locked=lockSmartCandidate(selected);
     if(!locked){
       smartSelectedSymbol=null;
       return null;
     }
 
-    selected=locked;
+    smartSelectedSymbol=locked.symbol;
+    updateSelectedMarketDisplay(locked.symbol,locked.snapshot);
 
-    smartSelectedSymbol=
-      selected.symbol;
-
-    updateSelectedMarketDisplay(
-      selected.symbol,
-      selected.snapshot
-    );
-
-    const validation=
-      selected.validation;
-
-    let validationText=
-      'validation collecting';
-
-    if(
-      validation.mature&&
-      validation.accuracy!==null
-    ){
-
-      validationText=
-        `${(
-          validation.accuracy*100
-        ).toFixed(1)}% historical · ${validation.total} samples`;
-
-    }else{
-
-      validationText=
-        `${validation.total} validation samples`;
-    }
-
-    const selectedPerf=smartHistoryPenalty(selected);
-    const selectedMarketPerf=smartMarketSelectionPenalty(selected);
+    const validation=locked.validation;
+    const validationText=validation&&validation.mature&&validation.accuracy!==null
+      ? `${(validation.accuracy*100).toFixed(1)}% historical · ${validation.total} samples`
+      : `${validation?.total||0} validation samples`;
 
     $('#runMessage').textContent=
-      `Smart AI selected ${names[selected.symbol]||selected.symbol} · ${selected.strategy} · ${selected.direction||''} · confidence ${(selected.confidence*100).toFixed(1)}% · ${validationText}`;
+      `Smart AI selected ${names[locked.symbol]||locked.symbol} · ${locked.strategy} · ${locked.direction||''} · confidence ${(locked.confidence*100).toFixed(1)}% · ${validationText} · strongest of ${scored.length} candidates`;
 
     updateRunButton();
-
-    return selected;
+    return locked;
   }
-
 
   /* ==========================================================
      FREE STRATEGY SIGNAL SELECTION
