@@ -710,6 +710,90 @@
     .aiScanBadge .pulse{width:7px;height:7px;border-radius:50%;background:var(--cyan);animation:casperPulse 1.6s infinite}
     @keyframes casperPulse{0%{opacity:.45}50%{opacity:1}100%{opacity:.45}}
 
+
+    /* ==========================================================
+       DIRECT SCAN + TRANSACTION OVERLAY
+       ========================================================== */
+    .casperOverlay{
+      position:fixed;
+      inset:0;
+      z-index:50;
+      display:grid;
+      place-items:center;
+      padding:18px;
+      background:#020b0fd9;
+      backdrop-filter:blur(7px)
+    }
+    .casperOverlay.hidden{display:none}
+    .casperOverlayPanel{
+      width:min(560px,100%);
+      max-height:min(760px,calc(100vh - 36px));
+      overflow:auto;
+      border:1px solid #1c5361;
+      border-radius:22px;
+      background:linear-gradient(180deg,#06161d,#081e27);
+      box-shadow:0 28px 100px #000b,0 0 45px #00cfe91c
+    }
+    .scanView,.transactionView{padding:30px 26px}
+    .scanView.hidden,.transactionView.hidden{display:none}
+    .scanView{text-align:center}
+    .scanOrb{
+      width:86px;height:86px;margin:4px auto 18px;border-radius:50%;
+      display:grid;place-items:center;border:2px solid var(--cyan);
+      color:var(--cyan);font-size:35px;
+      box-shadow:0 0 0 9px #18d5ea0d,0 0 32px #18d5ea40;
+      animation:casperScanPulse 1.7s ease-in-out infinite
+    }
+    @keyframes casperScanPulse{
+      0%,100%{transform:scale(.96);box-shadow:0 0 0 9px #18d5ea0d,0 0 22px #18d5ea25}
+      50%{transform:scale(1.04);box-shadow:0 0 0 15px #18d5ea0a,0 0 38px #18d5ea45}
+    }
+    .scanTitle{font-size:24px;font-weight:850;letter-spacing:.01em}
+    .scanDots i{font-style:normal;animation:casperDot 1.1s infinite;opacity:.2}
+    .scanDots i:nth-child(2){animation-delay:.18s}
+    .scanDots i:nth-child(3){animation-delay:.36s}
+    @keyframes casperDot{0%,100%{opacity:.2}45%{opacity:1}}
+    .scanSub{margin-top:7px;color:var(--muted);font-size:14px}
+    .scanLogs{
+      margin:22px 0 20px;padding:15px 16px;text-align:left;
+      border:1px solid var(--line);border-radius:14px;background:#020b0f99;
+      color:#7197a8;font:12px/1.75 ui-monospace,SFMono-Regular,Consolas,monospace;
+      min-height:156px
+    }
+    .scanLogs div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .scanLogs div:last-child{color:#8ddbe7}
+    .scanStop{
+      width:100%;min-height:46px;border:1px solid #5a2937;border-radius:12px;
+      background:#24131a;color:#ff8da1;font-weight:800
+    }
+    .transactionTop{display:flex;justify-content:space-between;gap:15px;align-items:flex-start}
+    .transactionEyebrow{font-size:11px;letter-spacing:.13em;color:var(--cyan);font-weight:850}
+    .transactionHeading{font-size:23px;font-weight:850;margin-top:5px}
+    .transactionLive{font-size:11px;font-weight:900;color:var(--green);display:flex;align-items:center;gap:6px}
+    .transactionLive span{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}
+    .transactionMarket{display:grid;grid-template-columns:1.5fr 1fr;gap:10px;margin-top:22px}
+    .transactionMarket>div,.transactionNumbers>div{
+      border:1px solid var(--line);background:#0b252e;border-radius:13px;padding:12px
+    }
+    .transactionMarket small,.transactionNumbers small{display:block;color:var(--muted);font-size:10px;letter-spacing:.08em}
+    .transactionMarket strong{display:block;margin-top:4px;font-size:15px}
+    .transactionSignal{margin-top:10px;padding:18px;border-radius:15px;text-align:center;border:1px solid #1c6575;background:#0b2b35}
+    .signalDirection{font-size:30px;font-weight:950;letter-spacing:.05em}
+    .signalConfidence{margin-top:4px;color:var(--muted);font-size:13px}
+    .transactionNumbers{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
+    .transactionNumbers b{display:block;margin-top:5px;font-size:15px}
+    .transactionProgress{height:5px;margin-top:18px;background:#07141a;border-radius:99px;overflow:hidden}
+    .transactionProgress span{display:block;height:100%;width:12%;background:var(--cyan);border-radius:99px;transition:width .25s ease}
+    .transactionStatus{text-align:center;font-weight:750;margin-top:15px}
+    .transactionContract{text-align:center;color:var(--muted);font-size:12px;margin-top:5px}
+    @media(max-width:600px){
+      .casperOverlay{padding:10px}
+      .casperOverlayPanel{max-height:calc(100vh - 20px);border-radius:18px}
+      .scanView,.transactionView{padding:24px 16px}
+      .scanTitle{font-size:21px}
+      .transactionHeading{font-size:20px}
+    }
+
     @media(max-width:850px){
       .topbar{padding:10px 14px}
       .brand{font-size:17px}
@@ -761,6 +845,15 @@
       .strategy{min-height:78px}
       .riskset{gap:5px}
       .risk{padding:14px 4px}
+    }
+
+    @media(max-width:600px){
+      .wrap{width:100%;max-width:100%;overflow-x:hidden}
+      .card,.strategies,.premiumGrid,.moneygrid,.fields{min-width:0}
+      .strategy,.run,.txrow,.marketbar{max-width:100%;overflow:hidden}
+      .txmeta,.txmarket,.txpl,#runMessage{overflow-wrap:anywhere;word-break:break-word}
+      input,select,button{max-width:100%;font-size:16px}
+      .transactions{overflow-x:hidden}
     }
   </style>
 </head>
@@ -1201,6 +1294,68 @@
 </p>
 
 </main>
+
+
+
+<!-- ==========================================================
+     CASPER LIVE SCAN / DIRECT TRANSACTION VIEW
+     ========================================================== -->
+<div class="casperOverlay hidden" id="casperOverlay" aria-live="polite">
+  <div class="casperOverlayPanel">
+    <div class="scanView" id="scanView">
+      <div class="scanOrb"><span>✦</span></div>
+      <div class="scanTitle">Scanning the market<span class="scanDots"><i>.</i><i>.</i><i>.</i></span></div>
+      <div class="scanSub" id="scanSub">Analysing live Volatility markets</div>
+      <div class="scanLogs" id="scanLogs">
+        <div>› Connecting to market data stream</div>
+        <div>› Encryption channel enabled</div>
+        <div>› Live data stream established</div>
+        <div>› Fetching market ticks</div>
+        <div>› Analysing volatility structure</div>
+        <div>› Testing Rise/Fall · Even/Odd · Mix Both</div>
+        <div>› Ranking validated opportunities</div>
+      </div>
+      <button class="scanStop" id="scanStop" type="button">■ Stop Demo</button>
+    </div>
+
+    <div class="transactionView hidden" id="transactionView">
+      <div class="transactionTop">
+        <div>
+          <div class="transactionEyebrow">NEXORA AI · DEMO TRANSACTION</div>
+          <div class="transactionHeading" id="txOverlayHeading">Preparing trade</div>
+        </div>
+        <div class="transactionLive"><span></span> LIVE</div>
+      </div>
+
+      <div class="transactionMarket">
+        <div>
+          <small>MARKET</small>
+          <strong id="txOverlayMarket">—</strong>
+        </div>
+        <div>
+          <small>STRATEGY</small>
+          <strong id="txOverlayStrategy">—</strong>
+        </div>
+      </div>
+
+      <div class="transactionSignal" id="txOverlaySignal">
+        <div class="signalDirection" id="txOverlayDirection">—</div>
+        <div class="signalConfidence" id="txOverlayConfidence">Confidence —</div>
+      </div>
+
+      <div class="transactionNumbers">
+        <div><small>STAKE</small><b id="txOverlayStake">0.00 USD</b></div>
+        <div><small>ENTRY</small><b id="txOverlayEntry">—</b></div>
+        <div><small>EXIT</small><b id="txOverlayExit">—</b></div>
+        <div><small>P/L</small><b id="txOverlayPL">—</b></div>
+      </div>
+
+      <div class="transactionProgress"><span id="txOverlayProgress"></span></div>
+      <div class="transactionStatus" id="txOverlayStatus">Preparing Demo contract…</div>
+      <div class="transactionContract" id="txOverlayContract">Waiting for contract</div>
+    </div>
+  </div>
+</div>
 
 <div class="toast hidden" id="toast"></div>
 
@@ -2404,6 +2559,8 @@ window.CASPER_ENGINE = (() => {
 
           ticks:state.accepted,
 
+          lastEpoch:state.lastEpoch,
+
           dataQuality:dataQuality(state),
 
           features,
@@ -2437,6 +2594,8 @@ window.CASPER_ENGINE = (() => {
         ready:true,
 
         ticks:state.accepted,
+
+        lastEpoch:state.lastEpoch,
 
         dataQuality:dataQuality(state),
 
@@ -2545,35 +2704,173 @@ window.CASPER_ENGINE = (() => {
 
     function smartAI(){
       const ranked=[];
+
+      /*
+        Smart AI v2
+        ------------
+        Evaluate EVERY live market on every fresh tick.  The AI first
+        compares the three Free engines (Rise/Fall, Even/Odd and Mix
+        Both), then applies data-quality, regime, entropy, concentration
+        and forward-validation filters.  We keep the strict tier for the
+        best signals, but expose a carefully bounded secondary tier so the
+        scanner does not remain silent for an excessive period simply
+        because one validation counter is still maturing.
+      */
       for(const snap of allMarkets()){
-        if(!snap.ready){ ranked.push({symbol:snap.symbol,eligible:false,score:0,reason:'insufficient_data',snapshot:snap}); continue; }
+        if(!snap.ready){
+          ranked.push({symbol:snap.symbol,eligible:false,executionTier:'warmup',score:0,reason:'insufficient_data',snapshot:snap});
+          continue;
+        }
+
         const q=snap.dataQuality;
-        if(q.integrity<.995 || snap.ticks<MIN_TICKS){ ranked.push({symbol:snap.symbol,eligible:false,score:0,reason:'data_quality_or_sample',snapshot:snap}); continue; }
-        const rf=snap.signals.riseFall, parity=snap.signals.parity, mix=snap.signals.mixBoth;
+        if(q.integrity<.995 || snap.ticks<MIN_TICKS){
+          ranked.push({symbol:snap.symbol,eligible:false,executionTier:'data_guard',score:0,reason:'data_quality_or_sample',snapshot:snap});
+          continue;
+        }
+
+        const rf=snap.signals.riseFall;
+        const parity=snap.signals.parity;
+        const mix=snap.signals.mixBoth;
         const candidates=[];
-        if(rf?.actionable) candidates.push({signal:rf,strategy:'Rise & Fall',baseStrategy:'Rise & Fall',validation:strategyValidationFactor(snap.validation,'Rise & Fall')});
-        if(parity?.actionable) candidates.push({signal:parity,strategy:'Even & Odd',baseStrategy:'Even & Odd',validation:parityValidationFactor(snap.validation,parity.direction)});
-        if(mix?.actionable){ const base=mix.baseStrategy; const v=base==='Rise & Fall'?strategyValidationFactor(snap.validation,'Rise & Fall'):parityValidationFactor(snap.validation,mix.direction); candidates.push({signal:mix,strategy:'Mix Both',baseStrategy:base,validation:v}); }
-        if(!candidates.length){ ranked.push({symbol:snap.symbol,eligible:false,score:0,reason:'no_free_strategy_edge',snapshot:snap}); continue; }
+
+        if(rf?.actionable){
+          candidates.push({
+            signal:rf,
+            strategy:'Rise & Fall',
+            baseStrategy:'Rise & Fall',
+            validation:strategyValidationFactor(snap.validation,'Rise & Fall')
+          });
+        }
+
+        if(parity?.actionable){
+          candidates.push({
+            signal:parity,
+            strategy:'Even & Odd',
+            baseStrategy:'Even & Odd',
+            validation:parityValidationFactor(snap.validation,parity.direction)
+          });
+        }
+
+        if(mix?.actionable){
+          const base=mix.baseStrategy;
+          const v=base==='Rise & Fall'
+            ? strategyValidationFactor(snap.validation,'Rise & Fall')
+            : parityValidationFactor(snap.validation,mix.direction);
+          candidates.push({
+            signal:mix,
+            strategy:'Mix Both',
+            baseStrategy:base,
+            validation:v
+          });
+        }
+
+        if(!candidates.length){
+          ranked.push({symbol:snap.symbol,eligible:false,executionTier:'no_edge',score:0,reason:'no_free_strategy_edge',snapshot:snap});
+          continue;
+        }
+
         const scored=candidates.map(c=>{
-          const f=snap.features, v=c.validation, entropy=f.digits.digitEntropy, concentration=f.digits.digitConcentration;
-          const regimePenalty=f.regime==='high_volatility'?.84:f.regime==='compression'?.91:f.regime==='range'?.95:1;
-          const validationStrength=v.mature?clamp(v.factor,.35,1.10):.72;
-          const validationBonus=v.mature?clamp(.80+Math.max(0,(v.accuracy||.5)-.5)*2.4,.70,1.12):.82;
+          const f=snap.features;
+          const v=c.validation;
+          const entropy=f.digits.digitEntropy;
+          const concentration=f.digits.digitConcentration;
+
+          const regimePenalty=
+            f.regime==='high_volatility' ? .84 :
+            f.regime==='compression' ? .91 :
+            f.regime==='range' ? .95 : 1;
+
+          const validationStrength=v.mature
+            ? clamp(v.factor,.35,1.10)
+            : .86;
+
+          const validationBonus=v.mature
+            ? clamp(.80+Math.max(0,(v.accuracy||.5)-.5)*2.4,.70,1.12)
+            : .88;
+
           const agreement=
             c.strategy==='Mix Both'
-              ? .94
-              : (rf?.actionable&&parity?.actionable ? .92 : .80);
-          const entropyPenalty=entropy>.985?.86:entropy>.95?.93:1;
-          const concentrationPenalty=concentration>.32?.88:concentration>.25?.94:1;
-          const score=c.signal.confidence*q.integrity*(.70+.30*clamp(f.direction.stability,.2,1))*validationStrength*validationBonus*agreement*regimePenalty*entropyPenalty*concentrationPenalty;
-          const eligible=score>=.60&&c.signal.confidence>=.61&&v.total>=VALIDATION_MINIMUM&&f.regime!=='high_volatility'&&entropy<.99;
-          return {symbol:snap.symbol,eligible,score,strategy:c.strategy,baseStrategy:c.baseStrategy,direction:c.signal.direction,confidence:c.signal.confidence,reason:eligible?'multi_strategy_validated_edge':'edge_filter_rejected',regime:f.regime,validation:v,snapshot:snap};
+              ? .96
+              : (rf?.actionable&&parity?.actionable ? .94 : .84);
+
+          const entropyPenalty=
+            entropy>.985 ? .86 :
+            entropy>.95 ? .93 : 1;
+
+          const concentrationPenalty=
+            concentration>.32 ? .88 :
+            concentration>.25 ? .94 : 1;
+
+          const score=
+            c.signal.confidence*
+            q.integrity*
+            (.70+.30*clamp(f.direction.stability,.2,1))*
+            validationStrength*
+            validationBonus*
+            agreement*
+            regimePenalty*
+            entropyPenalty*
+            concentrationPenalty;
+
+          const mature=
+            v.total>=VALIDATION_MINIMUM;
+
+          const strictEligible=
+            score>=.60&&
+            c.signal.confidence>=.61&&
+            mature&&
+            f.regime!=='high_volatility'&&
+            entropy<.99;
+
+          /*
+            Bounded execution tier: this is NOT a low-quality fallback.
+            It still requires excellent data, a strong signal, no high
+            volatility regime, and a meaningful forward-validation sample.
+            Its purpose is to prevent a healthy live system from waiting
+            indefinitely for one counter to reach 30 while the other
+            evidence is already strong.
+          */
+          const fastValidated=
+            score>=.655&&
+            c.signal.confidence>=.68&&
+            v.total>=12&&
+            q.integrity>=.997&&
+            f.regime!=='high_volatility'&&
+            entropy<.985;
+
+          const eligible=strictEligible||fastValidated;
+
+          return {
+            symbol:snap.symbol,
+            eligible,
+            executionTier:strictEligible?'validated':'fast_validated',
+            score,
+            strategy:c.strategy,
+            baseStrategy:c.baseStrategy,
+            direction:c.signal.direction,
+            confidence:c.signal.confidence,
+            reason:strictEligible
+              ? 'multi_strategy_validated_edge'
+              : fastValidated
+                ? 'strong_live_edge_with_forward_validation'
+                : 'edge_filter_rejected',
+            regime:f.regime,
+            validation:v,
+            snapshot:snap
+          };
         });
+
         scored.sort((a,b)=>b.score-a.score);
         ranked.push({...scored[0],alternatives:scored.slice(1,3)});
       }
-      ranked.sort((a,b)=>b.score-a.score);
+
+      ranked.sort((a,b)=>{
+        if(Boolean(b.eligible)!==Boolean(a.eligible)){
+          return b.eligible?1:-1;
+        }
+        return (b.score||0)-(a.score||0);
+      });
+
       return ranked;
     }
 
@@ -2703,6 +3000,46 @@ window.CASPER_ENGINE = (() => {
       maxTicks:1800
     });
 
+  /*
+    LIVE TICK CLOCK
+    ---------------
+    The scanner must be driven by the market, not by artificial
+    polling delays. Every accepted live tick advances this clock.
+    Continuous Smart AI waits for the next real tick before
+    evaluating again, so it cannot repeatedly trade the same
+    snapshot and it does not sit in a fake 20-minute polling loop.
+  */
+  let liveTickRevision=0;
+  const liveTickWaiters=[];
+
+  function signalLiveTick(){
+    liveTickRevision++;
+    const waiters=liveTickWaiters.splice(0);
+    for(const resolve of waiters){
+      try{ resolve(liveTickRevision); }catch{}
+    }
+  }
+
+  function waitForLiveTick(previousRevision,timeout=2500){
+    if(liveTickRevision>previousRevision){
+      return Promise.resolve(liveTickRevision);
+    }
+    return new Promise(resolve=>{
+      let settled=false;
+      const finish=value=>{
+        if(settled)return;
+        settled=true;
+        clearTimeout(timer);
+        const i=liveTickWaiters.indexOf(resolveWrapped);
+        if(i>=0)liveTickWaiters.splice(i,1);
+        resolve(value);
+      };
+      const resolveWrapped=()=>finish(liveTickRevision);
+      const timer=setTimeout(()=>finish(liveTickRevision),timeout);
+      liveTickWaiters.push(resolveWrapped);
+    });
+  }
+
   const market=$('#market');
 
   const marketPremium=$('#marketPremium');
@@ -2790,6 +3127,68 @@ window.CASPER_ENGINE = (() => {
       );
   }
 
+
+
+  /* ==========================================================
+     DIRECT SCAN / TRANSACTION VIEW
+     ========================================================== */
+  const overlay=$('#casperOverlay');
+  const scanView=$('#scanView');
+  const transactionView=$('#transactionView');
+
+  function showScanOverlay(reason='Scanning live markets'){
+    if(!overlay)return;
+    overlay.classList.remove('hidden');
+    scanView.classList.remove('hidden');
+    transactionView.classList.add('hidden');
+    $('#scanSub').textContent=reason;
+    const logs=$('#scanLogs');
+    if(logs){
+      logs.querySelectorAll('div').forEach((el,i)=>{
+        el.style.opacity=i<3?'1':'.78';
+      });
+    }
+  }
+
+  function showTransactionOverlay(candidate,stake,currency){
+    if(!overlay)return;
+    overlay.classList.remove('hidden');
+    scanView.classList.add('hidden');
+    transactionView.classList.remove('hidden');
+    $('#txOverlayHeading').textContent='Preparing Demo contract';
+    $('#txOverlayMarket').textContent=names[candidate.symbol]||candidate.symbol||'—';
+    $('#txOverlayStrategy').textContent=candidate.strategy||'—';
+    $('#txOverlayDirection').textContent=candidate.direction||'—';
+    $('#txOverlayConfidence').textContent=`Confidence ${((candidate.confidence||0)*100).toFixed(1)}%`;
+    $('#txOverlayStake').textContent=`${Number(stake||0).toFixed(2)} ${currency||'USD'}`;
+    $('#txOverlayEntry').textContent='—';
+    $('#txOverlayExit').textContent='—';
+    $('#txOverlayPL').textContent='—';
+    $('#txOverlayPL').style.color='';
+    $('#txOverlayProgress').style.width='12%';
+    $('#txOverlayStatus').textContent='Preparing Demo contract…';
+    $('#txOverlayContract').textContent='Waiting for proposal';
+  }
+
+  function updateTransactionOverlay(data={}){
+    if(!overlay)return;
+    if(data.heading!==undefined)$('#txOverlayHeading').textContent=data.heading;
+    if(data.status!==undefined)$('#txOverlayStatus').textContent=data.status;
+    if(data.contract!==undefined)$('#txOverlayContract').textContent=data.contract;
+    if(data.entry!==undefined)$('#txOverlayEntry').textContent=data.entry;
+    if(data.exit!==undefined)$('#txOverlayExit').textContent=data.exit;
+    if(data.progress!==undefined)$('#txOverlayProgress').style.width=`${Math.max(5,Math.min(100,Number(data.progress)||0))}%`;
+    if(data.pl!==undefined){
+      const pl=Number(data.pl)||0;
+      $('#txOverlayPL').textContent=`${pl>=0?'+':''}${pl.toFixed(2)} ${data.currency||'USD'}`;
+      $('#txOverlayPL').style.color=pl>0?'var(--green)':pl<0?'var(--red)':'var(--text)';
+    }
+  }
+
+  function hideCasperOverlay(delay=0){
+    const close=()=>overlay&&overlay.classList.add('hidden');
+    if(delay>0)setTimeout(close,delay);else close();
+  }
 
   function state(live=false){
 
@@ -3033,7 +3432,7 @@ window.CASPER_ENGINE = (() => {
       $('#tickCount').textContent='0';
 
       $('#runMessage').textContent=
-        'Smart AI is scanning all markets · no sufficiently strong Free-tier edge yet.';
+        continuousScanMessage();
 
       updateRunButton();
 
@@ -3090,9 +3489,23 @@ window.CASPER_ENGINE = (() => {
       const ranked=
         casperEngine.smartAI();
 
-      return ranked.find(
-        x=>x.eligible
-      )||null;
+      /* Highest-ranked eligible market wins.  Smart AI is deliberately
+         market-wide: it never locks itself to the selected manual market. */
+      const candidate=ranked.find(x=>x.eligible)||null;
+      if(!candidate)return null;
+
+      return {
+        symbol:candidate.symbol,
+        strategy:candidate.strategy,
+        baseStrategy:candidate.baseStrategy||candidate.strategy,
+        direction:candidate.direction,
+        confidence:candidate.confidence,
+        score:candidate.score,
+        reason:candidate.reason,
+        executionTier:candidate.executionTier,
+        snapshot:candidate.snapshot,
+        validation:candidate.validation
+      };
     }
 
     const symbol=
@@ -3283,6 +3696,7 @@ window.CASPER_ENGINE = (() => {
 
   function stopDemoRun(reason='user'){
     demoAutoRun=false;
+    if(reason==='risk'||reason==='error') hideCasperOverlay();
     demoRunSerial++;
 
     $('#runMessage').textContent=
@@ -3297,7 +3711,7 @@ window.CASPER_ENGINE = (() => {
 
   function continuousScanMessage(){
     if(activeStrategy==='Smart AI'){
-      return 'Smart AI is continuously scanning all 10 markets × Rise/Fall × Even/Odd × Mix Both for the next validated setup.';
+      return `Smart AI is continuously reading all ${symbols.length} live Volatility markets × Rise/Fall × Even/Odd × Mix Both.`;
     }
 
     const marketLabel=
@@ -3308,9 +3722,16 @@ window.CASPER_ENGINE = (() => {
     return `${activeStrategy} is continuously scanning ${marketLabel} for the next validated setup.`;
   }
 
+  function isRecoverableDemoError(message=''){
+    const text=String(message).toLowerCase();
+    return /connection|websocket|socket|timeout|timed out|temporar|server|network|rate|busy|not available|disconnected|authorization/i.test(text);
+  }
+
   async function demoRunLoop(serial){
 
-    let scansWithoutCandidate=0;
+    let lastTickSeen=liveTickRevision;
+    let executionRecoveryAttempts=0;
+    let lastExecutedEpochBySymbol=new Map();
 
     while(
       demoAutoRun&&
@@ -3324,88 +3745,80 @@ window.CASPER_ENGINE = (() => {
         break;
       }
 
-      if(
-        !signedIn||
-        !selectedAccountIsDemo()
-      ){
+      if(!signedIn||!selectedAccountIsDemo()){
         stopDemoRun('error');
         break;
       }
 
       /*
-        IMPORTANT:
-        A missing candidate is NOT an execution error.
-        It simply means the market has not produced the next
-        qualifying setup yet. Keep the session alive.
+        Always evaluate the freshest market state. After a completed
+        contract, wait for a NEW real tick rather than sleeping for an
+        arbitrary 450/900 ms. This makes the run cycle follow Deriv's
+        live feed and prevents duplicate entries on one snapshot.
       */
+      await waitForLiveTick(lastTickSeen,2500);
+      lastTickSeen=liveTickRevision;
+
+      if(!demoAutoRun||serial!==demoRunSerial)break;
+
       const candidate=getFreeCandidate();
 
       if(!candidate){
-
-        scansWithoutCandidate++;
-
-        $('#runMessage').textContent=
-          `${continuousScanMessage()} · waiting for a qualifying edge…`;
-
-        /*
-          Use a short polling interval so the next live tick
-          can produce a trade without making the UI appear stuck.
-        */
-        await sleep(
-          scansWithoutCandidate<5
-            ? 350
-            : 650
+        showScanOverlay(
+          activeStrategy==='Smart AI'
+            ? `Scanning all ${symbols.length} live Volatility markets · validating the newest tick`
+            : continuousScanMessage()
         );
-
+        $('#runMessage').textContent=
+          continuousScanMessage();
         continue;
       }
 
-      scansWithoutCandidate=0;
+      const candidateEpoch=
+        Number(candidate.snapshot?.features?.epoch)||
+        Number(candidate.snapshot?.features?.lastEpoch)||
+        Number(candidate.snapshot?.lastEpoch)||
+        0;
+
+      const previousEpoch=
+        Number(lastExecutedEpochBySymbol.get(candidate.symbol)||0);
+
+      if(candidateEpoch&&candidateEpoch<=previousEpoch){
+        continue;
+      }
 
       $('#runMessage').textContent=
-        `${activeStrategy==='Smart AI'?'Smart AI':'Nexora'} qualified ${names[candidate.symbol]||candidate.symbol} · ${candidate.strategy} · ${candidate.direction||''} · confidence ${(candidate.confidence*100).toFixed(1)}% · executing Demo trade`;
+        `Smart AI selected ${names[candidate.symbol]||candidate.symbol} · ${candidate.strategy} · ${candidate.direction||''} · ${(candidate.confidence*100).toFixed(1)}% · ${candidate.executionTier||'validated'} · executing Demo`;
 
-      const result=
-        await executeDemoTradeOnce(candidate);
+      const result=await executeDemoTradeOnce(candidate);
 
-      /*
-        The execution function can return undefined only when
-        another trade is already in progress or a safety guard
-        returned early. Never kill a continuous session for that.
-      */
-      if(
-        result===undefined
-      ){
-        await sleep(250);
+      if(result===undefined){
         continue;
       }
 
       if(result.error){
-
-        /*
-          A closed/expired trading socket can happen between
-          contracts. Give the authenticated Demo connection one
-          clean recovery attempt instead of permanently killing
-          the continuous session.
-        */
-        if(
-          demoAutoRun&&
-          serial===demoRunSerial&&
-          /connection|WebSocket|socket/i.test(
-            result.message||result.reason||''
-          )
-        ){
-
+        if(demoAutoRun&&serial===demoRunSerial&&isRecoverableDemoError(result.message||result.reason||'')){
+          executionRecoveryAttempts++;
           $('#runMessage').textContent=
-            'Demo trading connection interrupted · reconnecting and resuming the session…';
-
+            `Live execution connection recovered · resuming Smart AI scan (${executionRecoveryAttempts})…`;
           closeTradeSocket();
-          await sleep(900);
+          await sleep(Math.min(1200,250*executionRecoveryAttempts));
           continue;
         }
 
-        stopDemoRun('error');
-        break;
+        /* One bad proposal/contract must not silently kill a customer
+           session. Keep scanning unless the user/risk guard stopped it. */
+        executionRecoveryAttempts++;
+        $('#runMessage').textContent=
+          `Demo execution retry ${executionRecoveryAttempts} · Smart AI is continuing to scan for a fresh setup…`;
+        await sleep(Math.min(1000,200*executionRecoveryAttempts));
+        continue;
+      }
+
+      executionRecoveryAttempts=0;
+
+      if(candidateEpoch){
+        lastExecutedEpochBySymbol.set(candidate.symbol,candidateEpoch);
       }
 
       const after=demoRiskStatus();
@@ -3415,18 +3828,11 @@ window.CASPER_ENGINE = (() => {
         break;
       }
 
-      /*
-        Trade completed successfully.
-        Return to the scanner automatically. No second RUN click.
-      */
       $('#runMessage').textContent=
-        `${result.profit>=0?'Trade completed':'Trade completed'} · ${result.profit>=0?'+':''}${Number(result.profit||0).toFixed(2)} USD · ${demoSessionTrades} run${demoSessionTrades===1?'':'s'} · ${continuousScanMessage()}`;
+        `Demo result · ${result.profit>=0?'+':''}${Number(result.profit||0).toFixed(2)} USD · ${candidate.strategy} · ${names[candidate.symbol]||candidate.symbol} · ${demoSessionTrades} trades · ${continuousScanMessage()}`;
 
-      await sleep(
-        result.profit<0
-          ? 900
-          : 450
-      );
+      /* No artificial post-trade delay. The next real market tick drives
+         the next scan, just like a live trading engine. */
     }
   }
 
@@ -3461,6 +3867,12 @@ window.CASPER_ENGINE = (() => {
 
     const serial=demoRunSerial;
 
+    showScanOverlay(
+      activeStrategy==='Smart AI'
+        ? `Scanning all ${symbols.length} live Volatility markets`
+        : continuousScanMessage()
+    );
+
     $('#runMessage').textContent=
       'Continuous Demo session started · scanning live data for the next qualified setup.';
 
@@ -3472,7 +3884,15 @@ window.CASPER_ENGINE = (() => {
           '[CASPER] continuous loop',
           error
         );
-        stopDemoRun('error');
+        if(demoAutoRun&&serial===demoRunSerial){
+          $('#runMessage').textContent=
+            'Smart AI scanner recovered from an internal interruption · resuming live scan…';
+          setTimeout(()=>{
+            if(demoAutoRun&&serial===demoRunSerial){
+              demoRunLoop(serial).catch(()=>{});
+            }
+          },250);
+        }
       }
     );
   }
@@ -3621,6 +4041,7 @@ window.CASPER_ENGINE = (() => {
 
   function stopDemoTrading(){
     demoTradingStopped=true;
+    hideCasperOverlay();
     stopDemoRun('user');
     updateRunButton();
     $('#runMessage').textContent=
@@ -4203,6 +4624,13 @@ window.CASPER_ENGINE = (() => {
 
     demoTradeInProgress=true;
 
+    showTransactionOverlay(candidate,stake,currency);
+    updateTransactionOverlay({
+      heading:'Preparing Demo contract',
+      status:'Connecting to authenticated Demo execution…',
+      progress:18
+    });
+
     updateRunButton();
 
     $('#runMessage').textContent=
@@ -4264,6 +4692,13 @@ window.CASPER_ENGINE = (() => {
         );
       }
 
+      updateTransactionOverlay({
+        heading:'Signal confirmed · opening trade',
+        status:`Proposal received · ${stake.toFixed(2)} ${currency} · buying now…`,
+        contract:`Proposal ${String(proposal.id)}`,
+        progress:48
+      });
+
       $('#runMessage').textContent=
         `Demo proposal received · ${candidate.strategy} · ${candidate.direction||''} · stake ${stake.toFixed(2)} ${currency} · buying...`;
 
@@ -4290,6 +4725,13 @@ window.CASPER_ENGINE = (() => {
 
       const contractId=
         buy.contract_id;
+
+      updateTransactionOverlay({
+        heading:'Transaction active',
+        status:'Contract opened · monitoring the live result…',
+        contract:`Contract #${contractId}`,
+        progress:68
+      });
 
       $('#runMessage').textContent=
         `Demo contract opened · #${contractId} · ${candidate.strategy} · waiting for result...`;
@@ -4320,6 +4762,20 @@ window.CASPER_ENGINE = (() => {
         Number.isFinite(safeProfit)
           ? safeProfit
           : 0;
+
+      const finalStatus=
+        finalPL>0?'won':finalPL<0?'lost':'closed';
+
+      updateTransactionOverlay({
+        heading:finalStatus==='won'?'Transaction won':finalStatus==='lost'?'Transaction lost':'Transaction closed',
+        status:finalStatus==='won'?'WIN · payout realized':finalStatus==='lost'?'LOSS · contract completed':'Contract completed',
+        contract:`Contract #${contractId}`,
+        entry:Number(finalContract.entry_spot)||null ? String(Number(finalContract.entry_spot)) : '—',
+        exit:Number(finalContract.exit_spot)||null ? String(Number(finalContract.exit_spot)) : '—',
+        pl:finalPL,
+        currency,
+        progress:100
+      });
 
       /*
         IMPORTANT: Deriv's final-contract `payout` can represent the
@@ -4396,9 +4852,7 @@ window.CASPER_ENGINE = (() => {
 
         profit:finalPL,
 
-        status:
-          finalContract.status||
-          (finalPL>0?'won':'lost'),
+        status:finalStatus,
 
         sessionPL:demoSessionPL,
 
@@ -4429,6 +4883,11 @@ window.CASPER_ENGINE = (() => {
             : `Demo trade closed at ${finalPL.toFixed(2)} ${currency}`
       );
 
+      /* Keep the direct transaction result visible briefly, then return
+         immediately to the live scanner. No artificial trading delay is
+         added to the execution loop itself. */
+      hideCasperOverlay(700);
+
       if(riskAfter.blocked){
 
         $('#runMessage').textContent+=
@@ -4453,6 +4912,14 @@ window.CASPER_ENGINE = (() => {
 
       $('#runMessage').textContent=
         `Demo execution stopped · ${error.message||'Unknown Deriv error'}`;
+
+      updateTransactionOverlay({
+        heading:'Execution retry',
+        status:'Temporary Demo execution issue · returning to live scan…',
+        contract:'No completed contract recorded',
+        progress:100
+      });
+      hideCasperOverlay(500);
 
       showToast(
         error.message||
@@ -4658,6 +5125,9 @@ window.CASPER_ENGINE = (() => {
 
               pipSize:precision
             });
+
+          /* Wake the continuous Smart AI scanner on this fresh live tick. */
+          signalLiveTick();
 
 
           /*
@@ -5667,6 +6137,11 @@ window.CASPER_ENGINE = (() => {
   $('#runBtn').addEventListener(
     'click',
     startDemoRun
+  );
+
+  $('#scanStop').addEventListener(
+    'click',
+    stopDemoTrading
   );
 
 
