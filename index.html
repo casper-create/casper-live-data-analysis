@@ -2827,10 +2827,10 @@ window.CASPER_ENGINE = (() => {
                         : .72)
               : 1;
 
-          const agreement=
-            c.strategy==='Mix Both'
-              ? .96
-              : (rf?.actionable&&parity?.actionable ? .94 : .84);
+          /* Do not give Mix Both a built-in scoring advantage. All three Free
+             strategies compete on signal quality, data integrity and their own
+             forward-validation record. */
+          const agreement=1;
 
           const entropyPenalty=
             entropy>.985 ? .86 :
@@ -3221,23 +3221,56 @@ window.CASPER_ENGINE = (() => {
   const overlay=$('#casperOverlay');
   const scanView=$('#scanView');
   const transactionView=$('#transactionView');
+  let scanLogTimer=null;
+  let scanLogIndex=0;
+  /* Once a Demo transaction has opened, keep the direct transaction page
+     visible for the rest of the session. The scanner continues in background. */
+  let transactionViewEstablished=false;
+
+  function stopScanLogAnimation(){
+    if(scanLogTimer){clearInterval(scanLogTimer);scanLogTimer=null;}
+  }
 
   function showScanOverlay(reason='Scanning live markets'){
     if(!overlay)return;
+    /* After the first transaction, never switch the user back to the scan page.
+       Scanning continues in demoRunLoop; only the status text changes. */
+    if(transactionViewEstablished){
+      overlay.classList.remove('hidden');
+      scanView.classList.add('hidden');
+      transactionView.classList.remove('hidden');
+      const status=$('#txOverlayStatus');
+      if(status && !demoTradeInProgress){
+        status.textContent=demoAutoRun?'Scanning for the next qualified setup in the background…':'Last transaction shown · Demo scanner is stopped';
+      }
+      return;
+    }
     overlay.classList.remove('hidden');
     scanView.classList.remove('hidden');
     transactionView.classList.add('hidden');
     $('#scanSub').textContent=reason;
     const logs=$('#scanLogs');
     if(logs){
-      logs.querySelectorAll('div').forEach((el,i)=>{
-        el.style.opacity=i<3?'1':'.78';
-      });
+      const entries=[...logs.querySelectorAll('div')];
+      if(!scanLogTimer){
+        scanLogIndex=0;
+        const paint=()=>{
+          entries.forEach((el,i)=>{
+            el.style.opacity=i===scanLogIndex?'1':(i<scanLogIndex?'.92':'.42');
+            el.style.color=i===scanLogIndex?'#8ef0d0':'';
+          });
+          scanLogIndex=(scanLogIndex+1)%Math.max(entries.length,1);
+        };
+        paint();
+        scanLogTimer=setInterval(paint,720);
+      }
     }
   }
 
   function showTransactionOverlay(candidate,stake,currency){
     if(!overlay)return;
+    transactionViewEstablished=true;
+    stopScanLogAnimation();
     overlay.classList.remove('hidden');
     scanView.classList.add('hidden');
     transactionView.classList.remove('hidden');
@@ -3272,7 +3305,10 @@ window.CASPER_ENGINE = (() => {
   }
 
   function hideCasperOverlay(delay=0){
-    const close=()=>overlay&&overlay.classList.add('hidden');
+    const close=()=>{
+      stopScanLogAnimation();
+      if(overlay)overlay.classList.add('hidden');
+    };
     if(delay>0)setTimeout(close,delay);else close();
   }
 
@@ -3587,6 +3623,16 @@ window.CASPER_ENGINE = (() => {
   }
 
 
+  function passesSmartSelectionGate(option){
+    if(!option||!option.eligible)return false;
+    const confidence=Number(option.confidence||0);
+    const score=Number(option.score||0);
+    if(option.executionTier==='validated')return confidence>=.61&&score>=.60;
+    if(option.executionTier==='early_live')return confidence>=.625&&score>=.605;
+    if(option.executionTier==='balanced_live')return confidence>=.585&&score>=.575;
+    return false;
+  }
+
   function refreshSmartAI(){
 
     /* Keep the displayed candidate and execution candidate identical. */
@@ -3717,11 +3763,12 @@ window.CASPER_ENGINE = (() => {
       If the top two are essentially tied, do not gamble on a coin flip.
       Keep scanning for a fresh tick that creates a real leader.
     */
-    const strongEnough=
-      Number(top.option.confidence||0)>=.625 &&
-      Number(top.selectionScore||0)>=.575;
+    const strongEnough=passesSmartSelectionGate(top.option);
+    /* Small score ties are normal when many markets update together. Pick the
+       best qualified candidate instead of waiting indefinitely for an
+       artificial gap; the rank still decides which one wins. */
     const clearLeader=
-      !second || relativeGap>=.025 || Number(top.option.confidence||0)>=.70;
+      !second || relativeGap>=.01 || Number(top.option.confidence||0)>=.68;
 
     if(!strongEnough || !clearLeader){
       smartSelectedSymbol=null;
@@ -3736,8 +3783,7 @@ window.CASPER_ENGINE = (() => {
     let locked=null;
     let selected=null;
     for(const item of marketLeaders){
-      if(!item.option || !item.option.eligible)continue;
-      if(Number(item.option.confidence||0)<.625 || Number(item.selectionScore||0)<.575)continue;
+      if(!passesSmartSelectionGate(item.option))continue;
       const itemPerf=smartHistoryPenalty(item.option);
       if(itemPerf.blocked)continue;
       locked=lockSmartCandidate(item.option);
@@ -5238,10 +5284,15 @@ window.CASPER_ENGINE = (() => {
             : `Demo trade closed at ${finalPL.toFixed(2)} ${currency}`
       );
 
-      /* Keep the direct transaction result visible briefly, then return
-         immediately to the live scanner. No artificial trading delay is
-         added to the execution loop itself. */
-      hideCasperOverlay(700);
+      /* Keep the direct transaction page visible after the result. The next
+         scan runs in the background; the scan overlay must not replace this page. */
+      updateTransactionOverlay({
+        heading:finalPL>0?'Transaction won':finalPL<0?'Transaction lost':'Transaction closed',
+        status:riskAfter.blocked?'Risk limit reached · Demo session stopped':'Result recorded · scanning for the next qualified setup in the background…',
+        progress:100,
+        pl:finalPL,
+        currency
+      });
 
       if(riskAfter.blocked){
 
@@ -5270,11 +5321,10 @@ window.CASPER_ENGINE = (() => {
 
       updateTransactionOverlay({
         heading:'Execution retry',
-        status:'Temporary Demo execution issue · returning to live scan…',
+        status:'Temporary Demo execution issue · scanner will retry in the background…',
         contract:'No completed contract recorded',
         progress:100
       });
-      hideCasperOverlay(500);
 
       showToast(
         error.message||
