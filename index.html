@@ -4815,7 +4815,8 @@ window.CASPER_ENGINE = (() => {
           {
             resolve,
             reject,
-            timer
+            timer,
+            onUpdate
           }
         );
 
@@ -4854,6 +4855,14 @@ window.CASPER_ENGINE = (() => {
 
     if(!watcher)return;
 
+    /* Update the foreground transaction card on every live contract tick,
+       not only after Deriv reports the final result. */
+    if(typeof watcher.onUpdate==='function'){
+      try{watcher.onUpdate(contract);}catch(error){
+        console.warn('[CASPER] Live transaction display update failed:',error);
+      }
+    }
+
     const final=
       Boolean(contract.is_sold)||
       [
@@ -4881,7 +4890,8 @@ window.CASPER_ENGINE = (() => {
 
   function waitForContractFinal(
     contractId,
-    timeout=90000
+    timeout=90000,
+    onUpdate=null
   ){
 
     const id=String(contractId);
@@ -5180,7 +5190,22 @@ window.CASPER_ENGINE = (() => {
       */
       const finalContract=
         await waitForContractFinal(
-          contractId
+          contractId,
+          90000,
+          liveContract=>{
+            const liveEntry=Number(liveContract.entry_spot);
+            const liveExit=Number(liveContract.current_spot ?? liveContract.exit_spot);
+            const liveProfit=Number(liveContract.profit);
+            updateTransactionOverlay({
+              heading:'Transaction active',
+              status:'LIVE · contract running · updating from Deriv',
+              contract:`Contract #${contractId}`,
+              entry:Number.isFinite(liveEntry)&&liveEntry!==0?String(liveEntry):'—',
+              exit:Number.isFinite(liveExit)&&liveExit!==0?String(liveExit):'—',
+              ...(Number.isFinite(liveProfit)?{pl:liveProfit,currency}:{}),
+              progress:liveContract.is_sold?100:78
+            });
+          }
         );
 
       const profit=
@@ -5364,7 +5389,10 @@ window.CASPER_ENGINE = (() => {
          scan runs in the background; the scan overlay must not replace this page. */
       updateTransactionOverlay({
         heading:finalPL>0?'Transaction won':finalPL<0?'Transaction lost':'Transaction closed',
-        status:riskAfter.blocked?'Risk limit reached · Demo session stopped':'Result recorded · scanning for the next qualified setup in the background…',
+        status:riskAfter.blocked?'Risk limit reached · Demo session stopped':'Result recorded · scanning in background for the next qualified trade…',
+        contract:`Contract #${contractId}`,
+        entry:Number(finalContract.entry_spot)||null ? String(Number(finalContract.entry_spot)) : '—',
+        exit:Number(finalContract.exit_spot)||null ? String(Number(finalContract.exit_spot)) : '—',
         progress:100,
         pl:finalPL,
         currency
