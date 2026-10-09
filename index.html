@@ -3631,6 +3631,22 @@ window.CASPER_ENGINE = (() => {
     if(!option||!option.eligible)return false;
     const confidence=Number(option.confidence||0);
     const score=Number(option.score||0);
+
+    /* A high model-confidence number is not enough on its own. For setups
+       with a meaningful validation history, reject candidates whose actual
+       historical hit rate is too close to the payout break-even point. */
+    const validation=option.validation||{};
+    const historicalAccuracy=Number(validation.accuracy);
+    const historicalTotal=Number(validation.total||0);
+    const recentAccuracy=Number(validation.recentAccuracy);
+    const recentTotal=Number(validation.recentTotal||0);
+    if(historicalTotal>=20 && Number.isFinite(historicalAccuracy) && historicalAccuracy<.60){
+      return false;
+    }
+    if(recentTotal>=8 && Number.isFinite(recentAccuracy) && recentAccuracy<.50){
+      return false;
+    }
+
     if(option.executionTier==='validated')return confidence>=.61&&score>=.60;
     if(option.executionTier==='early_live')return confidence>=.625&&score>=.605;
     if(option.executionTier==='balanced_live')return confidence>=.585&&score>=.575;
@@ -3756,8 +3772,23 @@ window.CASPER_ENGINE = (() => {
     }
     const marketLeaders=[...bestByMarket.values()]
       .sort((a,b)=>b.selectionScore-a.selectionScore);
-    const top=marketLeaders[0];
-    const second=marketLeaders[1];
+
+    /* Filter every market leader through the final quality gate BEFORE
+       choosing the top one. Otherwise a high-scoring but historically weak
+       leader can block a lower-ranked qualified candidate in another market. */
+    const qualifiedMarketLeaders=marketLeaders
+      .filter(item=>passesSmartSelectionGate(item.option));
+    if(!qualifiedMarketLeaders.length){
+      smartSelectedSymbol=null;
+      $('#marketName').textContent='Scanning for a stronger setup';
+      $('#rowMarket').textContent='No candidate passed the quality gate';
+      $('#runMessage').textContent='Smart AI is skipping weak setups and comparing all markets for a stronger validated opportunity…';
+      updateRunButton();
+      return null;
+    }
+
+    const top=qualifiedMarketLeaders[0];
+    const second=qualifiedMarketLeaders[1];
     const margin=second?top.selectionScore-second.selectionScore:Infinity;
     const relativeGap=second&&second.selectionScore>0
       ? margin/second.selectionScore
@@ -3786,7 +3817,7 @@ window.CASPER_ENGINE = (() => {
 
     let locked=null;
     let selected=null;
-    for(const item of marketLeaders){
+    for(const item of qualifiedMarketLeaders){
       if(!passesSmartSelectionGate(item.option))continue;
       const itemPerf=smartHistoryPenalty(item.option);
       if(itemPerf.blocked)continue;
@@ -4131,8 +4162,15 @@ window.CASPER_ENGINE = (() => {
             ? `Scanning all ${symbols.length} live Volatility markets · validating the newest tick`
             : continuousScanMessage()
         );
-        $('#runMessage').textContent=
-          continuousScanMessage();
+        if(transactionViewEstablished){
+          const status=$('#txOverlayStatus');
+          if(status && !demoTradeInProgress){
+            status.textContent='Scanning in background · comparing Rise & Fall, Even & Odd and Mix Both across live markets…';
+            $('#txOverlayHeading').textContent='Finding the next qualified trade';
+            $('#txOverlayProgress').style.width='18%';
+          }
+        }
+        $('#runMessage').textContent=continuousScanMessage();
         continue;
       }
 
@@ -4201,6 +4239,30 @@ window.CASPER_ENGINE = (() => {
 
   function startDemoRun(){
     if(demoAutoRun)return;
+
+    /* The scanner can continue working in the background, but once the user
+       starts a session the foreground should be the transaction page—not the
+       scanning panel. The scan animation/logs are replaced by live scan status
+       inside the transaction view until a qualified candidate is selected. */
+    transactionViewEstablished=true;
+    if(overlay){
+      overlay.classList.remove('hidden');
+      scanView.classList.add('hidden');
+      transactionView.classList.remove('hidden');
+      $('#txOverlayHeading').textContent='Finding the next qualified trade';
+      $('#txOverlayMarket').textContent='Scanning all Volatility markets';
+      $('#txOverlayStrategy').textContent='Rise & Fall · Even & Odd · Mix Both';
+      $('#txOverlayDirection').textContent='Waiting for validated signal';
+      $('#txOverlayConfidence').textContent='Analysing live data';
+      $('#txOverlayStake').textContent=`${Number(numericInput('#stake')||1).toFixed(2)} USD`; 
+      $('#txOverlayEntry').textContent='—';
+      $('#txOverlayExit').textContent='—';
+      $('#txOverlayPL').textContent='—';
+      $('#txOverlayPL').style.color='';
+      $('#txOverlayProgress').style.width='8%';
+      $('#txOverlayStatus').textContent='Scanner running in background · comparing all markets and Free strategies…';
+      $('#txOverlayContract').textContent='Waiting for a qualified setup';
+    }
 
     /*
       Reset only the stop flag here. We do NOT reset the
