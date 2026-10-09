@@ -4789,7 +4789,7 @@ window.CASPER_ENGINE = (() => {
           data.req_id
         );
 
-      const errorMessage=data.error.message||data.error.code||'Deriv trading request failed.';
+      const errorMessage=[data.error.code,data.error.message].filter(Boolean).join(': ')||'Deriv trading request failed.';
       if(reqId&&tradePending.has(reqId)){
         const pending=tradePending.get(reqId);
         clearTimeout(pending.timer);
@@ -5310,16 +5310,25 @@ window.CASPER_ENGINE = (() => {
 
           duration_unit:'t',
 
-          underlying_symbol:symbol
+          underlying_symbol:symbol,
+
+          /* New Deriv Options WebSocket proposal flow supports a proposal
+             subscription. Keep the quote tied to this authenticated socket
+             so the returned proposal ID can be bought on the same session. */
+          subscribe:1
         });
 
       const proposal=
         proposalResponse.proposal;
 
-      if(!proposal?.id){
+      if(proposalResponse.error){
+        const apiError=proposalResponse.error;
+        throw new Error([apiError.code,apiError.message].filter(Boolean).join(': ')||'Deriv rejected the contract proposal.');
+      }
 
+      if(proposalResponse.msg_type!=='proposal'||!proposal?.id){
         throw new Error(
-          'Deriv returned no proposal ID.'
+          `Deriv did not return a valid proposal response (received ${proposalResponse.msg_type||'unknown response'}).`
         );
       }
 
@@ -5673,7 +5682,7 @@ window.CASPER_ENGINE = (() => {
 
       updateTransactionOverlay({
         heading:'Execution retry',
-        status:'Temporary Demo execution issue · scanner will retry in the background…',
+        status:`Demo execution rejected · ${error.message||'check Deriv response'} · scanner will retry only after cooldown`,
         contract:'No completed contract recorded',
         progress:100
       });
