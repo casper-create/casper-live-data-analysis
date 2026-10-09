@@ -1492,6 +1492,7 @@
    FREE STRATEGY ANALYSIS
    DEMO-ONLY EXECUTION
    CONTRACT RESULT TRACKING
+   V13: CONTRACT WATCHER RECOVERY + FREE SELL CONTROL REMOVED
    REAL ACCOUNT EXECUTION BLOCKED
    PREMIUM EXECUTION BLOCKED
    ============================================================ */
@@ -4604,9 +4605,6 @@ window.CASPER_ENGINE = (() => {
     if(current)spots.push(`Current ${current}`);
     if(exit)spots.push(`Exit ${exit}`);
     const id=escapeHTML(trade.contractId||'pending');
-    const canSell=Boolean(trade.canSell)&&!trade.sellPending;
-    const sellLabel=trade.sellPending?'Selling…':'× Sell';
-    const sellButton=`<button class="txsell" type="button" data-sell-contract="${id}" ${canSell?'':'disabled'} aria-label="Sell contract ${id}">${sellLabel}</button>`;
     return `
       <div class="txrow txrow-active" data-active-contract="${id}">
         <div class="txrowMain">
@@ -4616,7 +4614,6 @@ window.CASPER_ENGINE = (() => {
         </div>
         <div class="txrowRight">
           <div class="txpl ${plClass}">${plText}</div>
-          ${sellButton}
         </div>
       </div>`;
   }
@@ -4792,24 +4789,16 @@ window.CASPER_ENGINE = (() => {
           data.req_id
         );
 
+      const errorMessage=data.error.message||data.error.code||'Deriv trading request failed.';
       if(reqId&&tradePending.has(reqId)){
-
-        const pending=
-          tradePending.get(reqId);
-
+        const pending=tradePending.get(reqId);
         clearTimeout(pending.timer);
-
         tradePending.delete(reqId);
-
-        pending.reject(
-          new Error(
-            data.error.message||
-            data.error.code||
-            'Deriv trading request failed.'
-          )
-        );
+        pending.reject(new Error(errorMessage));
       }
-
+      // A proposal_open_contract subscription uses its own req_id, not the
+      // ordinary tradePending map. Reject that watcher immediately on API error.
+      rejectContractWatcherForRequest(data,errorMessage);
       return;
     }
 
@@ -5090,119 +5079,84 @@ window.CASPER_ENGINE = (() => {
   }
 
 
+  function normalizeContractId(value){
+    if(value===undefined||value===null||value==='')return '';
+    const text=String(value).trim();
+    // Deriv contract IDs are numeric, but keeping a normalized string avoids
+    // mismatches between numeric JSON values and string values in callbacks.
+    return /^\d+$/.test(text)?String(Number(text)):text;
+  }
+
   function handleContractUpdate(contract){
-
-    const contractId=
-      String(
-        contract.contract_id||''
-      );
-
+    if(!contract||typeof contract!=='object')return;
+    const contractId=normalizeContractId(contract.contract_id);
     if(!contractId)return;
-
-    const watcher=
-      contractWatchers.get(
-        contractId
-      );
-
-    if(!watcher)return;
-
-    /* Update the foreground transaction card on every live contract tick,
-       not only after Deriv reports the final result. */
+    const watcher=contractWatchers.get(contractId);
+    if(!watcher){
+      // Ignore unrelated account updates, but surface a diagnostic when this
+      // is the currently displayed contract so it is not silently mis-tracked.
+      if(activeDemoContract&&normalizeContractId(activeDemoContract.contractId)===contractId){
+        console.warn('[CASPER] Active contract update arrived without a watcher:',contractId);
+      }
+      return;
+    }
     if(typeof watcher.onUpdate==='function'){
       try{watcher.onUpdate(contract);}catch(error){
         console.warn('[CASPER] Live transaction display update failed:',error);
       }
     }
-
-    const final=
-      Boolean(contract.is_sold)||
-      [
-        'sold',
-        'won',
-        'lost',
-        'expired'
-      ].includes(
-        String(
-          contract.status||''
-        ).toLowerCase()
-      );
-
+    const status=String(contract.status||'').toLowerCase();
+    const final=Boolean(contract.is_sold)||Boolean(contract.is_expired)||
+      ['sold','won','lost','expired','cancelled'].includes(status);
     if(!final)return;
-
     clearTimeout(watcher.timer);
-
-    contractWatchers.delete(
-      contractId
-    );
-
+    contractWatchers.delete(contractId);
     watcher.resolve(contract);
   }
 
-
-  function waitForContractFinal(
-    contractId,
-    timeout=90000,
-    onUpdate=null
-  ){
-
-    const id=String(contractId);
-
-    return new Promise(
-      (resolve,reject)=>{
-
-        const timer=
-          setTimeout(
-            ()=>{
-
-              contractWatchers.delete(id);
-
-              reject(
-                new Error(
-                  'Timed out while waiting for the Demo contract result.'
-                )
-              );
-
-            },
-            timeout
-          );
-
-        contractWatchers.set(
-          id,
-          {
-            resolve,
-            reject,
-            timer,
-            onUpdate
-          }
-        );
-
-        try{
-
-          tradeSocket.send(
-            JSON.stringify({
-
-              proposal_open_contract:1,
-
-              contract_id:
-                Number(contractId)||contractId,
-
-              subscribe:1,
-
-              req_id:
-                ++tradeRequestId
-            })
-          );
-
-        }catch(error){
-
-          clearTimeout(timer);
-
-          contractWatchers.delete(id);
-
-          reject(error);
-        }
+  function rejectContractWatcherForRequest(data,errorMessage){
+    const reqId=Number(data?.echo_req?.req_id||data?.req_id);
+    if(!reqId)return false;
+    for(const [contractId,watcher] of contractWatchers){
+      if(Number(watcher.subscriptionReqId)===reqId){
+        clearTimeout(watcher.timer);
+        contractWatchers.delete(contractId);
+        watcher.reject(new Error(errorMessage||'Deriv could not recognize the subscribed Demo contract.'));
+        return true;
       }
-    );
+    }
+    return false;
+  }
+
+  function waitForContractFinal(contractId,timeout=90000,onUpdate=null){
+    const id=normalizeContractId(contractId);
+    if(!id)return Promise.reject(new Error('Deriv returned an invalid contract ID.'));
+    if(!tradeSocket||tradeSocket.readyState!==WebSocket.OPEN){
+      return Promise.reject(new Error('Demo trading connection is not open; cannot monitor the contract yet.'));
+    }
+    // Replace a stale watcher for the same contract safely before resubscribing.
+    const previous=contractWatchers.get(id);
+    if(previous){clearTimeout(previous.timer);contractWatchers.delete(id);}
+    const reqId=++tradeRequestId;
+    return new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{
+        contractWatchers.delete(id);
+        reject(new Error(`Timed out monitoring Demo contract #${id}. The contract was not marked as a win or loss without a confirmed final response.`));
+      },timeout);
+      contractWatchers.set(id,{resolve,reject,timer,onUpdate,subscriptionReqId:reqId});
+      try{
+        tradeSocket.send(JSON.stringify({
+          proposal_open_contract:1,
+          contract_id:/^\d+$/.test(id)?Number(id):id,
+          subscribe:1,
+          req_id:reqId
+        }));
+      }catch(error){
+        clearTimeout(timer);
+        contractWatchers.delete(id);
+        reject(error);
+      }
+    });
   }
 
 
@@ -5472,7 +5426,7 @@ window.CASPER_ENGINE = (() => {
             const liveProfit=Number(liveContract.profit);
             const liveValueSource=liveContract.sell_price ?? liveContract.bid_price ?? liveContract.payout;
             const liveValue=Number(liveValueSource);
-            if(activeDemoContract&&String(activeDemoContract.contractId)===String(contractId)){
+            if(activeDemoContract&&normalizeContractId(activeDemoContract.contractId)===normalizeContractId(contractId)){
               if(liveContract.entry_spot!==undefined&&liveContract.entry_spot!==null&&Number.isFinite(liveEntry)) activeDemoContract.entrySpot=liveEntry;
               if(liveContract.current_spot!==undefined&&liveContract.current_spot!==null&&Number.isFinite(liveCurrent)) activeDemoContract.currentSpot=liveCurrent;
               if(liveContract.exit_spot!==undefined&&liveContract.exit_spot!==null&&Number.isFinite(liveExit)) activeDemoContract.exitSpot=liveExit;
@@ -5652,7 +5606,7 @@ window.CASPER_ENGINE = (() => {
         sessionLosses:demoSessionLosses
       };
 
-      if(activeDemoContract&&String(activeDemoContract.contractId)===String(contractId)){
+      if(activeDemoContract&&normalizeContractId(activeDemoContract.contractId)===normalizeContractId(contractId)){
         activeDemoContract=null;
       }
       saveDemoTrade(resultRecord);
