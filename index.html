@@ -3075,6 +3075,10 @@ window.CASPER_ENGINE = (() => {
   let smartLockedCandidate=null;
   let smartLastCandidateKey='';
   const smartComboCooldown=new Map();
+  /* Track the last epoch actually traded for each market. This map is read
+     by refreshSmartAI() when scoring freshness, so it must exist before the
+     first WebSocket tick can trigger candidate ranking. */
+  const lastExecutedEpochBySymbol=new Map();
 
   const SMART_VALUE=
     '__CASPER_SMART_AUTO__';
@@ -5166,6 +5170,16 @@ window.CASPER_ENGINE = (() => {
         finalPL>0
           ? stake+finalPL
           : 0;
+
+      /* Record the market epoch only after a contract has genuinely closed.
+         A proposal rejection or failed buy must not mark a tick as consumed. */
+      const executedEpoch=
+        Number(candidate.snapshot?.features?.epoch)||
+        Number(candidate.snapshot?.features?.lastEpoch)||
+        Number(candidate.snapshot?.lastEpoch)||0;
+      if(executedEpoch>0){
+        lastExecutedEpochBySymbol.set(symbol,executedEpoch);
+      }
 
       demoSessionTrades++;
       demoSessionStake+=stake;
