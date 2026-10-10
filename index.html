@@ -3949,29 +3949,19 @@ window.CASPER_ENGINE = (() => {
     }
 
     const top=qualifiedMarketLeaders[0];
-    const second=qualifiedMarketLeaders[1];
-    const margin=second?top.selectionScore-second.selectionScore:Infinity;
-    const relativeGap=second&&second.selectionScore>0
-      ? margin/second.selectionScore
-      : Infinity;
 
-    /*
-      If the top two are essentially tied, do not gamble on a coin flip.
-      Keep scanning for a fresh tick that creates a real leader.
-    */
-    const strongEnough=passesSmartSelectionGate(top.option);
-    /* Small score ties are normal when many markets update together. Pick the
-       best qualified candidate instead of waiting indefinitely for an
-       artificial gap; the rank still decides which one wins. */
-    const clearLeader=
-      !second || relativeGap>=.01 || Number(top.option.confidence||0)>=.68;
-
-    if(!strongEnough || !clearLeader){
+    /* V15 FAST SELECTION:
+       Every leader here has already passed the existing eligibility, confidence,
+       score and validation gates. Do not wait for an extra relative-score gap:
+       live markets often update together and near-tied scores can delay entry
+       despite a qualified setup being available. Pick the top qualified leader
+       immediately while retaining the existing quality and history checks. */
+    if(!passesSmartSelectionGate(top.option)){
       smartSelectedSymbol=null;
-      $('#marketName').textContent='Auto-selecting the best';
-      $('#rowMarket').textContent='Comparing all markets';
+      $('#marketName').textContent='Scanning for a stronger setup';
+      $('#rowMarket').textContent='Validating best candidate';
       $('#runMessage').textContent=
-        'Smart AI is comparing the strongest live opportunities before entering…';
+        'Smart AI is checking the next qualified live opportunity…';
       updateRunButton();
       return null;
     }
