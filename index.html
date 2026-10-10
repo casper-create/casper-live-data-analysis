@@ -1501,10 +1501,28 @@ window.CASPER_ENGINE = (() => {
 
   const DEFAULT_MAX_TICKS = 1800;
   const MIN_TICKS = 40;
-  const VALIDATION_MINIMUM = 30;
+  /* V16 requires a meaningful forward-validation sample before any Smart AI
+     candidate can reach a purchase request. A high heuristic score alone is
+     not evidence of a tradable edge. */
+  const VALIDATION_MINIMUM = 60;
+  const SMART_MIN_LOWER_BOUND = 0.52;
 
   const clamp = (v,min,max) =>
     Math.max(min,Math.min(max,v));
+
+  /* Wilson 95% lower confidence bound for a measured hit rate. This is more
+     conservative than ranking on raw accuracy, especially with small samples. */
+  function wilsonLowerBound(accuracy,total,z=1.96){
+    const n=Number(total||0);
+    const p=Number(accuracy);
+    if(!Number.isFinite(p)||n<=0)return null;
+    const phat=clamp(p,0,1);
+    const z2=z*z;
+    const denominator=1+z2/n;
+    const center=phat+z2/(2*n);
+    const margin=z*Math.sqrt((phat*(1-phat)/n)+(z2/(4*n*n)));
+    return clamp((center-margin)/denominator,0,1);
+  }
 
   const mean = arr => {
     if(!arr.length)return 0;
@@ -2176,8 +2194,11 @@ window.CASPER_ENGINE = (() => {
       options.sort((a,b)=>b.confidence-a.confidence);
       const best=options[0], second=options[1];
       const agreement=second ? clamp(1-Math.abs(best.confidence-second.confidence)*1.5,.72,1) : .78;
-      const confidence=clamp(best.confidence*.72+agreement*.18+Math.min(1,best.score)*.10,.5,.95);
-      return {strategy:'Mix Both',baseStrategy:best.strategy,actionable:confidence>=.61,direction:best.direction,confidence,score:confidence,reason:'cross_strategy_free_comparison',component:best};
+      /* Mix Both is a selector, not a confidence amplifier. It may choose the
+         stronger component, but it must not manufacture confidence by blending
+         arbitrary constants into the score. */
+      const confidence=clamp(best.confidence,.5,.95);
+      return {strategy:'Mix Both',baseStrategy:best.strategy,actionable:best.actionable&&confidence>=.61,direction:best.direction,confidence,score:best.score,reason:'cross_strategy_free_comparison',component:best};
     }
 
     function calculateSignals(features){
@@ -2786,6 +2807,7 @@ window.CASPER_ENGINE = (() => {
         mature,
         accuracy:record.accuracy,
         total:record.total,
+        lowerBound:wilsonLowerBound(record.accuracy,record.total),
         recentAccuracy:record.recentAccuracy??null,
         recentTotal:record.recentTotal||0
       };
@@ -2997,9 +3019,19 @@ window.CASPER_ENGINE = (() => {
 
             This is deliberately a quality floor, not a promise of profit.
           */
-          const liveValidationReady=v.total>=8;
+          const lowerBound=v.lowerBound;
+          const enoughForwardEvidence=v.total>=VALIDATION_MINIMUM;
+          const validationEvidence=
+            enoughForwardEvidence&&
+            Number.isFinite(lowerBound)&&
+            lowerBound>=SMART_MIN_LOWER_BOUND&&
+            !(v.recentTotal>=12&&v.recentAccuracy!==null&&v.recentAccuracy<.45);
 
+          /* The former early-live/balanced tiers allowed a trade after only 4–8
+             outcomes. V16 still ranks every signal, but none may execute unless
+             its market+strategy forward validation has enough evidence. */
           const strictEligible=
+            validationEvidence&&
             score>=.60&&
             c.signal.confidence>=.61&&
             mature&&
@@ -3007,24 +3039,17 @@ window.CASPER_ENGINE = (() => {
             entropy<.99;
 
           const balancedEligible=
+            validationEvidence&&
             score>=.575&&
             c.signal.confidence>=.585&&
-            liveValidationReady&&
             q.integrity>=.995&&
             f.regime!=='high_volatility'&&
             entropy<.985&&
             concentration<.34;
 
-          const earlyLiveEligible=
-            score>=.605&&
-            c.signal.confidence>=.625&&
-            v.total>=4&&
-            q.integrity>=.998&&
-            f.regime!=='high_volatility'&&
-            entropy<.97&&
-            concentration<.30;
+          const earlyLiveEligible=false;
 
-          const eligible=strictEligible||balancedEligible||earlyLiveEligible;
+          const eligible=strictEligible||balancedEligible;
 
           return {
             symbol:snap.symbol,
@@ -3053,6 +3078,7 @@ window.CASPER_ENGINE = (() => {
             validation:v,
             recentAccuracy:v.recentAccuracy,
             recentTotal:v.recentTotal,
+            validationLowerBound:lowerBound,
             snapshot:snap
           };
         });
@@ -3694,6 +3720,18 @@ window.CASPER_ENGINE = (() => {
   }
 
 
+  function smartWilsonLowerBound(accuracy,total,z=1.96){
+    const n=Number(total||0);
+    const p=Number(accuracy);
+    if(!Number.isFinite(p)||n<=0)return null;
+    const phat=Math.max(0,Math.min(1,p));
+    const z2=z*z;
+    const denominator=1+z2/n;
+    const center=phat+z2/(2*n);
+    const margin=z*Math.sqrt((phat*(1-phat)/n)+(z2/(4*n*n)));
+    return Math.max(0,Math.min(1,(center-margin)/denominator));
+  }
+
   function smartCandidateKey(candidate){
     if(!candidate)return '';
     const epoch=
@@ -3801,15 +3839,21 @@ window.CASPER_ENGINE = (() => {
     const historicalTotal=Number(validation.total||0);
     const recentAccuracy=Number(validation.recentAccuracy);
     const recentTotal=Number(validation.recentTotal||0);
-    if(historicalTotal>=20 && Number.isFinite(historicalAccuracy) && historicalAccuracy<.60){
+    const lowerBound=Number(validation.lowerBound);
+
+    /* Do not turn a model score into a claim of probability. The strategy must
+       first beat a conservative statistical floor on forward-only outcomes. */
+    if(historicalTotal<60||!Number.isFinite(lowerBound)||lowerBound<.52){
       return false;
     }
-    if(recentTotal>=8 && Number.isFinite(recentAccuracy) && recentAccuracy<.50){
+    if(historicalTotal>=60&&Number.isFinite(historicalAccuracy)&&historicalAccuracy<.50){
+      return false;
+    }
+    if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.45){
       return false;
     }
 
     if(option.executionTier==='validated')return confidence>=.61&&score>=.60;
-    if(option.executionTier==='early_live')return confidence>=.625&&score>=.605;
     if(option.executionTier==='balanced_live')return confidence>=.585&&score>=.575;
     return false;
   }
@@ -3950,7 +3994,7 @@ window.CASPER_ENGINE = (() => {
 
     const top=qualifiedMarketLeaders[0];
 
-    /* V15 FAST SELECTION:
+    /* V16 EVIDENCE-GATED SELECTION:
        Every leader here has already passed the existing eligibility, confidence,
        score and validation gates. Do not wait for an extra relative-score gap:
        live markets often update together and near-tied scores can delay entry
@@ -4049,36 +4093,45 @@ window.CASPER_ENGINE = (() => {
       return null;
     }
 
+    const validationRecord=
+      (activeStrategy==='Even & Odd' || (activeStrategy==='Mix Both' && signal.baseStrategy==='Even & Odd'))
+        ? (
+            signal.direction==='EVEN'
+              ? snap.validation.strategies.even
+              : snap.validation.strategies.odd
+          )
+        : (
+            (activeStrategy==='Rise & Fall' || (activeStrategy==='Mix Both' && signal.baseStrategy==='Rise & Fall'))
+              ? snap.validation.strategies.riseFall
+              : null
+          );
+
+    const validation=validationRecord?{
+      ...validationRecord,
+      lowerBound:Number.isFinite(Number(validationRecord.lowerBound))
+        ? Number(validationRecord.lowerBound)
+        : smartWilsonLowerBound(validationRecord.accuracy,validationRecord.total)
+    }:null;
+
+    /* Individual Free strategy cards use the same evidence standard as Smart
+       AI; this avoids turning the test buttons into an unfiltered loss machine. */
+    if(!validation||Number(validation.total||0)<60||!Number.isFinite(validation.lowerBound)||validation.lowerBound<.52){
+      return null;
+    }
+    if(Number(validation.recentTotal||0)>=12&&Number.isFinite(Number(validation.recentAccuracy))&&Number(validation.recentAccuracy)<.45){
+      return null;
+    }
+
     return {
-
       symbol,
-
       strategy:signal.strategy,
-
       baseStrategy:signal.baseStrategy||signal.strategy,
-
       direction:signal.direction,
-
       confidence:signal.confidence,
-
       score:signal.score,
-
       reason:signal.reason,
-
       snapshot:snap,
-
-      validation:
-        (activeStrategy==='Even & Odd' || (activeStrategy==='Mix Both' && signal.baseStrategy==='Even & Odd'))
-          ? (
-              signal.direction==='EVEN'
-                ? snap.validation.strategies.even
-                : snap.validation.strategies.odd
-            )
-          : (
-              (activeStrategy==='Rise & Fall' || (activeStrategy==='Mix Both' && signal.baseStrategy==='Rise & Fall'))
-                ? snap.validation.strategies.riseFall
-                : null
-            )
+      validation
     };
   }
 
@@ -5337,15 +5390,46 @@ window.CASPER_ENGINE = (() => {
         );
       }
 
+      /* V16 payout-aware entry gate. The real proposal gives the actual gross
+         payout for this exact market, contract and stake. The measured 95% lower
+         confidence bound must clear break-even plus a safety margin before BUY. */
+      const quotedPayout=Number(proposal.payout);
+      const validation=candidate.validation||{};
+      const observedLowerBound=Number(validation.lowerBound);
+      const validationSamples=Number(validation.total||0);
+      if(!Number.isFinite(quotedPayout)||quotedPayout<=askPrice){
+        throw new Error('Smart AI skipped this setup: Deriv did not quote a usable payout above the stake.');
+      }
+      const breakEvenRate=askPrice/quotedPayout;
+      const requiredLowerBound=breakEvenRate+0.025;
+      const recentSamples=Number(validation.recentTotal||0);
+      const recentAccuracy=Number(validation.recentAccuracy);
+      if(validationSamples<60||!Number.isFinite(observedLowerBound)||observedLowerBound<requiredLowerBound){
+        throw new Error(`Smart AI skipped before purchase: validation lower bound ${(Number.isFinite(observedLowerBound)?observedLowerBound*100:0).toFixed(1)}% does not clear quoted break-even ${(breakEvenRate*100).toFixed(1)}% plus safety margin. No contract was bought.`);
+      }
+      if(recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<breakEvenRate){
+        throw new Error(`Smart AI skipped before purchase: recent ${recentSamples}-sample accuracy ${(recentAccuracy*100).toFixed(1)}% is below the quoted break-even rate. No contract was bought.`);
+      }
+
+      /* A signal is valid only for the market state that produced it. If a new
+         tick arrived while Deriv was returning the proposal, do not buy against
+         an expired prediction; return to the scanner and evaluate the new tick. */
+      const candidateEpoch=Number(candidate.snapshot?.lastEpoch||candidate.snapshot?.features?.epoch||candidate.snapshot?.features?.lastEpoch||0);
+      const latestSnapshot=casperEngine.snapshot(symbol);
+      const latestEpoch=Number(latestSnapshot?.lastEpoch||0);
+      if(candidateEpoch>0&&latestEpoch>0&&latestEpoch!==candidateEpoch){
+        throw new Error('Smart AI skipped before purchase: a newer live tick arrived after this signal. Re-scanning the fresh market state. No contract was bought.');
+      }
+
       updateTransactionOverlay({
-        heading:'Signal confirmed · opening trade',
-        status:`Proposal received · ${stake.toFixed(2)} ${currency} · buying now…`,
+        heading:'Evidence and payout confirmed',
+        status:`Demo proposal passed payout-aware gate · lower bound ${(observedLowerBound*100).toFixed(1)}% · break-even ${(breakEvenRate*100).toFixed(1)}% · buying…`,
         contract:`Proposal ${String(proposal.id)}`,
         progress:48
       });
 
       $('#runMessage').textContent=
-        `Demo proposal received · ${candidate.strategy} · ${candidate.direction||''} · stake ${stake.toFixed(2)} ${currency} · buying...`;
+        `Demo proposal passed evidence gate · ${candidate.strategy} · ${candidate.direction||''} · lower bound ${(observedLowerBound*100).toFixed(1)}% · break-even ${(breakEvenRate*100).toFixed(1)}% · buying...`;
 
       /*
         Re-check risk immediately before BUY. This closes the race where
