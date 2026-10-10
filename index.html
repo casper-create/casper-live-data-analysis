@@ -4389,7 +4389,9 @@ window.CASPER_ENGINE = (() => {
 
   async function demoRunLoop(serial){
 
-    let lastTickSeen=liveTickRevision;
+    /* V17 FAST-START: evaluate the ticks already collected immediately.
+       Do not spend the first 2.5 seconds waiting before the first scan. */
+    let lastTickSeen=liveTickRevision-1;
     let executionRecoveryAttempts=0;
     let lastExecutedCandidateKey='';
 
@@ -4411,12 +4413,15 @@ window.CASPER_ENGINE = (() => {
       }
 
       /*
-        Always evaluate the freshest market state. After a completed
-        contract, wait for a NEW real tick rather than sleeping for an
-        arbitrary 450/900 ms. This makes the run cycle follow Deriv's
-        live feed and prevents duplicate entries on one snapshot.
+        FAST MARKET SCAN:
+        Evaluate all live market snapshots and all Smart AI Free strategies
+        immediately. If no candidate qualifies yet, wait for the next live
+        tick for at most 2 seconds, then rescan. This timeout is a feed-wakeup
+        bound, not a mandatory pause before scanning or executing.
       */
-      await waitForLiveTick(lastTickSeen,2500);
+      if(lastTickSeen===liveTickRevision){
+        await waitForLiveTick(lastTickSeen,2000);
+      }
       lastTickSeen=liveTickRevision;
 
       if(!demoAutoRun||serial!==demoRunSerial)break;
@@ -4551,13 +4556,13 @@ window.CASPER_ENGINE = (() => {
         : continuousScanMessage()
     );
 
-    /* The supplied reference shows the terminal animation briefly, then the
-       Transactions page remains visible while Smart AI continues scanning. */
+    /* V17: keep the reference scan animation to a maximum of two seconds.
+       It is visual only and never blocks candidate selection or execution. */
     scanTransitionTimer=setTimeout(()=>{
       if(demoAutoRun&&serial===demoRunSerial&&!transactionViewEstablished){
         activateTransactionFocus();
       }
-    },3200);
+    },2000);
 
     $('#runMessage').textContent=
       'Continuous Demo session started · scanning live data for the next qualified setup.';
