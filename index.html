@@ -3243,11 +3243,9 @@ window.CASPER_ENGINE = (() => {
      by refreshSmartAI() when scoring freshness, so it must exist before the
      first WebSocket tick can trigger candidate ranking. */
   const lastExecutedEpochBySymbol=new Map();
-  /* Prevent Smart AI from concentrating every short Demo trade on one market.
-     This is a selection cooldown, not a signal: it never makes a weak market
-     eligible and never forces a trade. If no other market qualifies, keep scanning. */
-  const lastSmartMarketTradeAt=new Map();
-  const SMART_MARKET_COOLDOWN_MS=25000;
+  /* No market cooldown: every configured market competes on fresh evidence.
+     Recent history may influence ranking, but a strong candidate is never rejected
+     solely because its market traded recently. */
 
   const SMART_VALUE=
     '__CASPER_SMART_AUTO__';
@@ -3899,7 +3897,7 @@ window.CASPER_ENGINE = (() => {
         - freshness
         - recent execution repetition
         - confidence
-        - separation from the next-best candidate
+        - relative strength across all currently qualified candidates
     */
     const now=Date.now();
     const recentSmart=readDemoHistory()
@@ -3936,7 +3934,7 @@ window.CASPER_ENGINE = (() => {
         else if(winRate>=.67) marketFactor=1.05;
       }
 
-      /* Avoid repeatedly choosing the same market unless it is clearly best. */
+      /* Recent history is a modest ranking input, never a hard market block. */
       const age=ms.lastTime?now-ms.lastTime:Infinity;
       const recentMarketFactor=
         age<8000 ? .72 :
@@ -3975,16 +3973,9 @@ window.CASPER_ENGINE = (() => {
     .filter(x=>!x.exact.blocked)
     .sort((a,b)=>b.selectionScore-a.selectionScore);
 
-    /* A strong score must not cause repeated back-to-back trades on one index.
-       During the cooldown, other independently qualified markets get priority.
-       This does not rotate blindly: if no other market has a qualified setup,
-       Smart AI waits for fresh evidence instead of forcing a trade. */
-    const diversifiedScored=activeStrategy==='Smart AI'
-      ? scored.filter(item=>{
-          const last=Number(lastSmartMarketTradeAt.get(item.option.symbol)||0);
-          return !last || now-last>=SMART_MARKET_COOLDOWN_MS;
-        })
-      : scored;
+    /* Every market remains eligible to compete. Do not force market rotation
+       or suppress a valid setup merely because that market traded recently. */
+    const diversifiedScored=scored;
 
     if(!diversifiedScored.length){
       smartSelectedSymbol=null;
@@ -5644,9 +5635,6 @@ window.CASPER_ENGINE = (() => {
         Number(candidate.snapshot?.lastEpoch)||0;
       if(executedEpoch>0){
         lastExecutedEpochBySymbol.set(symbol,executedEpoch);
-      }
-      if(activeStrategy==='Smart AI'){
-        lastSmartMarketTradeAt.set(symbol,Date.now());
       }
 
       demoSessionTrades++;
