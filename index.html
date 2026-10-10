@@ -3243,6 +3243,11 @@ window.CASPER_ENGINE = (() => {
      by refreshSmartAI() when scoring freshness, so it must exist before the
      first WebSocket tick can trigger candidate ranking. */
   const lastExecutedEpochBySymbol=new Map();
+  /* Prevent Smart AI from concentrating every short Demo trade on one market.
+     This is a selection cooldown, not a signal: it never makes a weak market
+     eligible and never forces a trade. If no other market qualifies, keep scanning. */
+  const lastSmartMarketTradeAt=new Map();
+  const SMART_MARKET_COOLDOWN_MS=25000;
 
   const SMART_VALUE=
     '__CASPER_SMART_AUTO__';
@@ -3970,7 +3975,18 @@ window.CASPER_ENGINE = (() => {
     .filter(x=>!x.exact.blocked)
     .sort((a,b)=>b.selectionScore-a.selectionScore);
 
-    if(!scored.length){
+    /* A strong score must not cause repeated back-to-back trades on one index.
+       During the cooldown, other independently qualified markets get priority.
+       This does not rotate blindly: if no other market has a qualified setup,
+       Smart AI waits for fresh evidence instead of forcing a trade. */
+    const diversifiedScored=activeStrategy==='Smart AI'
+      ? scored.filter(item=>{
+          const last=Number(lastSmartMarketTradeAt.get(item.option.symbol)||0);
+          return !last || now-last>=SMART_MARKET_COOLDOWN_MS;
+        })
+      : scored;
+
+    if(!diversifiedScored.length){
       smartSelectedSymbol=null;
       $('#marketName').textContent='Auto-selecting the best';
       $('#rowMarket').textContent='Scanning all markets';
@@ -3987,7 +4003,7 @@ window.CASPER_ENGINE = (() => {
     /* Apply the final gate to EVERY strategy candidate before grouping by
        market. This prevents a market's best-scoring but unqualified strategy
        from hiding another qualified strategy on that same market. */
-    const qualifiedCandidates=scored
+    const qualifiedCandidates=diversifiedScored
       .filter(item=>passesSmartSelectionGate(item.option));
 
     /* Compare markets after strategy-level qualification. Each market contributes
@@ -4052,7 +4068,7 @@ window.CASPER_ENGINE = (() => {
       : `${validation?.total||0} validation samples`;
 
     $('#runMessage').textContent=
-      `Smart AI selected ${names[locked.symbol]||locked.symbol} · ${locked.strategy} · ${locked.direction||''} · confidence ${(locked.confidence*100).toFixed(1)}% · ${validationText} · best of ${marketLeaders.length} market leaders`;
+      `Smart AI selected ${names[locked.symbol]||locked.symbol} · ${locked.strategy} · ${locked.direction||''} · confidence ${(locked.confidence*100).toFixed(1)}% · ${validationText} · best of ${qualifiedMarketLeaders.length} qualified market leaders`;
 
     updateRunButton();
     return locked;
@@ -5628,6 +5644,9 @@ window.CASPER_ENGINE = (() => {
         Number(candidate.snapshot?.lastEpoch)||0;
       if(executedEpoch>0){
         lastExecutedEpochBySymbol.set(symbol,executedEpoch);
+      }
+      if(activeStrategy==='Smart AI'){
+        lastSmartMarketTradeAt.set(symbol,Date.now());
       }
 
       demoSessionTrades++;
