@@ -1505,6 +1505,9 @@ window.CASPER_ENGINE = (() => {
      candidate can reach a purchase request. A high heuristic score alone is
      not evidence of a tradable edge. */
   const VALIDATION_MINIMUM = 60;
+  /* V16.1: allow a guarded Demo-calibration tier to collect real contract outcomes.
+     This is not a claim of profitability; the mature tier still needs 60 samples. */
+  const DEMO_CALIBRATION_MINIMUM = 8;
   const SMART_MIN_LOWER_BOUND = 0.52;
 
   const clamp = (v,min,max) =>
@@ -3026,10 +3029,14 @@ window.CASPER_ENGINE = (() => {
             Number.isFinite(lowerBound)&&
             lowerBound>=SMART_MIN_LOWER_BOUND&&
             !(v.recentTotal>=12&&v.recentAccuracy!==null&&v.recentAccuracy<.45);
+          const calibrationEvidence=
+            v.total>=DEMO_CALIBRATION_MINIMUM&&
+            !(v.recentTotal>=12&&v.recentAccuracy!==null&&v.recentAccuracy<.40);
 
-          /* The former early-live/balanced tiers allowed a trade after only 4–8
-             outcomes. V16 still ranks every signal, but none may execute unless
-             its market+strategy forward validation has enough evidence. */
+          /* Mature evidence is preferred. Until 60 samples exist, a deliberately
+             stricter signal may run in DEMO ONLY to collect real settled outcomes.
+             This avoids a circular deadlock where no contracts execute, so no
+             contract results can ever be collected. */
           const strictEligible=
             validationEvidence&&
             score>=.60&&
@@ -3047,9 +3054,16 @@ window.CASPER_ENGINE = (() => {
             entropy<.985&&
             concentration<.34;
 
-          const earlyLiveEligible=false;
+          const earlyLiveEligible=
+            calibrationEvidence&&
+            score>=.60&&
+            c.signal.confidence>=.64&&
+            q.integrity>=.998&&
+            f.regime!=='high_volatility'&&
+            entropy<.975&&
+            concentration<.30;
 
-          const eligible=strictEligible||balancedEligible;
+          const eligible=strictEligible||balancedEligible||earlyLiveEligible;
 
           return {
             symbol:snap.symbol,
@@ -3058,7 +3072,7 @@ window.CASPER_ENGINE = (() => {
               strictEligible
                 ? 'validated'
                 : earlyLiveEligible
-                  ? 'early_live'
+                  ? 'demo_calibration'
                   : balancedEligible
                     ? 'balanced_live'
                     : 'filtered',
@@ -3070,7 +3084,7 @@ window.CASPER_ENGINE = (() => {
             reason:strictEligible
               ? 'multi_strategy_validated_edge'
               : earlyLiveEligible
-                ? 'strong_fresh_live_edge'
+                ? 'guarded_demo_calibration_candidate'
                 : balancedEligible
                   ? 'balanced_live_edge_with_forward_validation'
                   : 'edge_filter_rejected',
@@ -3841,20 +3855,24 @@ window.CASPER_ENGINE = (() => {
     const recentTotal=Number(validation.recentTotal||0);
     const lowerBound=Number(validation.lowerBound);
 
-    /* Do not turn a model score into a claim of probability. The strategy must
-       first beat a conservative statistical floor on forward-only outcomes. */
-    if(historicalTotal<60||!Number.isFinite(lowerBound)||lowerBound<.52){
-      return false;
+    /* Mature candidates must pass the statistical lower-bound gate. During
+       Demo calibration, require at least eight forward samples and a stronger
+       live signal; do not mistake this exploratory tier for proven profitability. */
+    if(option.executionTier==='validated'){
+      if(historicalTotal<60||!Number.isFinite(lowerBound)||lowerBound<.52)return false;
+      if(Number.isFinite(historicalAccuracy)&&historicalAccuracy<.50)return false;
+      if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.45)return false;
+      return confidence>=.61&&score>=.60;
     }
-    if(historicalTotal>=60&&Number.isFinite(historicalAccuracy)&&historicalAccuracy<.50){
-      return false;
+    if(option.executionTier==='balanced_live'){
+      return historicalTotal>=60&&Number.isFinite(lowerBound)&&lowerBound>=.52&&
+        !(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.45)&&
+        confidence>=.585&&score>=.575;
     }
-    if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.45){
-      return false;
+    if(option.executionTier==='demo_calibration'){
+      return historicalTotal>=8&&confidence>=.64&&score>=.60&&
+        !(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.40);
     }
-
-    if(option.executionTier==='validated')return confidence>=.61&&score>=.60;
-    if(option.executionTier==='balanced_live')return confidence>=.585&&score>=.575;
     return false;
   }
 
@@ -3966,28 +3984,27 @@ window.CASPER_ENGINE = (() => {
       return null;
     }
 
-    /* Compare markets first, not two strategies from the SAME market.
-       Strategy candidates compete within each market; then each market's
-       best candidate competes against the other market leaders. */
+    /* Apply the final gate to EVERY strategy candidate before grouping by
+       market. This prevents a market's best-scoring but unqualified strategy
+       from hiding another qualified strategy on that same market. */
+    const qualifiedCandidates=scored
+      .filter(item=>passesSmartSelectionGate(item.option));
+
+    /* Compare markets after strategy-level qualification. Each market contributes
+       its strongest qualified strategy; those market leaders then compete globally. */
     const bestByMarket=new Map();
-    for(const item of scored){
+    for(const item of qualifiedCandidates){
       const key=String(item.option.symbol||'');
       if(!key)continue;
       if(!bestByMarket.has(key))bestByMarket.set(key,item);
     }
-    const marketLeaders=[...bestByMarket.values()]
+    const qualifiedMarketLeaders=[...bestByMarket.values()]
       .sort((a,b)=>b.selectionScore-a.selectionScore);
-
-    /* Filter every market leader through the final quality gate BEFORE
-       choosing the top one. Otherwise a high-scoring but historically weak
-       leader can block a lower-ranked qualified candidate in another market. */
-    const qualifiedMarketLeaders=marketLeaders
-      .filter(item=>passesSmartSelectionGate(item.option));
     if(!qualifiedMarketLeaders.length){
       smartSelectedSymbol=null;
       $('#marketName').textContent='Scanning for a stronger setup';
-      $('#rowMarket').textContent='No candidate passed the quality gate';
-      $('#runMessage').textContent='Smart AI is skipping weak setups and comparing all markets for a stronger validated opportunity…';
+      $('#rowMarket').textContent='Scanning all markets';
+      $('#runMessage').textContent='Scanning continues · comparing live markets and strategy groups for a qualified setup…';
       updateRunButton();
       return null;
     }
@@ -4113,13 +4130,17 @@ window.CASPER_ENGINE = (() => {
         : smartWilsonLowerBound(validationRecord.accuracy,validationRecord.total)
     }:null;
 
-    /* Individual Free strategy cards use the same evidence standard as Smart
-       AI; this avoids turning the test buttons into an unfiltered loss machine. */
-    if(!validation||Number(validation.total||0)<60||!Number.isFinite(validation.lowerBound)||validation.lowerBound<.52){
-      return null;
-    }
-    if(Number(validation.recentTotal||0)>=12&&Number.isFinite(Number(validation.recentAccuracy))&&Number(validation.recentAccuracy)<.45){
-      return null;
+    /* Individual Free strategies need to be testable in Demo too. Use a guarded
+       calibration threshold until enough forward outcomes exist, then apply the
+       mature statistical gate. This must never enable Real-account execution. */
+    if(!validation||Number(validation.total||0)<8)return null;
+    if(Number(validation.total||0)>=60){
+      if(!Number.isFinite(Number(validation.lowerBound))||Number(validation.lowerBound)<.52)return null;
+      if(Number(validation.accuracy)<.50)return null;
+      if(Number(validation.recentTotal||0)>=12&&Number.isFinite(Number(validation.recentAccuracy))&&Number(validation.recentAccuracy)<.45)return null;
+    }else{
+      if(Number(signal.confidence||0)<.64||Number(signal.score||0)<.60)return null;
+      if(Number(validation.recentTotal||0)>=12&&Number.isFinite(Number(validation.recentAccuracy))&&Number(validation.recentAccuracy)<.40)return null;
     }
 
     return {
@@ -5404,11 +5425,26 @@ window.CASPER_ENGINE = (() => {
       const requiredLowerBound=breakEvenRate+0.025;
       const recentSamples=Number(validation.recentTotal||0);
       const recentAccuracy=Number(validation.recentAccuracy);
-      if(validationSamples<60||!Number.isFinite(observedLowerBound)||observedLowerBound<requiredLowerBound){
-        throw new Error(`Smart AI skipped before purchase: validation lower bound ${(Number.isFinite(observedLowerBound)?observedLowerBound*100:0).toFixed(1)}% does not clear quoted break-even ${(breakEvenRate*100).toFixed(1)}% plus safety margin. No contract was bought.`);
+      if(validationSamples<8){
+        throw new Error('Demo calibration skipped: fewer than eight forward-validation observations are available for this strategy.');
       }
-      if(recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<breakEvenRate){
-        throw new Error(`Smart AI skipped before purchase: recent ${recentSamples}-sample accuracy ${(recentAccuracy*100).toFixed(1)}% is below the quoted break-even rate. No contract was bought.`);
+      if(validationSamples>=60){
+        if(!Number.isFinite(observedLowerBound)||observedLowerBound<requiredLowerBound){
+          throw new Error(`Smart AI skipped before purchase: mature validation lower bound ${(Number.isFinite(observedLowerBound)?observedLowerBound*100:0).toFixed(1)}% does not clear quoted break-even ${(breakEvenRate*100).toFixed(1)}% plus safety margin. No contract was bought.`);
+        }
+        if(recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<breakEvenRate){
+          throw new Error(`Smart AI skipped before purchase: recent ${recentSamples}-sample accuracy ${(recentAccuracy*100).toFixed(1)}% is below the quoted break-even rate. No contract was bought.`);
+        }
+      }else{
+        /* Calibration tier is strictly Demo-only. The stronger live signal and
+           positive quoted payout are required, but an immature Wilson bound is
+           not falsely treated as evidence of a proven edge. */
+        if(Number(candidate.confidence||0)<.64||Number(candidate.score||0)<.60){
+          throw new Error('Demo calibration skipped: the live signal is below the stricter exploratory threshold.');
+        }
+        if(recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<Math.max(.40,breakEvenRate-.05)){
+          throw new Error('Demo calibration paused: recent validation is deteriorating below the exploratory floor.');
+        }
       }
 
       /* A signal is valid only for the market state that produced it. If a new
