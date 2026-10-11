@@ -1381,7 +1381,7 @@
 
 <p class="foot">
   CASPER LIVE DATA ANALYSIS · Live market analysis engine active ·
-  Free Demo execution enabled · Real trading disabled · Premium locked
+  Demo execution enabled · Four strategies available for testing · Real trading disabled
 </p>
 
 </main>
@@ -4134,11 +4134,15 @@ window.CASPER_ENGINE = (() => {
         const aligned=signal.direction==='RISE'?momentum>0:signal.direction==='FALL'?momentum<0:false;
         if(Number(signal.confidence||0)<.68||stability<.35||Math.abs(momentum)<.02||!aligned)return null;
       }
+      let autoSwitcherDirection=null;
       if(activeStrategy==='Auto Switcher'){
         const directionScore=Number(features.direction?.direction20||0);
+        // Select direction from the live directional score, not from a possibly stale generic signal label.
         if(Number(signal.confidence||0)<.64||Math.abs(directionScore)<.08)return null;
+        autoSwitcherDirection=directionScore>0?'RISE':'FALL';
       }
-      const direction=activeStrategy==='Over 8 Killer'?'OVER_8':signal.direction;
+      const direction=activeStrategy==='Over 8 Killer'?'OVER_8':
+        activeStrategy==='Auto Switcher'?autoSwitcherDirection:signal.direction;
       return {
         symbol, strategy:activeStrategy, baseStrategy:activeStrategy, direction,
         digit:signal.digit, confidence:Number(signal.confidence||0), score:Number(signal.score||0),
@@ -5591,7 +5595,10 @@ window.CASPER_ENGINE = (() => {
         else if(candidate.strategy==='Over 8 Killer') latestSignal=latestSnapshot.signals?.over8;
         else if(candidate.strategy==='Even & Odd') latestSignal=latestSnapshot.signals?.parity;
         else if(candidate.strategy==='Mix Both') latestSignal=latestSnapshot.signals?.mixBoth;
-        const freshDirection=candidate.strategy==='Over 8 Killer'?'OVER_8':latestSignal?.direction;
+        const freshDirection=candidate.strategy==='Over 8 Killer'?'OVER_8':
+          candidate.strategy==='Auto Switcher'
+            ? (Number(latestSnapshot?.features?.direction?.direction20||0)>0?'RISE':'FALL')
+            : latestSignal?.direction;
         let premiumFreshFilter=true;
         if(candidate.strategy==='TickStrike Pro'){
           const f=latestSnapshot?.features||{};
@@ -6207,24 +6214,19 @@ window.CASPER_ENGINE = (() => {
             const best=
               analysis?.bestSignal;
 
-            if(best){
-
-              if(best.actionable){
-
-                $('#runMessage').textContent=
-                  `${best.strategy} analysis · ${best.direction||''} · confidence ${(best.confidence*100).toFixed(1)}%`;
-
-              }else{
-
-                $('#runMessage').textContent=
-                  `Market analysis active · ${best.reason||'waiting for stronger conditions'}`;
+            if(!(demoAutoRun&&premiumStrategyNames.has(activeStrategy))){
+                if(best){
+                  if(best.actionable){
+                    $('#runMessage').textContent=
+                      `${best.strategy} analysis · ${best.direction||''} · confidence ${(best.confidence*100).toFixed(1)}%`;
+                  }else{
+                    $('#runMessage').textContent=
+                      `Market analysis active · ${best.reason||'waiting for stronger conditions'}`;
+                  }
+                }else{
+                  $('#runMessage').textContent='Building market sample for analysis…';
+                }
               }
-
-            }else{
-
-              $('#runMessage').textContent=
-                'Building market sample for analysis…';
-            }
 
             updateRunButton();
           }
