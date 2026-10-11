@@ -3177,32 +3177,36 @@ window.CASPER_ENGINE = (() => {
     'https://casper-live-data-analysis.onrender.com';
 
 
+  // Full Premium market registry. Symbols are still verified against the
+  // live active_symbols response before Premium can select them for execution.
   const names={
-
     "1HZ100V":"Volatility 100 (1s)",
-
     "1HZ75V":"Volatility 75 (1s)",
-
     "1HZ50V":"Volatility 50 (1s)",
-
     "1HZ25V":"Volatility 25 (1s)",
-
     "1HZ10V":"Volatility 10 (1s)",
-
     "R_100":"Volatility 100 Index",
-
     "R_75":"Volatility 75 Index",
-
     "R_50":"Volatility 50 Index",
-
     "R_25":"Volatility 25 Index",
-
-    "R_10":"Volatility 10 Index"
+    "R_10":"Volatility 10 Index",
+    "1HZ150V":"Volatility 150 (1s)",
+    "1HZ250V":"Volatility 250 (1s)"
   };
 
-
-  const symbols=
-    Object.keys(names);
+  // Keep Free Smart AI's original ten-market scan scope unchanged.
+  const symbols=[
+    '1HZ100V','1HZ75V','1HZ50V','1HZ25V','1HZ10V',
+    'R_100','R_75','R_50','R_25','R_10'
+  ];
+  // Premium subscribes to all 12 intended markets, then ranks only markets
+  // confirmed active by Deriv. Do not infer availability from a display name.
+  const premiumSymbols=Object.keys(names);
+  const availableSymbols=new Set();
+  const contractTypesBySymbol=new Map();
+  const contractRequestToSymbol=new Map();
+  let contractDiscoveryRequestId=20000;
+  let activeSymbolRegistryReady=false;
 
 
   let ws=null;
@@ -3305,8 +3309,23 @@ window.CASPER_ENGINE = (() => {
 
   const marketPremium=$('#marketPremium');
 
-  marketPremium.innerHTML=
-    market.innerHTML;
+  marketPremium.innerHTML=market.innerHTML;
+  // Premium has its own selector so its expanded market scope does not alter
+  // Free Smart AI's selector or its ten-market candidate loop.
+  for(const symbol of Object.keys(names)){
+    if(![...marketPremium.options].some(option=>option.value===symbol)){
+      marketPremium.add(new Option(names[symbol],symbol));
+    }
+  }
+  if(![...marketPremium.options].some(option=>option.value===SMART_VALUE)){
+    marketPremium.add(new Option('Scan all 12 Premium markets',SMART_VALUE),marketPremium.options[0]||null);
+  }else{
+    const allOption=[...marketPremium.options].find(option=>option.value===SMART_VALUE);
+    if(allOption)allOption.textContent='Scan all 12 Premium markets';
+  }
+  // Auto Switcher always compares the full Premium registry, regardless of
+  // the single-market selection used by the other selectable strategies.
+  marketPremium.value='1HZ100V';
 
 
   /* ==========================================================
@@ -4093,67 +4112,102 @@ window.CASPER_ENGINE = (() => {
 
   function getFreeCandidate(){
 
-    // Premium strategies have independent selection and filters; only the
-    // verified Demo execution, settlement, ledger and risk controls are shared.
+    // Premium strategies use their own candidate ranking and the full Premium
+    // registry. Free Smart AI remains on its original ten-market candidate path.
     if(['Matches Printer','Over 8 Killer','TickStrike Pro','Auto Switcher'].includes(activeStrategy)){
-      const symbol=market.value===SMART_VALUE?smartSelectedSymbol:market.value;
-      if(!symbol||!names[symbol])return null;
-      const snap=casperEngine.snapshot(symbol);
-      if(!snap||!snap.ready||!snap.features?.ready)return null;
+      const allMarketMode=activeStrategy==='Auto Switcher'||marketPremium.value===SMART_VALUE;
+      const scanSymbols=allMarketMode
+        ? premiumSymbols
+        : [marketPremium.value||market.value].filter(symbol=>Boolean(names[symbol]));
+      const candidates=[];
 
-      let signal=null, validationRecord=null;
-      if(activeStrategy==='Matches Printer'){
-        signal=snap.signals?.match;
-        validationRecord=snap.validation?.strategies?.match;
-      }else if(activeStrategy==='Over 8 Killer'){
-        signal=snap.signals?.over8;
-        validationRecord=snap.validation?.strategies?.over8;
-      }else{
-        signal=snap.signals?.riseFall;
-        validationRecord=snap.validation?.strategies?.riseFall;
+      for(const symbol of scanSymbols){
+        if(!activeSymbolRegistryReady||!availableSymbols.has(symbol))continue;
+        const snap=casperEngine.snapshot(symbol);
+        if(!snap||!snap.ready||!snap.features?.ready)continue;
+
+        let signal=null, validationRecord=null;
+        if(activeStrategy==='Matches Printer'){
+          signal=snap.signals?.match;
+          validationRecord=snap.validation?.strategies?.match;
+        }else if(activeStrategy==='Over 8 Killer'){
+          signal=snap.signals?.over8;
+          validationRecord=snap.validation?.strategies?.over8;
+        }else{
+          signal=snap.signals?.riseFall;
+          validationRecord=snap.validation?.strategies?.riseFall;
+        }
+        if(!signal?.actionable||!validationRecord)continue;
+        const hasLowerBound=validationRecord.lowerBound!==null&&validationRecord.lowerBound!==undefined&&Number.isFinite(Number(validationRecord.lowerBound));
+        const validation={
+          ...validationRecord,
+          lowerBound:hasLowerBound
+            ? Number(validationRecord.lowerBound)
+            : smartWilsonLowerBound(validationRecord.accuracy,validationRecord.total)
+        };
+        const total=Number(validation.total||0);
+        const recentTotal=Number(validation.recentTotal||0);
+        const recentAccuracy=Number(validation.recentAccuracy);
+        if(total<8)continue;
+        if(total>=60){
+          if(!Number.isFinite(Number(validation.lowerBound))||Number(validation.lowerBound)<.52)continue;
+          if(Number(validation.accuracy)<.50)continue;
+          if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.45)continue;
+        }else{
+          if(Number(signal.confidence||0)<.64||Number(signal.score||0)<.60)continue;
+          if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.40)continue;
+        }
+
+        const features=snap.features;
+        if(activeStrategy==='TickStrike Pro'){
+          const momentum=Number(features.price?.momentum||0);
+          const stability=Number(features.direction?.stability||0);
+          const aligned=signal.direction==='RISE'?momentum>0:signal.direction==='FALL'?momentum<0:false;
+          if(Number(signal.confidence||0)<.68||stability<.35||Math.abs(momentum)<.02||!aligned)continue;
+        }
+        let direction=signal.direction;
+        if(activeStrategy==='Auto Switcher'){
+          const directionScore=Number(features.direction?.direction20||0);
+          if(Number(signal.confidence||0)<.64||Math.abs(directionScore)<.08)continue;
+          direction=directionScore>0?'RISE':'FALL';
+          // Require momentum alignment too; do not buy simply because a tiny
+          // directional score has a sign.
+          const momentum=Number(features.price?.momentum||0);
+          const stability=Number(features.direction?.stability||0);
+          if(stability<.35||Math.abs(momentum)<.02)continue;
+          if(direction==='RISE'&&momentum<=0)continue;
+          if(direction==='FALL'&&momentum>=0)continue;
+        }
+        if(activeStrategy==='Matches Printer'){
+          const digit=Number(signal.digit);
+          if(!Number.isInteger(digit)||digit<0||digit>9)continue;
+        }
+
+        const candidate={
+          symbol, strategy:activeStrategy, baseStrategy:activeStrategy, direction,
+          digit:signal.digit, confidence:Number(signal.confidence||0), score:Number(signal.score||0),
+          reason:signal.reason||'premium_strategy_signal', snapshot:snap, validation,
+          executionTier:total<60?'demo_calibration':'validated'
+        };
+        // Never ask Deriv for a proposal on a market/contract combination until
+        // contracts_for has confirmed that exact contract type is offered.
+        const offeredTypes=contractTypesBySymbol.get(symbol);
+        if(!(offeredTypes instanceof Set)||!offeredTypes.has(strategyToContract(candidate)))continue;
+        // Prefer proven out-of-sample performance when mature, while still
+        // ranking live confidence, score, stability and sample maturity.
+        const mature=total>=60;
+        const lower=Number(validation.lowerBound);
+        const recentPenalty=recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.50?.12:0;
+        candidate.rankScore=(mature?0.38*Math.max(0,Math.min(1,lower)):0.12)+
+          0.25*candidate.confidence+0.22*candidate.score+
+          0.08*Math.max(0,Math.min(1,Number(features.direction?.stability||0)))+
+          0.07*Math.min(1,total/100)-recentPenalty;
+        candidates.push(candidate);
       }
-      if(!signal?.actionable||!validationRecord)return null;
-      const hasLowerBound=validationRecord.lowerBound!==null&&validationRecord.lowerBound!==undefined&&Number.isFinite(Number(validationRecord.lowerBound));
-      const validation={
-        ...validationRecord,
-        lowerBound:hasLowerBound
-          ? Number(validationRecord.lowerBound)
-          : smartWilsonLowerBound(validationRecord.accuracy,validationRecord.total)
-      };
-      const total=Number(validation.total||0);
-      const recentTotal=Number(validation.recentTotal||0);
-      const recentAccuracy=Number(validation.recentAccuracy);
-      if(total<8)return null;
-      if(total>=60){
-        if(!Number.isFinite(Number(validation.lowerBound))||Number(validation.lowerBound)<.52)return null;
-        if(Number(validation.accuracy)<.50)return null;
-        if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.45)return null;
-      }else{
-        if(Number(signal.confidence||0)<.64||Number(signal.score||0)<.60)return null;
-        if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.40)return null;
-      }
-      const features=snap.features;
-      if(activeStrategy==='TickStrike Pro'){
-        const momentum=Number(features.price?.momentum||0);
-        const stability=Number(features.direction?.stability||0);
-        const aligned=signal.direction==='RISE'?momentum>0:signal.direction==='FALL'?momentum<0:false;
-        if(Number(signal.confidence||0)<.68||stability<.35||Math.abs(momentum)<.02||!aligned)return null;
-      }
-      let autoSwitcherDirection=null;
-      if(activeStrategy==='Auto Switcher'){
-        const directionScore=Number(features.direction?.direction20||0);
-        // Select direction from the live directional score, not from a possibly stale generic signal label.
-        if(Number(signal.confidence||0)<.64||Math.abs(directionScore)<.08)return null;
-        autoSwitcherDirection=directionScore>0?'RISE':'FALL';
-      }
-      const direction=activeStrategy==='Over 8 Killer'?'OVER_8':
-        activeStrategy==='Auto Switcher'?autoSwitcherDirection:signal.direction;
-      return {
-        symbol, strategy:activeStrategy, baseStrategy:activeStrategy, direction,
-        digit:signal.digit, confidence:Number(signal.confidence||0), score:Number(signal.score||0),
-        reason:signal.reason||'premium_strategy_signal', snapshot:snap, validation,
-        executionTier:total<60?'demo_calibration':'validated'
-      };
+
+      if(!candidates.length)return null;
+      candidates.sort((a,b)=>b.rankScore-a.rankScore);
+      return candidates[0];
     }
 
     if(activeStrategy==='Smart AI'){
@@ -4478,11 +4532,11 @@ window.CASPER_ENGINE = (() => {
       return `Smart AI is continuously reading all ${symbols.length} live Volatility markets × Rise/Fall × Even/Odd × Mix Both.`;
     }
 
-    const marketLabel=
-      names[market.value]||
-      market.value||
-      'selected market';
-
+    if(activeStrategy==='Auto Switcher'||marketPremium.value===SMART_VALUE){
+      return `${activeStrategy} is continuously comparing all ${premiumSymbols.length} Premium Volatility markets for the strongest qualified setup.`;
+    }
+    const premiumSymbol=marketPremium.value||market.value;
+    const marketLabel=names[premiumSymbol]||premiumSymbol||'selected market';
     return `${activeStrategy} is continuously scanning ${marketLabel} for the next validated setup.`;
   }
 
@@ -4564,8 +4618,7 @@ window.CASPER_ENGINE = (() => {
         }
         $('#runMessage').textContent=continuousScanMessage();
         if(premiumStrategyNames.has(activeStrategy)){
-          const premiumMarketLabel=names[market.value]||market.value||'selected market';
-          $('#premiumMessage').textContent=`${activeStrategy} · scanning ${premiumMarketLabel} · waiting for a qualified live signal. No trade has been placed.`;
+          $('#premiumMessage').textContent=`${activeStrategy} · ${continuousScanMessage()} · waiting for a qualified live signal. No trade has been placed.`;
         }
         continue;
       }
@@ -4677,7 +4730,7 @@ window.CASPER_ENGINE = (() => {
 
     showScanOverlay(
       activeStrategy==='Smart AI'
-        ? `Scanning all ${symbols.length} live Volatility markets`
+        ? `Scanning all ${premiumSymbols.length} Premium Volatility markets`
         : continuousScanMessage()
     );
 
@@ -6076,7 +6129,7 @@ window.CASPER_ENGINE = (() => {
 
     for(
       const symbol
-      of symbols
+      of premiumSymbols
     ){
 
       try{
@@ -6098,6 +6151,12 @@ window.CASPER_ENGINE = (() => {
   function connect(){
 
     try{
+      // A reconnect must revalidate the live market registry before Premium
+      // chooses another symbol; never trade from stale availability data.
+      activeSymbolRegistryReady=false;
+      availableSymbols.clear();
+      contractTypesBySymbol.clear();
+      contractRequestToSymbol.clear();
 
       if(ws){
 
@@ -6155,49 +6214,81 @@ window.CASPER_ENGINE = (() => {
         }
 
         if(d.error){
-
-          console.warn(
-            'Deriv feed error:',
-            d.error
-          );
-
+          const failedReqId=Number(d.echo_req?.req_id||d.req_id||0);
+          const contractSymbol=contractRequestToSymbol.get(failedReqId)||String(d.echo_req?.contracts_for||'');
+          if(contractSymbol){
+            contractRequestToSymbol.delete(failedReqId);
+            contractTypesBySymbol.delete(contractSymbol);
+            const detail=`Deriv could not verify available contracts for ${names[contractSymbol]||contractSymbol}: ${d.error.code||'API error'} — ${d.error.message||'no details returned'}. This market is being skipped safely.`;
+            console.warn('[CASPER] '+detail,d);
+            if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=detail;
+          }else{
+            console.warn('Deriv feed error:',d.error);
+          }
           state(false);
-
           return;
         }
 
+
+        if(d.msg_type==='contracts_for'){
+          const reqId=Number(d.echo_req?.req_id||d.req_id||0);
+          const requestedSymbol=contractRequestToSymbol.get(reqId)||String(d.echo_req?.contracts_for||'');
+          if(requestedSymbol){
+            const availableContracts=d.contracts_for?.available;
+            if(Array.isArray(availableContracts)){
+              const types=new Set(availableContracts.map(item=>String(item.contract_type||'').toUpperCase()).filter(Boolean));
+              contractTypesBySymbol.set(requestedSymbol,types);
+              console.info('[CASPER] Verified contract types for',requestedSymbol,[...types]);
+              if(!types.size){
+                const detail=`Deriv returned no contract types for ${names[requestedSymbol]||requestedSymbol}; Premium will skip this market until availability can be verified.`;
+                if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=detail;
+              }
+            }else{
+              contractTypesBySymbol.delete(requestedSymbol);
+              console.warn('[CASPER] Unexpected contracts_for response shape for',requestedSymbol,d);
+              if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=`Could not verify contract availability for ${names[requestedSymbol]||requestedSymbol}; this market is being skipped safely.`;
+            }
+            contractRequestToSymbol.delete(reqId);
+          }
+          return;
+        }
 
         if(
           d.msg_type==='active_symbols'&&
           Array.isArray(d.active_symbols)
         ){
-
-          for(
-            const item
-            of d.active_symbols
-          ){
-
-            const symbol=
-              item.underlying_symbol||
-              item.symbol;
-
-            const places=
-              decimalPlaces(
-                item.pip_size??item.pip
-              );
-
-            if(
-              symbol&&
-              places!==null
-            ){
-
-              pipSizes.set(
-                symbol,
-                places
-              );
+          availableSymbols.clear();
+          for(const item of d.active_symbols){
+            const symbol=item.underlying_symbol||item.symbol;
+            const places=decimalPlaces(item.pip_size??item.pip);
+            if(symbol&&names[symbol]){
+              const suspended=Number(item.is_trading_suspended||0)===1;
+              if(!suspended)availableSymbols.add(symbol);
+              if(places!==null)pipSizes.set(symbol,places);
             }
           }
-
+          activeSymbolRegistryReady=true;
+          const missing=premiumSymbols.filter(symbol=>!availableSymbols.has(symbol));
+          if(missing.length){
+            console.info('[CASPER] Premium markets not currently confirmed active by Deriv and will be skipped:',missing);
+          }
+          // Discover supported contracts per market before allowing a Premium
+          // candidate to reach the proposal endpoint. This prevents blindly
+          // sending DIGITMATCH/DIGITOVER/Rise-Fall to unsupported instruments.
+          let requestIndex=0;
+          for(const symbol of premiumSymbols){
+            if(!availableSymbols.has(symbol))continue;
+            const reqId=contractDiscoveryRequestId++;
+            contractRequestToSymbol.set(reqId,symbol);
+            try{
+              ws.send(JSON.stringify({contracts_for:symbol,req_id:reqId}));
+            }catch(error){
+              contractRequestToSymbol.delete(reqId);
+              console.warn('[CASPER] Could not request contract availability for',symbol,error);
+            }
+            requestIndex++;
+          }
+          console.info(`[CASPER] Requested contract availability for ${requestIndex} active Premium markets.`);
           return;
         }
 
@@ -6257,11 +6348,13 @@ window.CASPER_ENGINE = (() => {
             Smart AI uses every market.
           */
           if(activeStrategy==='Smart AI'){
-
-            state(true);
-
-            refreshSmartAI();
-
+            // Keep Free Smart AI's original ten-market behaviour. Premium-only
+            // extra markets update their own snapshots but do not trigger Free
+            // candidate refreshes.
+            if(symbols.includes(symbol)){
+              state(true);
+              refreshSmartAI();
+            }
             return;
           }
 
@@ -6397,12 +6490,10 @@ window.CASPER_ENGINE = (() => {
         return;
       }
 
-      market.value=
-        marketPremium.value;
-
-      market.dispatchEvent(
-        new Event('change')
-      );
+      if(names[marketPremium.value]){
+        market.value=marketPremium.value;
+        market.dispatchEvent(new Event('change'));
+      }
     }
   );
 
@@ -7247,7 +7338,10 @@ window.CASPER_ENGINE = (() => {
       if(!['Matches Printer','Over 8 Killer','TickStrike Pro','Auto Switcher'].includes(activeStrategy)){
         showToast('Select one of the four Premium strategies first.');return;
       }
-      market.value=marketPremium.value||market.value;
+      if(names[marketPremium.value]){
+        // Keep the visible shared market display in sync only for a real symbol.
+        market.value=marketPremium.value;
+      }
       $('#stake').value=$('#stakePremium').value;
       $('#target').value=$('#targetPremium').value;
       $('#maxloss').value=$('#lossPremium').value;
