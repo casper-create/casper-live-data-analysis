@@ -4530,6 +4530,20 @@ window.CASPER_ENGINE = (() => {
 
       if(!demoAutoRun||serial!==demoRunSerial)break;
 
+      // Never place a second contract while a previously bought contract is
+      // still open or unresolved. This guard also protects against a monitor
+      // disconnect/timeout accidentally returning control to the scan loop.
+      if(activeDemoContract&&String(activeDemoContract.status||'open').toLowerCase()==='open'){
+        const contractLabel=String(activeDemoContract.contractId||'unknown');
+        $('#runMessage').textContent=`Monitoring existing Demo contract #${contractLabel} · waiting for Deriv's confirmed settlement · no new trade will be opened.`;
+        if(transactionViewEstablished){
+          const txStatus=$('#txOverlayStatus');
+          if(txStatus)txStatus.textContent='LIVE · waiting for confirmed settlement before the next scan';
+        }
+        await sleep(1000);
+        continue;
+      }
+
       const candidate=getFreeCandidate();
 
       if(!candidate){
@@ -5326,11 +5340,39 @@ window.CASPER_ENGINE = (() => {
     if(previous){clearTimeout(previous.timer);contractWatchers.delete(id);}
     const reqId=++tradeRequestId;
     return new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>{
-        contractWatchers.delete(id);
-        reject(new Error(`Timed out monitoring Demo contract #${id}. The contract was not marked as a win or loss without a confirmed final response.`));
-      },timeout);
-      contractWatchers.set(id,{resolve,reject,timer,onUpdate,subscriptionReqId:reqId});
+      const watcher={resolve,reject,timer:null,onUpdate,subscriptionReqId:reqId,monitorAttempts:0};
+      const subscribeAgain=()=>{
+        if(!contractWatchers.has(id)||contractWatchers.get(id)!==watcher)return;
+        if(!tradeSocket||tradeSocket.readyState!==WebSocket.OPEN){
+          clearTimeout(watcher.timer);
+          contractWatchers.delete(id);
+          reject(new Error(`Lost the Demo monitoring connection for contract #${id}. The contract remains unresolved and will not be counted as a win or loss.`));
+          return;
+        }
+        watcher.monitorAttempts++;
+        watcher.subscriptionReqId=++tradeRequestId;
+        try{
+          tradeSocket.send(JSON.stringify({
+            proposal_open_contract:1,
+            contract_id:/^\d+$/.test(id)?Number(id):id,
+            subscribe:1,
+            req_id:watcher.subscriptionReqId
+          }));
+          // Deriv may fail to deliver a final update on a stale subscription.
+          // Renew monitoring without completing the trade or opening another one.
+          watcher.timer=setTimeout(subscribeAgain,timeout);
+          if(activeDemoContract&&normalizeContractId(activeDemoContract.contractId)===id){
+            $('#runMessage').textContent=`Contract #${id} is still unresolved · renewing Deriv monitoring (${watcher.monitorAttempts}) · no replacement trade will be opened.`;
+            const txStatus=$('#txOverlayStatus');
+            if(txStatus)txStatus.textContent='LIVE · renewing Deriv contract monitoring; result not yet confirmed';
+          }
+        }catch(error){
+          clearTimeout(watcher.timer);
+          contractWatchers.delete(id);
+          reject(error);
+        }
+      };
+      contractWatchers.set(id,watcher);
       try{
         tradeSocket.send(JSON.stringify({
           proposal_open_contract:1,
@@ -5338,8 +5380,9 @@ window.CASPER_ENGINE = (() => {
           subscribe:1,
           req_id:reqId
         }));
+        watcher.timer=setTimeout(subscribeAgain,timeout);
       }catch(error){
-        clearTimeout(timer);
+        clearTimeout(watcher.timer);
         contractWatchers.delete(id);
         reject(error);
       }
