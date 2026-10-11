@@ -3216,15 +3216,20 @@ window.CASPER_ENGINE = (() => {
   let activeStrategy='Smart AI';
   const premiumStrategyNames=new Set(['Matches Printer','Over 8 Killer','TickStrike Pro','Auto Switcher']);
 
-  // Mirror the shared engine's status into the Premium screen. Previously the
-  // execution loop updated only #runMessage inside the Free tab, making Premium
-  // appear idle even while it was scanning or handling proposal errors.
+  // Mirror only messages that belong to the active Premium run. The previous
+  // observer copied every generic Free-panel update, so an unrelated
+  // 'Rise & Fall analysis · RISE' message could overwrite Auto Switcher's own
+  // FALL status and make the screen contradict the purchased contract.
   const runMessageNode=$('#runMessage');
   if(runMessageNode&&typeof MutationObserver!=='undefined'){
     const runMessageObserver=new MutationObserver(()=>{
       if(!premiumStrategyNames.has(activeStrategy))return;
       const message=runMessageNode.textContent.trim();
-      if(message&&$('#premiumMessage'))$('#premiumMessage').textContent=message;
+      if(!message||!$('#premiumMessage'))return;
+      const belongsToPremium =
+        message.includes(activeStrategy) ||
+        /Demo (proposal|contract|result|execution|risk|session)|Deriv proposal|proposal rejected|contract opened|waiting for result|sign in with Deriv|choose a Demo account/i.test(message);
+      if(belongsToPremium)$('#premiumMessage').textContent=message;
     });
     runMessageObserver.observe(runMessageNode,{childList:true,characterData:true,subtree:true});
   }
@@ -4536,14 +4541,17 @@ window.CASPER_ENGINE = (() => {
         if(transactionViewEstablished){
           const status=$('#txOverlayStatus');
           if(status && !demoTradeInProgress){
-            status.textContent='Scanning in background · comparing Rise & Fall, Even & Odd and Mix Both across live markets…';
+            status.textContent=premiumStrategyNames.has(activeStrategy)
+              ? `Scanning in background · ${activeStrategy} is evaluating ${names[market.value]||market.value||'the selected market'}…`
+              : 'Scanning in background · comparing Rise & Fall, Even & Odd and Mix Both across live markets…';
             $('#txOverlayHeading').textContent='Finding the next qualified trade';
             $('#txOverlayProgress').style.width='18%';
           }
         }
         $('#runMessage').textContent=continuousScanMessage();
         if(premiumStrategyNames.has(activeStrategy)){
-          $('#premiumMessage').textContent=`${activeStrategy} · ${continuousScanMessage()} No qualifying signal yet; no trade has been placed.`;
+          const premiumMarketLabel=names[market.value]||market.value||'selected market';
+          $('#premiumMessage').textContent=`${activeStrategy} · scanning ${premiumMarketLabel} · waiting for a qualified live signal. No trade has been placed.`;
         }
         continue;
       }
@@ -5519,8 +5527,19 @@ window.CASPER_ENGINE = (() => {
       if(proposalResponse.error){
         const apiError=proposalResponse.error;
         const details=[apiError.code,apiError.message].filter(Boolean).join(': ');
-        console.error('[CASPER] Deriv proposal rejected:',{details,request:proposalPayload,response:proposalResponse});
-        throw new Error(details||'Deriv rejected the contract proposal; check the browser console for the request and response details.');
+        // Keep the full rejection evidence visible so we can correct the exact
+        // rejected field instead of guessing at proposal parameters.
+        const echoedRequest=proposalResponse.echo_req||proposalResponse.echo_req_payload||null;
+        const diagnostic={
+          code:apiError.code||null,
+          message:apiError.message||null,
+          request:proposalPayload,
+          echoedRequest,
+          msg_type:proposalResponse.msg_type||null
+        };
+        console.error('[CASPER] Deriv proposal rejected (full diagnostic):',diagnostic,proposalResponse);
+        const compactRequest=JSON.stringify(proposalPayload);
+        throw new Error(`${details||'Deriv rejected the contract proposal'} | Request sent: ${compactRequest}`);
       }
 
       if(proposalResponse.msg_type!=='proposal'||!proposal?.id){
@@ -5625,15 +5644,19 @@ window.CASPER_ENGINE = (() => {
         candidate.score=freshScore||candidate.score;
       }
 
+      const evidenceStatus=validationSamples>=60
+        ? `Validated lower bound ${(observedLowerBound*100).toFixed(1)}% · break-even ${(breakEvenRate*100).toFixed(1)}%`
+        : `Demo calibration · ${validationSamples} validation samples · break-even ${(breakEvenRate*100).toFixed(1)}%`;
       updateTransactionOverlay({
         heading:'Evidence and payout confirmed',
-        status:`Demo proposal passed payout-aware gate · lower bound ${(observedLowerBound*100).toFixed(1)}% · break-even ${(breakEvenRate*100).toFixed(1)}% · buying…`,
+        status:`${evidenceStatus} · buying Demo contract…`,
         contract:`Proposal ${String(proposal.id)}`,
         progress:48
       });
 
-      $('#runMessage').textContent=
-        `Demo proposal passed evidence gate · ${candidate.strategy} · ${candidate.direction||''} · lower bound ${(observedLowerBound*100).toFixed(1)}% · break-even ${(breakEvenRate*100).toFixed(1)}% · buying...`;
+      const evidenceMessage=`Demo proposal passed payout-aware gate · ${candidate.strategy} · ${candidate.direction||''} · ${evidenceStatus} · buying…`;
+      $('#runMessage').textContent=evidenceMessage;
+      if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=evidenceMessage;
 
       /*
         Re-check risk immediately before BUY. This closes the race where
@@ -5695,8 +5718,9 @@ window.CASPER_ENGINE = (() => {
         progress:68
       });
 
-      $('#runMessage').textContent=
-        `Demo contract opened · #${contractId} · ${candidate.strategy} · waiting for result...`;
+      const openedMessage=`Demo contract opened · #${contractId} · ${candidate.strategy} · ${candidate.direction||contractType} · ${contractType} · waiting for confirmed result…`;
+      $('#runMessage').textContent=openedMessage;
+      if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=openedMessage;
 
       /*
         Subscribe to the open contract and wait for
@@ -5909,8 +5933,9 @@ window.CASPER_ENGINE = (() => {
 
       if(demoRiskLimitReached())showSessionSummary();
 
-      $('#runMessage').textContent=
-        `Demo result · ${finalPL>=0?'+':''}${finalPL.toFixed(2)} ${currency} · ${candidate.strategy} · ${names[symbol]} · Session P/L ${demoSessionPL>=0?'+':''}${demoSessionPL.toFixed(2)} ${currency} · ${demoSessionTrades} trade${demoSessionTrades===1?'':'s'}`;
+      const finalResultMessage=`Demo result · ${finalPL>=0?'+':''}${finalPL.toFixed(2)} ${currency} · ${candidate.strategy} · ${names[symbol]||symbol} · ${candidate.direction||contractType} · Session P/L ${demoSessionPL>=0?'+':''}${demoSessionPL.toFixed(2)} ${currency} · ${demoSessionTrades} trade${demoSessionTrades===1?'':'s'}`;
+      $('#runMessage').textContent=finalResultMessage;
+      if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=finalResultMessage;
 
       showToast(
         finalPL>0
@@ -6374,6 +6399,11 @@ window.CASPER_ENGINE = (() => {
       b.addEventListener(
         'click',
         ()=>{
+
+          if(demoAutoRun){
+            showToast('Stop the current Demo run before changing strategy.');
+            return;
+          }
 
           const p=
             b.closest('.premiumGrid')
