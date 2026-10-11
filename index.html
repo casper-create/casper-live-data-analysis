@@ -4990,7 +4990,17 @@ window.CASPER_ENGINE = (() => {
           data.req_id
         );
 
-      const errorMessage=[data.error.code,data.error.message].filter(Boolean).join(': ')||'Deriv trading request failed.';
+      const baseErrorMessage=[data.error.code,data.error.message].filter(Boolean).join(': ')||'Deriv trading request failed.';
+      // Keep Deriv's actual rejection and echoed request in the page status.
+      // Previously only the short code/message reached the UI because this
+      // promise rejects here, before executeDemoTradeOnce can add diagnostics.
+      const responseDiagnostic={
+        error:{code:data.error.code||null,message:data.error.message||null},
+        echoedRequest:data.echo_req||data.echo_req_payload||null,
+        requestId:reqId||null,
+        messageType:data.msg_type||null
+      };
+      const errorMessage=`${baseErrorMessage} | Deriv details: ${JSON.stringify(responseDiagnostic)}`;
       if(reqId&&tradePending.has(reqId)){
         const pending=tradePending.get(reqId);
         clearTimeout(pending.timer);
