@@ -996,7 +996,6 @@
   <button class="tab" data-panel="manual">♧ &nbsp;Manual Trading</button>
   <button class="tab active" data-panel="free">✧ &nbsp;Nexora AI Free</button>
   <button class="tab" data-panel="premium">♛ &nbsp;Nexora AI Premium</button>
-  <button class="tab" data-panel="pricing">◇ &nbsp;AI Pricing</button>
 </nav>
 
 <main class="wrap">
@@ -1221,17 +1220,17 @@
 
         <div class="pills">
           <span class="pill" style="color:var(--gold);border-color:#856618">PREMIUM</span>
-          <span class="pill demo">REAL &amp; DEMO</span>
+          <span class="pill demo">DEMO ONLY</span>
         </div>
 
         <div class="subtitle" id="premiumSubtitle">
-          Premium strategy access
+          Creation build · all four strategies available for Demo testing
         </div>
       </div>
     </div>
 
     <button class="login" id="unlockBtn">
-      ♛ &nbsp;Premium access
+      ♛ &nbsp;Creation Mode
     </button>
 
   </div>
@@ -1252,7 +1251,7 @@
       <span class="lock">▣ ALPHA</span>
       <b>Matches Printer</b>
       <p>
-        Digit Match: evaluates digit probabilities, stability and validation before qualification.
+        Smart digit-match analysis with probability concentration, stability and forward-validation filters.
       </p>
     </button>
 
@@ -1261,7 +1260,7 @@
       <span class="lock">▣ QUANTUM</span>
       <b>Over 8 Killer</b>
       <p>
-        Digit Over 8: evaluates the 9/Over-8 distribution and validates the edge before qualification.
+        Over 8 sniper: filters live digit distribution and forward validation before entry.
       </p>
     </button>
 
@@ -1270,7 +1269,7 @@
       <span class="lock">▣ APEX</span>
       <b>TickStrike Pro</b>
       <p>
-        Rise / Fall: combines momentum, trend, volatility and signal stability.
+        High-speed tick momentum plays using direction persistence, trend and live-tick stability.
       </p>
     </button>
 
@@ -1279,7 +1278,7 @@
       <span class="lock">▣ APEX</span>
       <b>Auto Switcher</b>
       <p>
-        Direction manager only: switches Rise ↔ Fall from its own validated trend rule.
+        Automatically switches between Rise and Fall using the current live directional signal.
       </p>
     </button>
 
@@ -1327,13 +1326,12 @@
   </div>
 
   <button class="run" id="premiumRunBtn"
-    style="background:linear-gradient(100deg,#ffc629,#a450ef);color:#111"
-    disabled>
-    ▣ &nbsp;Premium access not configured
+    style="background:linear-gradient(100deg,#ffc629,#a450ef);color:#111">
+    ▣ &nbsp;Start Premium Demo Run
   </button>
 
   <div class="message" id="premiumMessage">
-    Premium subscription access is not configured yet. No Premium orders are enabled.
+    Choose one of the four strategies. Demo execution only; real-money trading is disabled.
   </div>
 
   <div class="transactions" id="transactionsPremium">
@@ -1378,20 +1376,7 @@
 </section>
 
 
-<section class="card panels" id="pricing">
 
-  <div class="heading">
-    <div>
-      <h1>AI Pricing</h1>
-      <div class="subtitle">Nexora AI Free and Premium</div>
-    </div>
-  </div>
-
-  <p class="manualnote">
-    Choose Nexora AI Free or Nexora AI Premium from the tabs above.
-  </p>
-
-</section>
 
 
 <p class="foot">
@@ -3311,7 +3296,8 @@ window.CASPER_ENGINE = (() => {
 
   let signedIn=false;
 
-  let premiumOwner=false;
+  // Creation build: all four Premium strategy cards are available for Demo testing.
+  let premiumOwner=true;
 
   const balanceSockets=new Map();
 
@@ -4077,6 +4063,65 @@ window.CASPER_ENGINE = (() => {
 
   function getFreeCandidate(){
 
+    // Premium strategies have independent selection and filters; only the
+    // verified Demo execution, settlement, ledger and risk controls are shared.
+    if(['Matches Printer','Over 8 Killer','TickStrike Pro','Auto Switcher'].includes(activeStrategy)){
+      const symbol=market.value===SMART_VALUE?smartSelectedSymbol:market.value;
+      if(!symbol||!names[symbol])return null;
+      const snap=casperEngine.snapshot(symbol);
+      if(!snap||!snap.ready||!snap.features?.ready)return null;
+
+      let signal=null, validationRecord=null;
+      if(activeStrategy==='Matches Printer'){
+        signal=snap.signals?.match;
+        validationRecord=snap.validation?.strategies?.match;
+      }else if(activeStrategy==='Over 8 Killer'){
+        signal=snap.signals?.over8;
+        validationRecord=snap.validation?.strategies?.over8;
+      }else{
+        signal=snap.signals?.riseFall;
+        validationRecord=snap.validation?.strategies?.riseFall;
+      }
+      if(!signal?.actionable||!validationRecord)return null;
+      const hasLowerBound=validationRecord.lowerBound!==null&&validationRecord.lowerBound!==undefined&&Number.isFinite(Number(validationRecord.lowerBound));
+      const validation={
+        ...validationRecord,
+        lowerBound:hasLowerBound
+          ? Number(validationRecord.lowerBound)
+          : smartWilsonLowerBound(validationRecord.accuracy,validationRecord.total)
+      };
+      const total=Number(validation.total||0);
+      const recentTotal=Number(validation.recentTotal||0);
+      const recentAccuracy=Number(validation.recentAccuracy);
+      if(total<8)return null;
+      if(total>=60){
+        if(!Number.isFinite(Number(validation.lowerBound))||Number(validation.lowerBound)<.52)return null;
+        if(Number(validation.accuracy)<.50)return null;
+        if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.45)return null;
+      }else{
+        if(Number(signal.confidence||0)<.64||Number(signal.score||0)<.60)return null;
+        if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.40)return null;
+      }
+      const features=snap.features;
+      if(activeStrategy==='TickStrike Pro'){
+        const momentum=Number(features.price?.momentum||0);
+        const stability=Number(features.direction?.stability||0);
+        const aligned=signal.direction==='RISE'?momentum>0:signal.direction==='FALL'?momentum<0:false;
+        if(Number(signal.confidence||0)<.68||stability<.35||Math.abs(momentum)<.02||!aligned)return null;
+      }
+      if(activeStrategy==='Auto Switcher'){
+        const directionScore=Number(features.direction?.direction20||0);
+        if(Number(signal.confidence||0)<.64||Math.abs(directionScore)<.08)return null;
+      }
+      const direction=activeStrategy==='Over 8 Killer'?'OVER_8':signal.direction;
+      return {
+        symbol, strategy:activeStrategy, baseStrategy:activeStrategy, direction,
+        digit:signal.digit, confidence:Number(signal.confidence||0), score:Number(signal.score||0),
+        reason:signal.reason||'premium_strategy_signal', snapshot:snap, validation,
+        executionTier:total<60?'demo_calibration':'validated'
+      };
+    }
+
     if(activeStrategy==='Smart AI'){
 
       /* Never recompute a different candidate between the Smart AI card and
@@ -4465,7 +4510,7 @@ window.CASPER_ENGINE = (() => {
       }
 
       $('#runMessage').textContent=
-        `Smart AI selected ${names[candidate.symbol]||candidate.symbol} · ${candidate.strategy} · ${candidate.direction||''} · ${(candidate.confidence*100).toFixed(1)}% · ${candidate.executionTier||'validated'} · executing Demo`;
+        `${candidate.strategy} selected ${names[candidate.symbol]||candidate.symbol} · ${candidate.direction||''} · ${(candidate.confidence*100).toFixed(1)}% · ${candidate.executionTier||'validated'} · executing Demo`;
 
       const result=await executeDemoTradeOnce(candidate);
 
@@ -4479,7 +4524,7 @@ window.CASPER_ENGINE = (() => {
         if(demoAutoRun&&serial===demoRunSerial&&isRecoverableDemoError(result.message||result.reason||'')){
           executionRecoveryAttempts++;
           $('#runMessage').textContent=
-            `Live execution connection recovered · resuming Smart AI scan (${executionRecoveryAttempts})…`;
+            `Demo execution connection recovered · resuming ${activeStrategy} scan (${executionRecoveryAttempts})…`;
           closeTradeSocket();
           await sleep(Math.min(1200,250*executionRecoveryAttempts));
           continue;
@@ -4489,7 +4534,7 @@ window.CASPER_ENGINE = (() => {
            session. Keep scanning unless the user/risk guard stopped it. */
         executionRecoveryAttempts++;
         $('#runMessage').textContent=
-          `Demo execution retry ${executionRecoveryAttempts} · Smart AI is continuing to scan for a fresh setup…`;
+          `Demo execution retry ${executionRecoveryAttempts} · ${activeStrategy} is scanning for a fresh setup…`;
         await sleep(Math.min(1000,200*executionRecoveryAttempts));
         continue;
       }
@@ -4704,7 +4749,7 @@ window.CASPER_ENGINE = (() => {
     const list=$(targetId);
     if(!list)return;
     const history=readDemoHistory().slice(0,12);
-    const activeMarkup=targetId==='#txListFree'?renderActiveContractRow():'';
+    const activeMarkup=renderActiveContractRow();
 
     if(!history.length&&!activeMarkup){
       list.innerHTML=`<div class="txempty">${demoAutoRun?'Scanning live markets for the next qualified Demo transaction…':'No Demo transactions yet.'}</div>`;
@@ -5244,8 +5289,13 @@ window.CASPER_ENGINE = (() => {
 
   function strategyToContract(candidate){
 
+    if(candidate.strategy==='Matches Printer')return 'DIGITMATCH';
+    if(candidate.strategy==='Over 8 Killer')return 'DIGITOVER';
+
     if(
-      candidate.strategy==='Rise & Fall'
+      candidate.strategy==='Rise & Fall' ||
+      candidate.strategy==='TickStrike Pro' ||
+      candidate.strategy==='Auto Switcher'
     ){
 
       return candidate.direction==='RISE'
@@ -5386,6 +5436,9 @@ window.CASPER_ENGINE = (() => {
 
           contract_type:contractType,
 
+          ...(candidate.strategy==='Matches Printer'?{barrier:String(candidate.digit)}:{}),
+          ...(candidate.strategy==='Over 8 Killer'?{barrier:'8'}:{}),
+
           currency,
 
           duration:1,
@@ -5474,12 +5527,27 @@ window.CASPER_ENGINE = (() => {
       const latestEpoch=Number(latestSnapshot?.lastEpoch||0);
       if(candidateEpoch>0&&latestEpoch>0&&latestEpoch!==candidateEpoch){
         let latestSignal=null;
-        if(candidate.strategy==='Rise & Fall') latestSignal=latestSnapshot.signals?.riseFall;
+        if(candidate.strategy==='Rise & Fall'||candidate.strategy==='TickStrike Pro'||candidate.strategy==='Auto Switcher') latestSignal=latestSnapshot.signals?.riseFall;
+        else if(candidate.strategy==='Matches Printer') latestSignal=latestSnapshot.signals?.match;
+        else if(candidate.strategy==='Over 8 Killer') latestSignal=latestSnapshot.signals?.over8;
         else if(candidate.strategy==='Even & Odd') latestSignal=latestSnapshot.signals?.parity;
         else if(candidate.strategy==='Mix Both') latestSignal=latestSnapshot.signals?.mixBoth;
-        const sameDirection=Boolean(latestSignal?.actionable)&&
-          String(latestSignal.direction||'').toUpperCase()===String(candidate.direction||'').toUpperCase()&&
-          strategyToContract({...candidate, direction:latestSignal.direction})===contractType;
+        const freshDirection=candidate.strategy==='Over 8 Killer'?'OVER_8':latestSignal?.direction;
+        let premiumFreshFilter=true;
+        if(candidate.strategy==='TickStrike Pro'){
+          const f=latestSnapshot?.features||{};
+          const momentum=Number(f.price?.momentum||0);
+          premiumFreshFilter=Number(f.direction?.stability||0)>=.35&&Math.abs(momentum)>=.02&&
+            (freshDirection==='RISE'?momentum>0:freshDirection==='FALL'?momentum<0:false);
+        }else if(candidate.strategy==='Auto Switcher'){
+          const f=latestSnapshot?.features||{};
+          const directionalScore=Number(f.direction?.direction20||0);
+          premiumFreshFilter=Math.abs(directionalScore)>=.08&&
+            (freshDirection==='RISE'?directionalScore>0:freshDirection==='FALL'?directionalScore<0:false);
+        }
+        const sameDirection=Boolean(latestSignal?.actionable)&&premiumFreshFilter&&
+          String(freshDirection||'').toUpperCase()===String(candidate.direction||'').toUpperCase()&&
+          strategyToContract({...candidate, direction:freshDirection, digit:latestSignal?.digit??candidate.digit})===contractType;
         const freshConfidence=Number(latestSignal?.confidence||0);
         const freshScore=Number(latestSignal?.score||0);
         const freshMinimum=candidate.executionTier==='demo_calibration' ? .64 : .585;
@@ -6251,19 +6319,6 @@ window.CASPER_ENGINE = (() => {
               : 'free';
 
 
-          if(
-            p==='premium'&&
-            !premiumOwner
-          ){
-
-            showToast(
-              'Premium access is not configured for this account.'
-            );
-
-            return;
-          }
-
-
           $$(`#${p} .strategy`)
             .forEach(
               x=>
@@ -6305,7 +6360,7 @@ window.CASPER_ENGINE = (() => {
           }else{
 
             $('#premiumMessage').textContent=
-              `${activeStrategy} selected · Premium execution remains locked until access is configured.`;
+              `${activeStrategy} selected · ready for Demo testing. Real-money execution remains disabled.`;
           }
 
 
@@ -6367,8 +6422,8 @@ window.CASPER_ENGINE = (() => {
     resetDemoSession(true);
     $('#premiumMessage').textContent=
       premiumOwner
-        ? 'Premium session reset · Premium execution remains disabled until configured.'
-        : 'Premium subscription access is not configured yet. No Premium orders are enabled.';
+        ? 'Premium Demo session reset · select a strategy to continue testing.'
+        : 'Creation mode: select any strategy and test it on Deriv Demo. Real-money execution is disabled.';
     showToast('Demo transactions reset');
   });
 
@@ -6696,40 +6751,25 @@ window.CASPER_ENGINE = (() => {
           !data.accounts?.length
         );
 
-      $('#ownerPanel')
-        .classList
-        .toggle(
-          'hidden',
-          !premiumOwner
-        );
+      $('#ownerPanel').classList.add('hidden');
 
-      $('#unlockBtn').textContent=
-        premiumOwner
-          ? '♛  Owner Premium active'
-          : '♛  Premium access';
+      $('#unlockBtn').textContent='♛  Creation Mode';
 
       $('#premiumSubtitle').textContent=
         premiumOwner
           ? 'Owner access enabled for this Deriv account'
-          : 'Premium access for subscribed accounts';
+          : 'Creation build · all four strategies available for Demo testing';
 
       $('#ownerStatus').textContent=
         premiumOwner
-          ? 'This Deriv account is on the private owner allowlist. Premium controls are unlocked, but Premium order execution remains disabled until the Premium system is configured.'
-          : 'Premium subscription access is not configured yet.';
+          ? 'Creation build: Premium strategies are enabled for Demo testing. Real-money execution remains disabled.'
+          : 'Creation mode: Premium strategies are available for Demo testing.';
 
       $$('#premium .strategy')
-        .forEach(
-          button=>{
-
-            button.disabled=!premiumOwner;
-
-            button.classList.toggle(
-              'locked',
-              !premiumOwner
-            );
-          }
-        );
+        .forEach(button=>{
+          button.disabled=false;
+          button.classList.remove('locked');
+        });
 
 
       if(signedIn){
@@ -6813,20 +6853,16 @@ window.CASPER_ENGINE = (() => {
           .add('hidden');
 
         $('#unlockBtn').textContent=
-          '♛  Premium access';
+          '♛  Creation Mode';
 
         $('#premiumSubtitle').textContent=
-          'Premium access for subscribed accounts';
+          'Creation build · all four strategies available for Demo testing';
 
         $$('#premium .strategy')
-          .forEach(
-            button=>{
-
-              button.disabled=true;
-
-              button.classList.add('locked');
-            }
-          );
+          .forEach(button=>{
+            button.disabled=false;
+            button.classList.remove('locked');
+          });
       }
 
       updateRunButton();
@@ -6846,14 +6882,10 @@ window.CASPER_ENGINE = (() => {
         .add('hidden');
 
       $$('#premium .strategy')
-        .forEach(
-          button=>{
-
-            button.disabled=true;
-
-            button.classList.add('locked');
-          }
-        );
+        .forEach(button=>{
+          button.disabled=false;
+          button.classList.remove('locked');
+        });
 
       $('#loginBtn').textContent=
         'Login with Deriv';
@@ -7050,8 +7082,8 @@ window.CASPER_ENGINE = (() => {
 
       showToast(
         premiumOwner
-          ? 'Owner Premium access is active, but Premium execution is not enabled yet.'
-          : 'Premium subscription access is not configured yet.'
+          ? 'Creation mode: all four strategies are available for Demo testing.'
+          : 'Creation mode: Premium strategies are available for Demo testing.'
       );
     }
   );
@@ -7060,10 +7092,22 @@ window.CASPER_ENGINE = (() => {
   $('#premiumRunBtn').addEventListener(
     'click',
     ()=>{
-
-      showToast(
-        'Premium execution is locked until Premium access and strategy execution are configured.'
-      );
+      if(!signedIn){showToast('Sign in with Deriv first.');return;}
+      if(!selectedAccountIsDemo()){showToast('Choose a Demo account. Real-money execution is disabled.');return;}
+      const selectedPremium=$('#premium .strategy.selected');
+      if(selectedPremium){
+        if(activeStrategy==='Smart AI')leaveSmartMode();
+        activeStrategy=selectedPremium.dataset.strategy;
+      }
+      if(!['Matches Printer','Over 8 Killer','TickStrike Pro','Auto Switcher'].includes(activeStrategy)){
+        showToast('Select one of the four Premium strategies first.');return;
+      }
+      market.value=marketPremium.value||market.value;
+      $('#stake').value=$('#stakePremium').value;
+      $('#target').value=$('#targetPremium').value;
+      $('#maxloss').value=$('#lossPremium').value;
+      $('#premiumMessage').textContent=`${activeStrategy} Demo session running · results use confirmed Deriv settlements; no win rate is guaranteed.`;
+      startDemoRun();
     }
   );
 
@@ -7240,7 +7284,7 @@ window.CASPER_ENGINE = (() => {
   );
 
   console.info(
-    '[CASPER] Premium execution is disabled until Premium access is configured.'
+    '[CASPER] Premium strategies are available for Demo testing in creation mode.'
   );
 
   renderTransactions();
@@ -7260,5 +7304,3 @@ window.CASPER_ENGINE = (() => {
 
 </body>
 </html>
-
-
