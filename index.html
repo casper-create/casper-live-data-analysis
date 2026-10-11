@@ -3887,7 +3887,13 @@ window.CASPER_ENGINE = (() => {
     }
 
     const ranked=casperEngine.smartAI();
-    const rankedEligible=ranked.filter(x=>x&&x.eligible);
+    /* Card scope is authoritative: Auto-select evaluates all markets; a
+       specific market card limits Smart AI to that market only. */
+    const selectedCardMarket=market.value!==SMART_VALUE?market.value:null;
+    const scopedRanked=selectedCardMarket
+      ? ranked.filter(x=>x&&x.symbol===selectedCardMarket)
+      : ranked;
+    const rankedEligible=scopedRanked.filter(x=>x&&x.eligible);
 
     /*
       Smart AI does NOT simply take the engine's first row anymore.
@@ -5322,7 +5328,7 @@ window.CASPER_ENGINE = (() => {
     }
 
     const candidate=candidateOverride||getFreeCandidate();
-    if(!candidate){ return {error:true,reason:'no_candidate'}; }
+    if(!candidate){ return {error:true,reason:'no_candidate',message:'No qualified live candidate yet.'}; }
 
     const contractType=
       strategyToContract(candidate);
@@ -5333,7 +5339,7 @@ window.CASPER_ENGINE = (() => {
         'This Free strategy does not have a Demo contract mapping yet.'
       );
 
-      return;
+      return {error:true,reason:'missing_contract_mapping',message:'Free strategy has no supported Demo contract mapping.'};
     }
 
     const symbol=
@@ -5388,10 +5394,9 @@ window.CASPER_ENGINE = (() => {
 
           underlying_symbol:symbol,
 
-          /* New Deriv Options WebSocket proposal flow supports a proposal
-             subscription. Keep the quote tied to this authenticated socket
-             so the returned proposal ID can be bought on the same session. */
-          subscribe:1
+          /* One-shot quote: this fast executor needs a single proposal ID,
+             not a persistent quote stream. Avoid duplicate proposal-subscription
+             errors when the continuous loop requests the next contract. */
         });
 
       const proposal=
