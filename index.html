@@ -5425,39 +5425,49 @@ window.CASPER_ENGINE = (() => {
         - selected Free strategy
         - selected market
       */
-      const proposalResponse=
-        await sendTradeRequest({
+      // Build and validate the exact Deriv proposal parameters before sending.
+      // Digit contracts require a numeric last-digit barrier from 0 through 9.
+      const proposalPayload={
+        proposal:1,
+        amount:Number(stake),
+        basis:'stake',
+        contract_type:contractType,
+        currency:String(currency||'USD'),
+        duration:1,
+        duration_unit:'t',
+        underlying_symbol:String(symbol||'')
+      };
 
-          proposal:1,
+      if(candidate.strategy==='Matches Printer'){
+        const digit=Number(candidate.digit);
+        if(!Number.isInteger(digit)||digit<0||digit>9){
+          throw new Error(`Matches Printer has no valid digit barrier (received ${String(candidate.digit)}). No proposal was sent.`);
+        }
+        proposalPayload.barrier=String(digit);
+      }else if(candidate.strategy==='Over 8 Killer'){
+        proposalPayload.barrier='8';
+      }
 
-          amount:stake,
+      if(!proposalPayload.underlying_symbol){
+        throw new Error('Invalid market symbol. Select a supported Volatility market and try again.');
+      }
+      if(!Number.isFinite(proposalPayload.amount)||proposalPayload.amount<0.35){
+        throw new Error('Invalid stake amount. Enter at least 0.35 in the account currency.');
+      }
+      if(!['CALL','PUT','DIGITMATCH','DIGITOVER','DIGITEVEN','DIGITODD'].includes(proposalPayload.contract_type)){
+        throw new Error(`Unsupported contract type: ${String(proposalPayload.contract_type)}. No proposal was sent.`);
+      }
 
-          basis:'stake',
-
-          contract_type:contractType,
-
-          ...(candidate.strategy==='Matches Printer'?{barrier:String(candidate.digit)}:{}),
-          ...(candidate.strategy==='Over 8 Killer'?{barrier:'8'}:{}),
-
-          currency,
-
-          duration:1,
-
-          duration_unit:'t',
-
-          underlying_symbol:symbol,
-
-          /* One-shot quote: this fast executor needs a single proposal ID,
-             not a persistent quote stream. Avoid duplicate proposal-subscription
-             errors when the continuous loop requests the next contract. */
-        });
+      const proposalResponse=await sendTradeRequest(proposalPayload);
 
       const proposal=
         proposalResponse.proposal;
 
       if(proposalResponse.error){
         const apiError=proposalResponse.error;
-        throw new Error([apiError.code,apiError.message].filter(Boolean).join(': ')||'Deriv rejected the contract proposal.');
+        const details=[apiError.code,apiError.message].filter(Boolean).join(': ');
+        console.error('[CASPER] Deriv proposal rejected:',{details,request:proposalPayload,response:proposalResponse});
+        throw new Error(details||'Deriv rejected the contract proposal; check the browser console for the request and response details.');
       }
 
       if(proposalResponse.msg_type!=='proposal'||!proposal?.id){
