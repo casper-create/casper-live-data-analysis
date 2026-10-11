@@ -1331,7 +1331,7 @@
   </button>
 
   <div class="message" id="premiumMessage">
-    Choose one of the four strategies. Demo execution only; real-money trading is disabled.
+    Select a strategy, sign in, choose a Demo account, then start. Scan status, proposal errors, and confirmed trade results appear here. Real-money trading is disabled.
   </div>
 
   <div class="transactions" id="transactionsPremium">
@@ -3214,6 +3214,20 @@ window.CASPER_ENGINE = (() => {
   let retryTimer=null;
 
   let activeStrategy='Smart AI';
+  const premiumStrategyNames=new Set(['Matches Printer','Over 8 Killer','TickStrike Pro','Auto Switcher']);
+
+  // Mirror the shared engine's status into the Premium screen. Previously the
+  // execution loop updated only #runMessage inside the Free tab, making Premium
+  // appear idle even while it was scanning or handling proposal errors.
+  const runMessageNode=$('#runMessage');
+  if(runMessageNode&&typeof MutationObserver!=='undefined'){
+    const runMessageObserver=new MutationObserver(()=>{
+      if(!premiumStrategyNames.has(activeStrategy))return;
+      const message=runMessageNode.textContent.trim();
+      if(message&&$('#premiumMessage'))$('#premiumMessage').textContent=message;
+    });
+    runMessageObserver.observe(runMessageNode,{childList:true,characterData:true,subtree:true});
+  }
 
   let manualMarket='1HZ100V';
 
@@ -3442,6 +3456,17 @@ window.CASPER_ENGINE = (() => {
     if(overlay)overlay.classList.add('hidden');
     if(scanView)scanView.classList.remove('hidden');
     if(transactionView)transactionView.classList.add('hidden');
+
+    // A Premium run must keep the Premium panel visible. The previous code
+    // always focused the Free transaction list, hiding the Premium feedback.
+    if(premiumStrategyNames.has(activeStrategy)){
+      const freePanel=$('#free');
+      if(freePanel)freePanel.classList.remove('transaction-focus');
+      renderTransactions();
+      const premiumList=$('#transactionsPremium');
+      if(premiumList)premiumList.scrollIntoView({behavior:'smooth',block:'start'});
+      return;
+    }
     const freePanel=$('#free');
     if(freePanel)freePanel.classList.add('transaction-focus');
     renderTransactions();
@@ -4366,6 +4391,25 @@ window.CASPER_ENGINE = (() => {
 
 
   function updateRunButton(){
+    const premiumButton=$('#premiumRunBtn');
+    if(premiumButton){
+      if(demoAutoRun){
+        premiumButton.disabled=true;
+        premiumButton.textContent='⟳  Premium Demo session running…';
+      }else if(!signedIn){
+        premiumButton.disabled=true;
+        premiumButton.textContent='▷  Sign in with Deriv first';
+      }else if(!selectedAccountIsDemo()){
+        premiumButton.disabled=true;
+        premiumButton.textContent='▷  Choose a Demo account';
+      }else if(demoRiskStatus().blocked){
+        premiumButton.disabled=true;
+        premiumButton.textContent='✓  Demo risk limit reached';
+      }else{
+        premiumButton.disabled=false;
+        premiumButton.textContent='▣  Start Premium Demo Run';
+      }
+    }
     const button=$('#runBtn');
     if(!button)return;
 
@@ -4494,6 +4538,9 @@ window.CASPER_ENGINE = (() => {
           }
         }
         $('#runMessage').textContent=continuousScanMessage();
+        if(premiumStrategyNames.has(activeStrategy)){
+          $('#premiumMessage').textContent=`${activeStrategy} · ${continuousScanMessage()} No qualifying signal yet; no trade has been placed.`;
+        }
         continue;
       }
 
@@ -4552,8 +4599,9 @@ window.CASPER_ENGINE = (() => {
         break;
       }
 
-      $('#runMessage').textContent=
-        `Demo result · ${result.profit>=0?'+':''}${Number(result.profit||0).toFixed(2)} USD · ${candidate.strategy} · ${names[candidate.symbol]||candidate.symbol} · ${demoSessionTrades} trades · ${continuousScanMessage()}`;
+      const settledMessage=`Demo result · ${result.profit>=0?'+':''}${Number(result.profit||0).toFixed(2)} USD · ${candidate.strategy} · ${names[candidate.symbol]||candidate.symbol} · ${demoSessionTrades} trades · ${continuousScanMessage()}`;
+      $('#runMessage').textContent=settledMessage;
+      if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=settledMessage;
 
       /* No artificial post-trade delay. The next real market tick drives
          the next scan, just like a live trading engine. */
@@ -5411,8 +5459,9 @@ window.CASPER_ENGINE = (() => {
 
     updateRunButton();
 
-    $('#runMessage').textContent=
-      `Preparing Demo proposal · ${names[symbol]} · ${candidate.strategy} · ${candidate.direction||''} · confidence ${(candidate.confidence*100).toFixed(1)}%`;
+    const proposalStatus=`Preparing Demo proposal · ${names[symbol]||symbol} · ${candidate.strategy} · ${candidate.direction||''} · confidence ${(candidate.confidence*100).toFixed(1)}%`;
+    $('#runMessage').textContent=proposalStatus;
+    if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=proposalStatus;
 
     try{
 
@@ -5899,8 +5948,9 @@ window.CASPER_ENGINE = (() => {
         error
       );
 
-      $('#runMessage').textContent=
-        `Demo execution stopped · ${error.message||'Unknown Deriv error'}`;
+      const executionErrorMessage=`Demo execution stopped · ${error.message||'Unknown Deriv error'}`;
+      $('#runMessage').textContent=executionErrorMessage;
+      if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=executionErrorMessage;
 
       updateTransactionOverlay({
         heading:'Execution retry',
