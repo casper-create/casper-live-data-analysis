@@ -5429,8 +5429,8 @@ window.CASPER_ENGINE = (() => {
       }
 
       /* V16 payout-aware entry gate. The real proposal gives the actual gross
-         payout for this exact market, contract and stake. The measured 95% lower
-         confidence bound must clear break-even plus a safety margin before BUY. */
+         payout for this exact market, contract and stake. For mature validation,
+         the measured Wilson lower confidence bound must clear break-even plus a safety margin before BUY. */
       const quotedPayout=Number(proposal.payout);
       const validation=candidate.validation||{};
       const observedLowerBound=Number(validation.lowerBound);
@@ -5464,14 +5464,31 @@ window.CASPER_ENGINE = (() => {
         }
       }
 
-      /* A signal is valid only for the market state that produced it. If a new
-         tick arrived while Deriv was returning the proposal, do not buy against
-         an expired prediction; return to the scanner and evaluate the new tick. */
+      /* Revalidate against the newest tick rather than rejecting every proposal
+         merely because a tick arrived during the network round-trip. On fast
+         Volatility feeds that old check could reject nearly every trade. The
+         contract direction must still match a fresh actionable signal; if it
+         changed, skip safely and let the scanner choose again. */
       const candidateEpoch=Number(candidate.snapshot?.lastEpoch||candidate.snapshot?.features?.epoch||candidate.snapshot?.features?.lastEpoch||0);
       const latestSnapshot=casperEngine.snapshot(symbol);
       const latestEpoch=Number(latestSnapshot?.lastEpoch||0);
       if(candidateEpoch>0&&latestEpoch>0&&latestEpoch!==candidateEpoch){
-        throw new Error('Smart AI skipped before purchase: a newer live tick arrived after this signal. Re-scanning the fresh market state. No contract was bought.');
+        let latestSignal=null;
+        if(candidate.strategy==='Rise & Fall') latestSignal=latestSnapshot.signals?.riseFall;
+        else if(candidate.strategy==='Even & Odd') latestSignal=latestSnapshot.signals?.parity;
+        else if(candidate.strategy==='Mix Both') latestSignal=latestSnapshot.signals?.mixBoth;
+        const sameDirection=Boolean(latestSignal?.actionable)&&
+          String(latestSignal.direction||'').toUpperCase()===String(candidate.direction||'').toUpperCase()&&
+          strategyToContract({...candidate, direction:latestSignal.direction})===contractType;
+        const freshConfidence=Number(latestSignal?.confidence||0);
+        const freshScore=Number(latestSignal?.score||0);
+        const freshMinimum=candidate.executionTier==='demo_calibration' ? .64 : .585;
+        if(!latestSnapshot.ready||!sameDirection||freshConfidence<freshMinimum){
+          throw new Error('Signal changed while the Demo proposal was loading. No contract was bought; scanning the newest market state.');
+        }
+        candidate.snapshot=latestSnapshot;
+        candidate.confidence=freshConfidence;
+        candidate.score=freshScore||candidate.score;
       }
 
       updateTransactionOverlay({
@@ -7243,3 +7260,5 @@ window.CASPER_ENGINE = (() => {
 
 </body>
 </html>
+
+
