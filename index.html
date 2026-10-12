@@ -899,6 +899,30 @@
     .txlive{color:var(--cyan);font-size:10px;font-weight:850;letter-spacing:.04em}
     .txsell{border:1px solid #7b3344;background:#24131a;color:#ff9aaa;border-radius:7px;min-height:28px;padding:4px 8px;font-size:11px;font-weight:850;white-space:nowrap}
     .txsell:disabled{opacity:.42;cursor:not-allowed}
+    /* Reference-video transaction layout: vertically stacked compact rows, not a horizontal data table. */
+    .txcolumns{display:none!important}
+    .txlist{max-height:min(48vh,520px);overflow-y:auto;overflow-x:hidden;background:#f7fafc;color:#17232b}
+    .txrow{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px 13px;background:#f7fafc;color:#17232b;border-top:1px solid #e1e8ed;min-height:58px}
+    .txrow:first-child{border-top:0}
+    .txrowMain{min-width:0}
+    .txmarketLine{display:flex;align-items:center;gap:8px;min-width:0}
+    .txmarketIcon{color:#d75d66;font-size:14px}
+    .txmarket{font-size:12px;font-weight:800;color:#1d2932;line-height:1.25;overflow-wrap:anywhere}
+    .txmeta,.txdetail{display:block;color:#63717b;font-size:10px;line-height:1.35;margin-top:3px}
+    .txrowRight{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:5px;min-width:74px}
+    .txpl{font-size:13px;font-weight:900;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+    .txpl.win{color:#16806c}.txpl.loss{color:#b8445b}.txpl.flat{color:#687780}
+    .txrow .txcell{min-width:0;overflow-wrap:anywhere}
+    .txrow .txcell:nth-child(2),.txrow .txcell:nth-child(3){display:none}
+    .txrow .txcell:first-child{min-width:0}
+    .txrow .txcell:first-child .txdetail:nth-of-type(2){font-size:10px}
+    .txrow-active{background:#f7fafc;border-top-color:#dce5e9}
+    .txlive{color:#087e70;font-size:10px;font-weight:850}
+    .txsell{border:1px solid #e2b8be;background:#fff5f6;color:#a6384b;border-radius:7px;min-height:27px;padding:4px 8px;font-size:11px;font-weight:850;white-space:nowrap}
+    .txstats{background:#f7fafc;color:#1d2932;border-top:1px solid #e1e8ed}
+    .txstat{border-color:#e1e8ed!important;background:#f7fafc!important}
+    .txstat small{color:#65737d!important}.txstat strong{color:#1d2932!important}.txstat strong.good{color:#16806c!important}.txstat strong.bad{color:#b8445b!important}
+    @media(max-width:520px){.txlist{max-height:52vh}.txrow{padding:11px 10px;gap:8px}.txmarket{font-size:12px}.txpl{font-size:13px}}
     .sessionResultOverlay{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:18px;background:#01080ddd;backdrop-filter:blur(7px)}
     .sessionResultOverlay.hidden{display:none}
     .sessionResultPanel{position:relative;width:min(390px,100%);padding:25px 20px 20px;border:1px solid #176b63;border-radius:18px;background:linear-gradient(180deg,#f6fbfa,#e8f3f2);color:#16333a;box-shadow:0 25px 90px #0009;text-align:center}
@@ -4882,38 +4906,25 @@ window.CASPER_ENGINE = (() => {
   function renderActiveContractRow(){
     const trade=activeDemoContract;
     if(!trade)return '';
-    const plValue=trade.profit!==null&&trade.profit!==undefined&&Number.isFinite(Number(trade.profit))
+    const buy=Number(trade.buyPrice);
+    const value=Number(trade.value);
+    let plValue=(trade.profit!==null&&trade.profit!==undefined&&Number.isFinite(Number(trade.profit)))
       ? Number(trade.profit)
-      : null;
+      : (Number.isFinite(buy)&&Number.isFinite(value)?value-buy:null);
     const plClass=plValue===null?'flat':plValue>0?'win':plValue<0?'loss':'flat';
-    const plText=plValue===null?'OPEN':`${plValue>0?'+':''}${plValue.toFixed(2)} ${escapeHTML(trade.currency||'USD')}`;
-    const buyPrice=Number.isFinite(Number(trade.buyPrice))?formatMoney(Number(trade.buyPrice),trade.currency||'USD'):'—';
-    const quotedPayout=trade.quotedPayout!==null&&trade.quotedPayout!==undefined&&Number.isFinite(Number(trade.quotedPayout))?formatMoney(Number(trade.quotedPayout),trade.currency||'USD'):'Awaiting quote';
-    const currentValue=trade.value!==null&&trade.value!==undefined&&Number.isFinite(Number(trade.value))?formatMoney(Number(trade.value),trade.currency||'USD'):'—';
-    const time=trade.timestamp
-      ? new Date(trade.timestamp).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
-      : 'Live';
-    const entry=formatSpot(trade.entrySpot)||'—';
-    const exit=formatSpot(trade.exitSpot||trade.currentSpot)||'—';
+    const plText=plValue===null?'LIVE':`${plValue>0?'+':''}${plValue.toFixed(2)} ${escapeHTML(trade.currency||'USD')}`;
+    const quotedPayout=Number.isFinite(Number(trade.quotedPayout))?formatMoney(Number(trade.quotedPayout),trade.currency||'USD'):'—';
+    const currentValue=Number.isFinite(value)?formatMoney(value,trade.currency||'USD'):'—';
+    const time=trade.timestamp?new Date(trade.timestamp).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Live';
+    const stake=Number.isFinite(buy)?formatMoney(buy,trade.currency||'USD'):'—';
     const id=escapeHTML(trade.contractId||'pending');
-    return `
-      <div class="txrow txrow-active" data-active-contract="${id}">
-        <div class="txcell">
-          <div class="txmarketLine"><span class="txmarketIcon" aria-hidden="true">✣</span><div class="txmarket">${escapeHTML(trade.marketName||trade.symbol||'Deriv market')}</div></div>
-          <span class="txdetail">${escapeHTML(time)} · ${escapeHTML(trade.strategy||'Strategy')} · ${escapeHTML(trade.direction||'')}</span>
-          <span class="txdetail">Contract #${id} · <span class="txlive">${plValue===null?'LIVE':'SETTLED'}</span></span>
-        </div>
-        <div class="txcell">
-          <span class="txdetail">Entry</span><strong>${escapeHTML(entry)}</strong>
-          <span class="txdetail">Exit / current</span><strong>${escapeHTML(exit)}</strong>
-        </div>
-        <div class="txcell">
-          <span class="txdetail">Buy price</span><strong>${escapeHTML(buyPrice)}</strong>
-          <span class="txdetail">Quoted payout</span><strong>${escapeHTML(quotedPayout)}</strong>
-          <span class="txdetail">Current contract value</span><strong>${escapeHTML(currentValue)}</strong>
-          <span class="txdetail">Profit / loss</span><strong class="txpl ${plClass}">${plText}</strong>
-        </div>
-      </div>`;
+    const canSell=Boolean(trade.canSell)&&!trade.sellPending&&trade.contractId;
+    const sellButton=canSell?`<button class="txsell" type="button" data-sell-contract="${id}">× Sell</button>`:'';
+    return `<div class="txrow txrow-active" data-active-contract="${id}">
+      <div class="txcell"><div class="txmarketLine"><span class="txmarketIcon" aria-hidden="true">↗</span><div class="txmarket">${escapeHTML(trade.marketName||trade.symbol||'Deriv market')}</div></div>
+      <span class="txdetail">Stake ${stake} · Value ${currentValue}</span></div>
+      <div class="txrowRight"><strong class="txpl ${plClass}">${plText}</strong>${sellButton}<span class="txlive">LIVE</span></div>
+    </div>`;
   }
 
   function renderTransactionList(targetId){
@@ -4921,42 +4932,23 @@ window.CASPER_ENGINE = (() => {
     if(!list)return;
     const history=readDemoHistory().slice(0,12);
     const activeMarkup=renderActiveContractRow();
-
     if(!history.length&&!activeMarkup){
       list.innerHTML=`<div class="txempty">${demoAutoRun?'Scanning live markets for the next qualified Demo transaction…':'No Demo transactions yet.'}</div>`;
       return;
     }
-
     const historyMarkup=history.map(record=>{
       const pl=Number(record.profit)||0;
       const cls=pl>0?'win':pl<0?'loss':'flat';
       const sign=pl>0?'+':'';
-      const time=record.timestamp
-        ? new Date(record.timestamp).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
-        : '--:--';
-      const result=record.status==='won'?'WIN':record.status==='lost'?'LOSS':'CLOSED';
-      const entry=formatSpot(record.entrySpot)||'—';
-      const exit=formatSpot(record.exitSpot)||'—';
+      const time=record.timestamp?new Date(record.timestamp).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'--:--';
       const buyPrice=Number.isFinite(Number(record.buyPrice))?formatMoney(Number(record.buyPrice),record.currency||'USD'):'—';
       const payout=Number.isFinite(Number(record.payout))?formatMoney(Number(record.payout),record.currency||'USD'):'—';
-      const id=escapeHTML(record.contractId||'—');
-      return `
-        <div class="txrow">
-          <div class="txcell">
-            <div class="txmarketLine"><span class="txmarketIcon" aria-hidden="true">✣</span><div class="txmarket">${escapeHTML(record.marketName||record.market||'Deriv market')}</div></div>
-            <span class="txdetail">${escapeHTML(time)} · ${escapeHTML(record.strategy||'Strategy')} · ${escapeHTML(record.direction||'')} · ${result}</span>
-            <span class="txdetail">Contract #${id}</span>
-          </div>
-          <div class="txcell">
-            <span class="txdetail">Entry</span><strong>${escapeHTML(entry)}</strong>
-            <span class="txdetail">Exit</span><strong>${escapeHTML(exit)}</strong>
-          </div>
-          <div class="txcell">
-            <span class="txdetail">Buy price</span><strong>${escapeHTML(buyPrice)}</strong>
-            <span class="txdetail">Realized payout</span><strong>${escapeHTML(payout)}</strong>
-            <span class="txdetail">Profit / loss</span><strong class="txpl ${cls}">${sign}${pl.toFixed(2)} ${escapeHTML(record.currency||'USD')}</strong>
-          </div>
-        </div>`;
+      const stake=Number.isFinite(Number(record.buyPrice))?formatMoney(Number(record.buyPrice),record.currency||'USD'):'—';
+      const market=escapeHTML(record.marketName||record.market||'Deriv market');
+      const direction=escapeHTML(record.direction||'');
+      const strategy=escapeHTML(record.strategy||'Strategy');
+      const status=record.status==='won'?'WIN':record.status==='lost'?'LOSS':'CLOSED';
+      return `<div class="txrow"><div class="txcell"><div class="txmarketLine"><span class="txmarketIcon" aria-hidden="true">↗</span><div class="txmarket">${market}</div></div><span class="txdetail">${escapeHTML(time)} · Stake ${stake} · ${strategy} · ${direction}</span><span class="txdetail">${status} · Payout ${payout}</span></div><div class="txrowRight"><strong class="txpl ${cls}">${sign}${pl.toFixed(2)} ${escapeHTML(record.currency||'USD')}</strong></div></div>`;
     }).join('');
     list.innerHTML=activeMarkup+historyMarkup;
   }
@@ -6702,7 +6694,7 @@ window.CASPER_ENGINE = (() => {
   $('#stopFree').addEventListener('click',stopDemoTrading);
   $('#stopPremium').addEventListener('click',stopDemoTrading);
 
-  $('#txListFree').addEventListener('click',async event=>{
+  const handleTransactionSell=async event=>{
     const button=event.target.closest('[data-sell-contract]');
     if(!button)return;
     const contractId=String(button.dataset.sellContract||'');
@@ -6722,7 +6714,9 @@ window.CASPER_ENGINE = (() => {
       }
       showToast(`Sell unavailable · ${error?.message||'contract is no longer sellable'}`);
     }
-  });
+  };
+  $('#txListFree').addEventListener('click',handleTransactionSell);
+  $('#txListPremium').addEventListener('click',handleTransactionSell);
 
   $('#resetFree').addEventListener('click',()=>{
     resetDemoSession(true);
