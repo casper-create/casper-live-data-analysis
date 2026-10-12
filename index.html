@@ -5709,7 +5709,7 @@ window.CASPER_ENGINE = (() => {
         }
       }
 
-      const proposal=
+      let proposal=
         proposalResponse.proposal;
 
       if(proposalResponse.error){
@@ -5736,7 +5736,7 @@ window.CASPER_ENGINE = (() => {
         );
       }
 
-      const askPrice=
+      let askPrice=
         Number(
           proposal.ask_price
         );
@@ -5754,14 +5754,14 @@ window.CASPER_ENGINE = (() => {
       /* V16 payout-aware entry gate. The real proposal gives the actual gross
          payout for this exact market, contract and stake. For mature validation,
          the measured Wilson lower confidence bound must clear break-even plus a safety margin before BUY. */
-      const quotedPayout=Number(proposal.payout);
+      let quotedPayout=Number(proposal.payout);
       const validation=candidate.validation||{};
       const observedLowerBound=Number(validation.lowerBound);
       const validationSamples=Number(validation.total||0);
       if(!Number.isFinite(quotedPayout)||quotedPayout<=askPrice){
         throw new Error('Smart AI skipped this setup: Deriv did not quote a usable payout above the stake.');
       }
-      const breakEvenRate=askPrice/quotedPayout;
+      let breakEvenRate=askPrice/quotedPayout;
       const requiredLowerBound=breakEvenRate+0.025;
       const recentSamples=Number(validation.recentTotal||0);
       const recentAccuracy=Number(validation.recentAccuracy);
@@ -5865,13 +5865,58 @@ window.CASPER_ENGINE = (() => {
       /*
         Buy only on the authenticated Demo socket.
       */
-      const buyResponse=
-        await sendTradeRequest({
-
+      let buyResponse;
+      try{
+        buyResponse=await sendTradeRequest({
           buy:String(proposal.id),
-
           price:askPrice
         });
+      }catch(firstBuyError){
+        const firstBuyText=String(firstBuyError?.message||firstBuyError||'');
+        /* Deriv can invalidate a proposal before BUY reaches its server-side
+           handler. If it explicitly says the proposal is unknown, request a
+           fresh quote for the exact same contract parameters and retry BUY
+           once only. Never loop or pretend the first BUY succeeded. */
+        if(!/InvalidContractProposal|Unknown contract proposal/i.test(firstBuyText)){
+          throw firstBuyError;
+        }
+        $('#runMessage').textContent='Deriv no longer recognizes the quote. Refreshing the same Demo proposal once…';
+        if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent='Refreshing the same Demo proposal once…';
+        console.warn('[CASPER] Deriv rejected the proposal ID at BUY; requesting one fresh quote for the same Demo contract.',{
+          market:symbol, strategy:candidate.strategy, direction:candidate.direction,
+          duration:proposalPayload.duration, firstBuyError:firstBuyText
+        });
+        let refreshedResponse;
+        try{
+          refreshedResponse=await sendTradeRequest(proposalPayload);
+        }catch(refreshError){
+          throw new Error(`Deriv rejected the original proposal and the fresh-quote request also failed. No contract was bought. Original BUY error: ${firstBuyText}. Refresh error: ${String(refreshError?.message||refreshError)}`);
+        }
+        const refreshedProposal=refreshedResponse?.proposal;
+        const refreshedAsk=Number(refreshedProposal?.ask_price);
+        const refreshedPayout=Number(refreshedProposal?.payout);
+        if(refreshedResponse?.error||refreshedResponse?.msg_type!=='proposal'||!refreshedProposal?.id||!Number.isFinite(refreshedAsk)||refreshedAsk<=0||!Number.isFinite(refreshedPayout)||refreshedPayout<=refreshedAsk){
+          const reason=refreshedResponse?.error?`${refreshedResponse.error.code||'ProposalError'}: ${refreshedResponse.error.message||'fresh proposal rejected'}`:'Deriv did not return a valid fresh proposal with payout above stake';
+          throw new Error(`Deriv rejected the original proposal and the fresh quote could not be used. No contract was bought. ${reason}`);
+        }
+        const refreshedBreakEven=refreshedAsk/refreshedPayout;
+        if(validationSamples>=60&&(!Number.isFinite(observedLowerBound)||observedLowerBound<refreshedBreakEven+0.025)){
+          throw new Error('Fresh Deriv quote changed the break-even threshold; the validation gate no longer passes. No contract was bought.');
+        }
+        if(validationSamples>=60&&recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<refreshedBreakEven){
+          throw new Error('Fresh Deriv quote changed the break-even threshold; recent validation no longer passes. No contract was bought.');
+        }
+        proposal=refreshedProposal;
+        askPrice=refreshedAsk;
+        quotedPayout=refreshedPayout;
+        breakEvenRate=refreshedBreakEven;
+        $('#runMessage').textContent='Fresh Demo quote received. Sending one final BUY request…';
+        if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent='Fresh Demo quote received. Sending one final BUY request…';
+        buyResponse=await sendTradeRequest({
+          buy:String(proposal.id),
+          price:askPrice
+        });
+      }
 
       const buy=
         buyResponse.buy;
