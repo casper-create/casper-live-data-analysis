@@ -3252,7 +3252,12 @@ window.CASPER_ENGINE = (() => {
     'R_100','R_75','R_50','R_25','R_10'
   ];
   // Premium starts with known symbols, then expands from Deriv's live active_symbols response.
-  const premiumSymbols=Object.keys(names);
+  // Premium is intentionally limited to the same agreed 10 configured
+  // Volatility markets; do not expand this list from the live API registry.
+  const premiumSymbols=[
+    '1HZ100V','1HZ75V','1HZ50V','1HZ25V','1HZ10V',
+    'R_100','R_75','R_50','R_25','R_10'
+  ].filter(symbol=>Boolean(names[symbol]));
   const premiumSymbolSet=new Set(premiumSymbols);
   const premiumMarketOptions=new Set();
   const availableSymbols=new Set();
@@ -3273,23 +3278,12 @@ window.CASPER_ENGINE = (() => {
   let activeStrategy='Smart AI';
   const premiumStrategyNames=new Set(['Matches Printer','Over 8 Killer','TickStrike Pro','Auto Switcher']);
 
-  // Mirror only messages that belong to the active Premium run. The previous
-  // observer copied every generic Free-panel update, so an unrelated
-  // 'Rise & Fall analysis · RISE' message could overwrite Auto Switcher's own
-  // FALL status and make the screen contradict the purchased contract.
-  const runMessageNode=$('#runMessage');
-  if(runMessageNode&&typeof MutationObserver!=='undefined'){
-    const runMessageObserver=new MutationObserver(()=>{
-      if(!premiumStrategyNames.has(activeStrategy))return;
-      const message=runMessageNode.textContent.trim();
-      if(!message||!$('#premiumMessage'))return;
-      const belongsToPremium =
-        message.includes(activeStrategy) ||
-        /Demo (proposal|contract|result|execution|risk|session)|Deriv proposal|proposal rejected|contract opened|waiting for result|sign in with Deriv|choose a Demo account/i.test(message);
-      if(belongsToPremium)$('#premiumMessage').textContent=message;
-    });
-    runMessageObserver.observe(runMessageNode,{childList:true,characterData:true,subtree:true});
-  }
+  // PREMIUM / FREE STATUS ISOLATION:
+  // Do not mirror #runMessage into #premiumMessage. #runMessage belongs to
+  // the Free Smart AI/manual panel and its text can change on every tick.
+  // Premium execution writes its own status explicitly to #premiumMessage.
+  // This prevents Free Smart AI wording, strategies, and scan state from
+  // leaking into any of the four Premium strategies.
 
   let manualMarket='1HZ100V';
 
@@ -4799,9 +4793,13 @@ window.CASPER_ENGINE = (() => {
     const serial=demoRunSerial;
 
     showScanOverlay(
-      activeStrategy==='Smart AI'
-        ? `Scanning all ${premiumSymbols.length} Premium Volatility markets`
-        : continuousScanMessage()
+      premiumStrategyNames.has(activeStrategy)
+        ? (activeStrategy==='Auto Switcher'
+            ? 'Auto Switcher · scanning the 10 configured Volatility markets for Rise/Fall'
+            : continuousScanMessage())
+        : activeStrategy==='Smart AI'
+          ? `Smart AI · scanning all ${symbols.length} configured Free markets and Free strategies`
+          : continuousScanMessage()
     );
 
     /* V17: keep the reference scan animation to a maximum of two seconds.
@@ -4824,8 +4822,11 @@ window.CASPER_ENGINE = (() => {
           error
         );
         if(demoAutoRun&&serial===demoRunSerial){
-          $('#runMessage').textContent=
-            'Smart AI scanner recovered from an internal interruption · resuming live scan…';
+          $('#runMessage').textContent=premiumStrategyNames.has(activeStrategy)
+            ? `${activeStrategy} scanner recovered from an internal interruption · resuming Premium Demo scan…`
+            : activeStrategy==='Smart AI'
+              ? 'Free Smart AI scanner recovered from an internal interruption · resuming Free scan…'
+              : `${activeStrategy} scanner recovered from an internal interruption · resuming scan…`;
           setTimeout(()=>{
             if(demoAutoRun&&serial===demoRunSerial){
               demoRunLoop(serial).catch(()=>{});
@@ -5791,7 +5792,7 @@ window.CASPER_ENGINE = (() => {
           ? Math.max(.03,breakEvenRate-.05)
           : Math.max(.40,breakEvenRate-.05);
         if(recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<recentFloor){
-          throw new Error(`Demo calibration paused: recent validation ${(recentAccuracy*100).toFixed(1)}% is below this contract’s exploratory floor ${(recentFloor*100).toFixed(1)}%.`);
+          throw new Error(`Setup skipped safely: recent validation ${(recentAccuracy*100).toFixed(1)}% is below this contract’s exploratory floor ${(recentFloor*100).toFixed(1)}%. No contract was bought; CASPER will continue scanning for a stronger qualified setup.`);
         }
       }
 
@@ -6087,7 +6088,8 @@ window.CASPER_ENGINE = (() => {
 
         source:
           candidate.source||
-          (activeStrategy==='Smart AI'?'SMART AI':'MANUAL'),
+          (premiumStrategyNames.has(activeStrategy)?activeStrategy:
+            activeStrategy==='Smart AI'?'SMART AI':'MANUAL'),
 
         market:
           symbol,
@@ -6228,7 +6230,7 @@ window.CASPER_ENGINE = (() => {
 
       updateTransactionOverlay({
         heading:'Execution retry',
-        status:`Demo execution rejected · ${error.message||'check Deriv response'} · scanner will retry only after cooldown`,
+        status:`Setup not purchased · ${error.message||'check Deriv response'} · scanning for the next qualified setup`,
         contract:'No completed contract recorded',
         progress:100
       });
