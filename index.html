@@ -5966,7 +5966,47 @@ window.CASPER_ENGINE = (() => {
           });
         }catch(secondBuyError){
           const secondText=String(secondBuyError?.message||secondBuyError||'Unknown BUY error');
-          throw new Error(`Deriv rejected both the original proposal ID and one freshly issued proposal ID. No contract was bought. Original BUY error: ${firstBuyText}. Fresh proposal BUY error: ${secondText}`);
+          /* New Deriv API also documents direct contract-parameter purchase
+             (`buy: 1` + `parameters`). If both valid-looking proposal IDs are
+             rejected as unknown, make one bounded attempt through that supported
+             path using the SAME already-validated Demo quote's contract terms and
+             ask price. This avoids inventing or reusing any proposal ID. */
+          const directParameters={
+            amount:Number(proposalPayload.amount),
+            basis:String(proposalPayload.basis),
+            contract_type:String(proposalPayload.contract_type),
+            currency:String(proposalPayload.currency),
+            duration:Number(proposalPayload.duration),
+            duration_unit:String(proposalPayload.duration_unit),
+            underlying_symbol:String(proposalPayload.underlying_symbol)
+          };
+          if(proposalPayload.barrier!==undefined)directParameters.barrier=String(proposalPayload.barrier);
+          console.error('[CASPER] Both proposal IDs were rejected. Trying one documented direct-parameter Demo purchase.',{
+            accountType:'demo',market:symbol,strategy:candidate.strategy,
+            proposalId:String(freshProposal.id),maxPrice:askPrice,
+            parameters:directParameters,
+            originalBuyError:firstBuyText,
+            refreshedBuyError:secondText
+          });
+          try{
+            buyResponse=await sendTradeRequest({
+              buy:'1',
+              parameters:directParameters,
+              price:askPrice
+            });
+            if(!buyResponse?.buy?.contract_id){
+              throw new Error('Deriv direct-parameter purchase response did not include a contract_id.');
+            }
+            console.info('[CASPER] Direct-parameter Demo purchase accepted after proposal-ID rejection.',{
+              contractId:buyResponse.buy.contract_id,
+              market:symbol,
+              contractType:contractType,
+              maxPrice:askPrice
+            });
+          }catch(directBuyError){
+            const directText=String(directBuyError?.message||directBuyError||'Unknown direct BUY error');
+            throw new Error(`Deriv rejected both proposal IDs and the documented direct-parameter Demo purchase. No confirmed contract was returned. Original BUY error: ${firstBuyText}. Fresh proposal BUY error: ${secondText}. Direct BUY error: ${directText}`);
+          }
         }
       }
 
