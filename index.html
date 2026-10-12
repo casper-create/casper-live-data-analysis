@@ -4664,6 +4664,14 @@ window.CASPER_ENGINE = (() => {
 
       if(!demoAutoRun||serial!==demoRunSerial)break;
 
+      // A settled contract can remain in memory only if a post-settlement UI or
+      // ledger operation was interrupted. It is safe to clear that stale row;
+      // never clear a genuinely open/unresolved contract.
+      if(activeDemoContract&&String(activeDemoContract.status||'').toLowerCase()==='settled'){
+        activeDemoContract=null;
+        renderTransactions();
+      }
+
       // Never place a second contract while a previously bought contract is
       // still open or unresolved. This guard also protects against a monitor
       // disconnect/timeout accidentally returning control to the scan loop.
@@ -4773,7 +4781,7 @@ window.CASPER_ENGINE = (() => {
         break;
       }
 
-      const settledMessage=`Demo result · ${result.profit>=0?'+':''}${Number(result.profit||0).toFixed(2)} USD · ${candidate.strategy} · ${names[candidate.symbol]||candidate.symbol} · ${demoSessionTrades} trades · ${continuousScanMessage()}`;
+      const settledMessage=`Demo result · ${result.profit>=0?'+':''}${Number(result.profit||0).toFixed(2)} USD · ${candidate.strategy} · ${names[candidate.symbol]||candidate.symbol} · ${demoSessionTrades} trades · ${continuousScanMessage()} · continues after this result unless Target / Max Loss is reached or Stop is pressed.`;
       $('#runMessage').textContent=settledMessage;
       if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=settledMessage;
 
@@ -5903,6 +5911,9 @@ window.CASPER_ENGINE = (() => {
         Buy only on the authenticated Demo socket.
       */
       let buyResponse;
+      /* Track the purchase path explicitly so completed trades can be recorded
+         without throwing after a valid contract has already been bought. */
+      let boughtViaDirectParameters=false;
       try{
         buyResponse=await sendTradeRequest({
           buy:String(proposal.id),
@@ -5997,6 +6008,7 @@ window.CASPER_ENGINE = (() => {
             if(!buyResponse?.buy?.contract_id){
               throw new Error('Deriv direct-parameter purchase response did not include a contract_id.');
             }
+            boughtViaDirectParameters=true;
             console.info('[CASPER] Direct-parameter Demo purchase accepted after proposal-ID rejection.',{
               contractId:buyResponse.buy.contract_id,
               market:symbol,
@@ -6095,6 +6107,25 @@ window.CASPER_ENGINE = (() => {
             });
           }
         );
+
+      /*
+        SETTLEMENT LIFECYCLE GUARD:
+        Once Deriv has returned a final contract update, this contract is no
+        longer an open position. Mark it settled before doing any bookkeeping.
+        If a later UI/history operation throws, the continuous loop must not
+        mistake this already-closed contract for a live one and wait forever.
+      */
+      if(activeDemoContract&&normalizeContractId(activeDemoContract.contractId)===normalizeContractId(contractId)){
+        activeDemoContract.status='settled';
+        activeDemoContract.canSell=false;
+        activeDemoContract.sellPending=false;
+        const settledProfit=Number(finalContract.profit);
+        if(Number.isFinite(settledProfit))activeDemoContract.profit=settledProfit;
+        const settledEntry=Number(finalContract.entry_spot);
+        const settledExit=Number(finalContract.exit_spot);
+        if(Number.isFinite(settledEntry)&&settledEntry!==0)activeDemoContract.entrySpot=settledEntry;
+        if(Number.isFinite(settledExit)&&settledExit!==0)activeDemoContract.exitSpot=settledExit;
+      }
 
       const profit=
         Number(
@@ -6310,19 +6341,35 @@ window.CASPER_ENGINE = (() => {
 
     }catch(error){
 
+      /*
+        A confirmed settlement is not an open contract. If a later formatting,
+        storage, or UI operation fails, clear only the already-settled row so
+        Auto Switcher can recover and continue. An actually open/unresolved
+        contract remains protected and is never replaced by another trade.
+      */
+      const settlementWasConfirmed=Boolean(activeDemoContract&&String(activeDemoContract.status||'').toLowerCase()==='settled');
+      if(settlementWasConfirmed){
+        activeDemoContract=null;
+        try{renderTransactions();}catch(renderError){console.warn('[CASPER] Transaction redraw after settled-contract recovery failed:',renderError);}
+      }
+
       console.error(
         '[CASPER] Demo execution error:',
         error
       );
 
-      const executionErrorMessage=`Demo execution stopped · ${error.message||'Unknown Deriv error'}`;
+      const executionErrorMessage=settlementWasConfirmed
+        ? `Demo settlement received · recovering transaction bookkeeping and resuming scan · ${error.message||'post-settlement operation failed'}`
+        : `Demo execution stopped · ${error.message||'Unknown Deriv error'}`;
       $('#runMessage').textContent=executionErrorMessage;
       if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=executionErrorMessage;
 
       updateTransactionOverlay({
-        heading:'Execution retry',
-        status:`Setup not purchased · ${error.message||'check Deriv response'} · scanning for the next qualified setup`,
-        contract:'No completed contract recorded',
+        heading:settlementWasConfirmed?'Settlement received · recovering':'Execution retry',
+        status:settlementWasConfirmed
+          ? `Deriv confirmed the contract result; recovering the transaction ledger and continuing the scan · ${error.message||'post-settlement operation failed'}`
+          : `Setup not purchased · ${error.message||'check Deriv response'} · scanning for the next qualified setup`,
+        contract:settlementWasConfirmed?'Contract settled · ledger recovery':'No completed contract recorded',
         progress:100
       });
 
