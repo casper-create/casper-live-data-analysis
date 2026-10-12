@@ -1013,6 +1013,15 @@
       input,select,button{max-width:100%;font-size:16px}
       .transactions{overflow-x:hidden}
     }
+
+    /* Compact floating transaction control: users can hide/show the live ledger without stopping Demo execution. */
+    #txFloatingToggle{position:fixed;right:14px;bottom:18px;z-index:10000;border:1px solid #28b8c9;border-radius:999px;background:#08252d;color:#eafcff;box-shadow:0 8px 28px #0008;padding:10px 14px;font-size:12px;font-weight:850;letter-spacing:.02em;display:none;align-items:center;gap:7px;min-height:40px}
+    #txFloatingToggle[aria-expanded="true"]{background:#0b3842;border-color:#55e5ee}
+    #premium.tx-panel-hidden #transactionsPremium{display:none!important}
+    #premium.tx-panel-hidden.transaction-focus{display:block;max-width:1000px;margin:12px auto;padding:12px 14px;box-shadow:none}
+    #premium.tx-panel-hidden.transaction-focus>:not(#premiumMessage){display:none!important}
+    #premium.tx-panel-hidden #premiumMessage{margin:0;padding:10px;font-size:11px}
+    @media(max-width:520px){#txFloatingToggle{right:10px;bottom:12px;padding:9px 12px;min-height:38px}}
   </style>
 </head>
 
@@ -1260,6 +1269,8 @@
 
 </section>
 
+
+<button id="txFloatingToggle" type="button" aria-controls="transactionsPremium" aria-expanded="false" title="Show or hide transactions">☷ <span>Transactions</span></button>
 
 <section class="card panels" id="premium">
 
@@ -3525,6 +3536,30 @@ window.CASPER_ENGINE = (() => {
     logs.style.animationPlayState='running';
   }
 
+  let premiumTransactionsManuallyHidden=false;
+  function syncPremiumTransactionToggle(){
+    const btn=$('#txFloatingToggle');
+    const panel=$('#premium');
+    if(!btn||!panel)return;
+    const premiumActive=panel.classList.contains('active')||activeStrategy==='Matches Printer'||activeStrategy==='Over 8 Killer'||activeStrategy==='TickStrike Pro'||activeStrategy==='Auto Switcher';
+    btn.style.display=premiumActive?'inline-flex':'none';
+    const expanded=!premiumTransactionsManuallyHidden;
+    btn.setAttribute('aria-expanded',String(expanded));
+    const label=btn.querySelector('span');
+    if(label)label.textContent=expanded?'Hide Transactions':'Transactions';
+    panel.classList.toggle('tx-panel-hidden',premiumTransactionsManuallyHidden);
+  }
+  $('#txFloatingToggle')?.addEventListener('click',()=>{
+    premiumTransactionsManuallyHidden=!premiumTransactionsManuallyHidden;
+    const panel=$('#premium');
+    if(panel){
+      if(premiumTransactionsManuallyHidden)panel.classList.remove('transaction-focus');
+      else panel.classList.add('transaction-focus');
+    }
+    syncPremiumTransactionToggle();
+    if(!premiumTransactionsManuallyHidden){renderTransactions();$('#transactionsPremium')?.scrollIntoView({behavior:'smooth',block:'nearest'});}
+  });
+
   function activateTransactionFocus(){
     if(scanTransitionTimer){clearTimeout(scanTransitionTimer);scanTransitionTimer=null;}
     transactionViewEstablished=true;
@@ -3539,7 +3574,9 @@ window.CASPER_ENGINE = (() => {
       const freePanel=$('#free');
       const premiumPanel=$('#premium');
       if(freePanel)freePanel.classList.remove('transaction-focus');
-      if(premiumPanel)premiumPanel.classList.add('transaction-focus');
+      if(premiumPanel&&!premiumTransactionsManuallyHidden)premiumPanel.classList.add('transaction-focus');
+      if(premiumPanel&&premiumTransactionsManuallyHidden)premiumPanel.classList.add('tx-panel-hidden');
+      syncPremiumTransactionToggle();
       renderTransactions();
       const premiumList=$('#transactionsPremium');
       if(premiumList)premiumList.scrollIntoView({behavior:'smooth',block:'start'});
@@ -7628,6 +7665,9 @@ window.CASPER_ENGINE = (() => {
       $('#stake').value=$('#stakePremium').value;
       $('#target').value=$('#targetPremium').value;
       $('#maxloss').value=$('#lossPremium').value;
+      premiumTransactionsManuallyHidden=false;
+      $('#premium').classList.remove('tx-panel-hidden');
+      syncPremiumTransactionToggle();
       $('#premiumMessage').textContent=`${activeStrategy} Demo session running · results use confirmed Deriv settlements; no win rate is guaranteed.`;
       startDemoRun();
     }
@@ -7810,6 +7850,7 @@ window.CASPER_ENGINE = (() => {
   );
 
   renderTransactions();
+  syncPremiumTransactionToggle();
 
   console.info(
     '[CASPER] Demo trade history:',
