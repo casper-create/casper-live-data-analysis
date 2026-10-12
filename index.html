@@ -5911,9 +5911,6 @@ window.CASPER_ENGINE = (() => {
         Buy only on the authenticated Demo socket.
       */
       let buyResponse;
-      /* Track the purchase path explicitly so completed trades can be recorded
-         without throwing after a valid contract has already been bought. */
-      let boughtViaDirectParameters=false;
       try{
         buyResponse=await sendTradeRequest({
           buy:String(proposal.id),
@@ -6008,7 +6005,6 @@ window.CASPER_ENGINE = (() => {
             if(!buyResponse?.buy?.contract_id){
               throw new Error('Deriv direct-parameter purchase response did not include a contract_id.');
             }
-            boughtViaDirectParameters=true;
             console.info('[CASPER] Direct-parameter Demo purchase accepted after proposal-ID rejection.',{
               contractId:buyResponse.buy.contract_id,
               market:symbol,
@@ -6251,7 +6247,7 @@ window.CASPER_ENGINE = (() => {
 
         currency,
 
-        proposalId:boughtViaDirectParameters?'direct-parameters':String(proposal?.id||''),
+        proposalId:String(proposal?.id||''),
 
         contractId:String(contractId),
 
