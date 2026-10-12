@@ -3243,9 +3243,7 @@ window.CASPER_ENGINE = (() => {
     "R_75":"Volatility 75 Index",
     "R_50":"Volatility 50 Index",
     "R_25":"Volatility 25 Index",
-    "R_10":"Volatility 10 Index",
-    "1HZ150V":"Volatility 150 (1s)",
-    "1HZ250V":"Volatility 250 (1s)"
+    "R_10":"Volatility 10 Index"
   };
 
   // Keep Free Smart AI's original ten-market scan scope unchanged.
@@ -3376,7 +3374,7 @@ window.CASPER_ENGINE = (() => {
     marketPremium.add(new Option('Scan all available Deriv Volatility markets',SMART_VALUE),marketPremium.options[0]||null);
   }else{
     const allOption=[...marketPremium.options].find(option=>option.value===SMART_VALUE);
-    if(allOption)allOption.textContent='Scan all 12 Premium markets';
+    if(allOption)allOption.textContent='Scan all 10 configured Volatility markets';
   }
   // Auto Switcher always compares the full Premium registry, regardless of
   // the single-market selection used by the other selectable strategies.
@@ -4234,13 +4232,13 @@ window.CASPER_ENGINE = (() => {
         let direction=signal.direction;
         if(activeStrategy==='Auto Switcher'){
           const directionScore=Number(features.direction?.direction20||0);
-          if(Number(signal.confidence||0)<.64||Math.abs(directionScore)<.08)continue;
+          if(Number(signal.confidence||0)<.58||Math.abs(directionScore)<.04)continue;
           direction=directionScore>0?'RISE':'FALL';
           // Require momentum alignment too; do not buy simply because a tiny
           // directional score has a sign.
           const momentum=Number(features.price?.momentum||0);
           const stability=Number(features.direction?.stability||0);
-          if(stability<.35||Math.abs(momentum)<.02)continue;
+          if(stability<.20||Math.abs(momentum)<.005)continue;
           if(direction==='RISE'&&momentum<=0)continue;
           if(direction==='FALL'&&momentum>=0)continue;
         }
@@ -4601,7 +4599,7 @@ window.CASPER_ENGINE = (() => {
     }
 
     if(activeStrategy==='Auto Switcher'||marketPremium.value===SMART_VALUE){
-      return `${activeStrategy} is continuously comparing all ${premiumSymbols.length} Premium Volatility markets for the strongest qualified setup.`;
+      return `${activeStrategy} is continuously comparing the 10 configured Volatility markets for the strongest qualified Rise/Fall setup.`;
     }
     const premiumSymbol=marketPremium.value||market.value;
     const marketLabel=names[premiumSymbol]||premiumSymbol||'selected market';
@@ -5791,7 +5789,7 @@ window.CASPER_ENGINE = (() => {
         }else if(candidate.strategy==='Auto Switcher'){
           const f=latestSnapshot?.features||{};
           const directionalScore=Number(f.direction?.direction20||0);
-          premiumFreshFilter=Math.abs(directionalScore)>=.08&&
+          premiumFreshFilter=Math.abs(directionalScore)>=.04&&
             (freshDirection==='RISE'?directionalScore>0:freshDirection==='FALL'?directionalScore<0:false);
         }
         const sameDirection=Boolean(latestSignal?.actionable)&&premiumFreshFilter&&
@@ -6201,7 +6199,7 @@ window.CASPER_ENGINE = (() => {
     }
     const allOption=[...marketPremium.options].find(option=>option.value===SMART_VALUE);
     const count=[...availableSymbols].filter(symbol=>names[symbol]).length;
-    if(allOption)allOption.textContent=`Scan all ${count} available Deriv Volatility markets`;
+    if(allOption)allOption.textContent=`Scan all ${Math.min(count,10)} configured Volatility markets`;
     if(![...marketPremium.options].some(option=>option.value===marketPremium.value)){
       marketPremium.value=[...availableSymbols][0]||SMART_VALUE;
     }
@@ -6322,14 +6320,13 @@ window.CASPER_ENGINE = (() => {
             const displayName=String(item.underlying_symbol_name||item.display_name||'').trim();
             // Deriv is the source of truth: discover current and newly launched
             // Volatility indices dynamically; exclude unrelated synthetic markets.
-            const isVolatility=/\bvolatility\b/i.test(displayName) &&
-              (/^R_\d+$/i.test(symbol)||/^1HZ\d+V$/i.test(symbol));
-            if(!isVolatility)continue;
-            names[symbol]=displayName||symbol;
-            if(!premiumSymbolSet.has(symbol)){
-              premiumSymbolSet.add(symbol);
-              premiumSymbols.push(symbol);
-            }
+            const isConfiguredMarket=symbols.includes(symbol) &&
+              /\bvolatility\b/i.test(displayName) &&
+              (/^R_(100|75|50|25|10)$/i.test(symbol)||/^1HZ(100|75|50|25|10)V$/i.test(symbol));
+            if(!isConfiguredMarket)continue;
+            // Preserve the ten agreed market labels; Deriv confirms availability,
+            // but cannot silently expand CASPER's configured scan scope.
+            names[symbol]=displayName||names[symbol]||symbol;
             const places=decimalPlaces(item.pip_size??item.pip);
             const suspended=Number(item.is_trading_suspended||0)===1;
             if(!suspended)availableSymbols.add(symbol);
@@ -7578,7 +7575,7 @@ window.CASPER_ENGINE = (() => {
   );
 
   console.info(
-    '[CASPER] All supported Volatility markets are being monitored.'
+    '[CASPER] The ten configured Volatility markets are being monitored.'
   );
 
   console.info(
