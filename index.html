@@ -863,6 +863,34 @@
     #free.transaction-focus .transactionsActions{width:auto;flex:0 0 auto;gap:6px}
     #free.transaction-focus .txbtn{flex:0 0 auto;min-height:35px;padding:7px 9px;font-size:11px}
     #free.transaction-focus .txlist{max-height:min(43vh,370px)}
+    /* Premium switches to the full transaction screen after the first real purchase,
+       matching the reference videos instead of leaving Transactions at the bottom. */
+    #premium.transaction-focus{
+      display:block;
+      max-width:1000px;
+      margin:12px auto;
+      padding:12px 14px;
+      box-shadow:none
+    }
+    #premium.transaction-focus>:not(#transactionsPremium):not(#premiumMessage){display:none!important}
+    #premium.transaction-focus #premiumMessage{margin:0 0 10px;padding:8px 10px;font-size:11px}
+    #premium.transaction-focus #transactionsPremium{margin-top:0;border-radius:12px}
+    #premium.transaction-focus .transactionsHead{padding:14px 15px;align-items:center;flex-direction:row;justify-content:space-between;flex-wrap:wrap}
+    #premium.transaction-focus .transactionsTitle{white-space:nowrap}
+    #premium.transaction-focus .transactionsActions{width:auto;flex:0 0 auto;gap:6px}
+    #premium.transaction-focus .txbtn{flex:0 0 auto;min-height:35px;padding:7px 9px;font-size:11px}
+    #premium.transaction-focus .txlist{max-height:min(43vh,370px)}
+    .txcolumns{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,.9fr);gap:10px;padding:9px 14px;background:#071a20;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.035em;border-bottom:1px solid var(--line)}
+    .txcell{min-width:0;overflow-wrap:anywhere}
+    .txcell:last-child{text-align:right}
+    .txcell strong{display:block;color:var(--text);font-size:12px;letter-spacing:0;text-transform:none;margin-top:4px}
+    .txdetail{display:block;color:var(--muted);font-size:10px;margin-top:4px;line-height:1.35}
+    @media(max-width:520px){
+      .txcolumns{grid-template-columns:minmax(0,1fr) minmax(0,.9fr) minmax(0,.8fr);gap:6px;padding:8px;font-size:9px}
+      .txcell strong{font-size:11px}
+      #premium.transaction-focus,#free.transaction-focus{padding:8px;margin:8px auto}
+      #premium.transaction-focus .txlist,#free.transaction-focus .txlist{max-height:52vh}
+    }
     .txrow-active{background:linear-gradient(90deg,#0b2b32,#091e25);border-top-color:#1f5360}
     .txrowMain{min-width:0}
     .txmarketLine{display:flex;align-items:center;gap:7px;min-width:0}
@@ -1192,6 +1220,7 @@
         <button class="txbtn reset" id="resetFree" type="button">↻ Reset</button>
       </div>
     </div>
+    <div class="txcolumns" aria-hidden="true"><span>Type</span><span>Entry / Exit spot</span><span>Buy price / P&amp;L</span></div>
     <div class="txlist" id="txListFree">
       <div class="txempty">No Demo transactions yet.</div>
     </div>
@@ -1342,6 +1371,7 @@
         <button class="txbtn reset" id="resetPremium" type="button">↻ Reset</button>
       </div>
     </div>
+    <div class="txcolumns" aria-hidden="true"><span>Type</span><span>Entry / Exit spot</span><span>Buy price / P&amp;L</span></div>
     <div class="txlist" id="txListPremium">
       <div class="txempty">No Demo transactions yet.</div>
     </div>
@@ -1380,7 +1410,7 @@
 
 
 <p class="foot">
-  CASPER LIVE DATA ANALYSIS · Live market analysis engine active ·
+  CASPER LIVE DATA ANALYSIS · Premium transaction-focus build ·
   Demo execution enabled · Four strategies available for testing · Real trading disabled
 </p>
 
@@ -3199,9 +3229,10 @@ window.CASPER_ENGINE = (() => {
     '1HZ100V','1HZ75V','1HZ50V','1HZ25V','1HZ10V',
     'R_100','R_75','R_50','R_25','R_10'
   ];
-  // Premium subscribes to all 12 intended markets, then ranks only markets
-  // confirmed active by Deriv. Do not infer availability from a display name.
+  // Premium starts with known symbols, then expands from Deriv's live active_symbols response.
   const premiumSymbols=Object.keys(names);
+  const premiumSymbolSet=new Set(premiumSymbols);
+  const premiumMarketOptions=new Set();
   const availableSymbols=new Set();
   const contractTypesBySymbol=new Map();
   const contractRequestToSymbol=new Map();
@@ -3318,7 +3349,7 @@ window.CASPER_ENGINE = (() => {
     }
   }
   if(![...marketPremium.options].some(option=>option.value===SMART_VALUE)){
-    marketPremium.add(new Option('Scan all 12 Premium markets',SMART_VALUE),marketPremium.options[0]||null);
+    marketPremium.add(new Option('Scan all available Deriv Volatility markets',SMART_VALUE),marketPremium.options[0]||null);
   }else{
     const allOption=[...marketPremium.options].find(option=>option.value===SMART_VALUE);
     if(allOption)allOption.textContent='Scan all 12 Premium markets';
@@ -3485,7 +3516,9 @@ window.CASPER_ENGINE = (() => {
     // always focused the Free transaction list, hiding the Premium feedback.
     if(premiumStrategyNames.has(activeStrategy)){
       const freePanel=$('#free');
+      const premiumPanel=$('#premium');
       if(freePanel)freePanel.classList.remove('transaction-focus');
+      if(premiumPanel)premiumPanel.classList.add('transaction-focus');
       renderTransactions();
       const premiumList=$('#transactionsPremium');
       if(premiumList)premiumList.scrollIntoView({behavior:'smooth',block:'start'});
@@ -4120,11 +4153,12 @@ window.CASPER_ENGINE = (() => {
         ? premiumSymbols
         : [marketPremium.value||market.value].filter(symbol=>Boolean(names[symbol]));
       const candidates=[];
+      const scanDiag={markets:scanSymbols.length,registry:0,snapshot:0,signal:0,validation:0,quality:0,contract:0,qualified:0};
 
       for(const symbol of scanSymbols){
-        if(!activeSymbolRegistryReady||!availableSymbols.has(symbol))continue;
+        if(!activeSymbolRegistryReady||!availableSymbols.has(symbol)){scanDiag.registry++;continue;}
         const snap=casperEngine.snapshot(symbol);
-        if(!snap||!snap.ready||!snap.features?.ready)continue;
+        if(!snap||!snap.ready||!snap.features?.ready){scanDiag.snapshot++;continue;}
 
         let signal=null, validationRecord=null;
         if(activeStrategy==='Matches Printer'){
@@ -4137,7 +4171,7 @@ window.CASPER_ENGINE = (() => {
           signal=snap.signals?.riseFall;
           validationRecord=snap.validation?.strategies?.riseFall;
         }
-        if(!signal?.actionable||!validationRecord)continue;
+        if(!signal?.actionable||!validationRecord){scanDiag.signal++;continue;}
         const hasLowerBound=validationRecord.lowerBound!==null&&validationRecord.lowerBound!==undefined&&Number.isFinite(Number(validationRecord.lowerBound));
         const validation={
           ...validationRecord,
@@ -4148,14 +4182,22 @@ window.CASPER_ENGINE = (() => {
         const total=Number(validation.total||0);
         const recentTotal=Number(validation.recentTotal||0);
         const recentAccuracy=Number(validation.recentAccuracy);
-        if(total<8)continue;
-        if(total>=60){
-          if(!Number.isFinite(Number(validation.lowerBound))||Number(validation.lowerBound)<.52)continue;
-          if(Number(validation.accuracy)<.50)continue;
-          if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.45)continue;
+        if(total<8){scanDiag.validation++;continue;}
+        const digitContractStrategy=activeStrategy==='Matches Printer'||activeStrategy==='Over 8 Killer';
+        if(digitContractStrategy){
+          /* Digit contracts have lower natural hit rates and often larger payouts.
+             A universal 50% accuracy gate incorrectly makes them ineligible even
+             when the offered payout could make their expected value positive.
+             Their actual break-even test is applied after Deriv returns a quote. */
+          const minDigitSignal=activeStrategy==='Matches Printer'?.50:.59;
+          if(Number(signal.confidence||0)<minDigitSignal||Number(signal.score||0)<.50){scanDiag.quality++;continue;}
+        }else if(total>=60){
+          if(!Number.isFinite(Number(validation.lowerBound))||Number(validation.lowerBound)<.52){scanDiag.quality++;continue;}
+          if(Number(validation.accuracy)<.50){scanDiag.quality++;continue;}
+          if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.45){scanDiag.quality++;continue;}
         }else{
-          if(Number(signal.confidence||0)<.64||Number(signal.score||0)<.60)continue;
-          if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.40)continue;
+          if(Number(signal.confidence||0)<.64||Number(signal.score||0)<.60){scanDiag.quality++;continue;}
+          if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.40){scanDiag.quality++;continue;}
         }
 
         const features=snap.features;
@@ -4192,7 +4234,8 @@ window.CASPER_ENGINE = (() => {
         // Never ask Deriv for a proposal on a market/contract combination until
         // contracts_for has confirmed that exact contract type is offered.
         const offeredTypes=contractTypesBySymbol.get(symbol);
-        if(!(offeredTypes instanceof Set)||!offeredTypes.has(strategyToContract(candidate)))continue;
+        if(!(offeredTypes instanceof Set)||!offeredTypes.has(strategyToContract(candidate))){scanDiag.contract++;continue;}
+        scanDiag.qualified++;
         // Prefer proven out-of-sample performance when mature, while still
         // ranking live confidence, score, stability and sample maturity.
         const mature=total>=60;
@@ -4205,6 +4248,7 @@ window.CASPER_ENGINE = (() => {
         candidates.push(candidate);
       }
 
+      window.CASPER_PREMIUM_SCAN_DIAGNOSTICS={...scanDiag,strategy:activeStrategy,at:Date.now()};
       if(!candidates.length)return null;
       candidates.sort((a,b)=>b.rankScore-a.rankScore);
       return candidates[0];
@@ -4618,7 +4662,11 @@ window.CASPER_ENGINE = (() => {
         }
         $('#runMessage').textContent=continuousScanMessage();
         if(premiumStrategyNames.has(activeStrategy)){
-          $('#premiumMessage').textContent=`${activeStrategy} · ${continuousScanMessage()} · waiting for a qualified live signal. No trade has been placed.`;
+          const diag=window.CASPER_PREMIUM_SCAN_DIAGNOSTICS;
+          const detail=diag&&diag.strategy===activeStrategy
+            ? `Scan ${diag.qualified}/${diag.markets} qualified · waiting for data/validation: ${diag.snapshot} · no actionable signal: ${diag.signal} · insufficient validation: ${diag.validation} · quality filter: ${diag.quality} · contract not verified: ${diag.contract} · market not active/registry pending: ${diag.registry}.`
+            : 'Waiting for the live market registry and first valid tick snapshots.';
+          $('#premiumMessage').textContent=`${activeStrategy} · ${continuousScanMessage()} · ${detail} No trade has been placed.`;
         }
         continue;
       }
@@ -4839,35 +4887,31 @@ window.CASPER_ENGINE = (() => {
       : null;
     const plClass=plValue===null?'flat':plValue>0?'win':plValue<0?'loss':'flat';
     const plText=plValue===null?'OPEN':`${plValue>0?'+':''}${plValue.toFixed(2)} ${escapeHTML(trade.currency||'USD')}`;
-    const valueText=trade.value!==null&&trade.value!==undefined&&Number.isFinite(Number(trade.value))
-      ? formatMoney(Number(trade.value),trade.currency||'USD')
-      : 'Updating…';
+    const buyPrice=Number.isFinite(Number(trade.buyPrice))?formatMoney(Number(trade.buyPrice),trade.currency||'USD'):'—';
+    const quotedPayout=trade.quotedPayout!==null&&trade.quotedPayout!==undefined&&Number.isFinite(Number(trade.quotedPayout))?formatMoney(Number(trade.quotedPayout),trade.currency||'USD'):'Awaiting quote';
+    const currentValue=trade.value!==null&&trade.value!==undefined&&Number.isFinite(Number(trade.value))?formatMoney(Number(trade.value),trade.currency||'USD'):'—';
     const time=trade.timestamp
       ? new Date(trade.timestamp).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
       : 'Live';
-    const metadata=[
-      `Stake ${formatMoney(trade.stake,trade.currency||'USD')}`,
-      `Value ${valueText}`,
-      escapeHTML(trade.strategy||'Strategy'),
-      escapeHTML(trade.direction||'')
-    ].filter(Boolean);
-    const spots=[];
-    const entry=formatSpot(trade.entrySpot);
-    const current=formatSpot(trade.currentSpot);
-    const exit=formatSpot(trade.exitSpot);
-    if(entry)spots.push(`Entry ${entry}`);
-    if(current)spots.push(`Current ${current}`);
-    if(exit)spots.push(`Exit ${exit}`);
+    const entry=formatSpot(trade.entrySpot)||'—';
+    const exit=formatSpot(trade.exitSpot||trade.currentSpot)||'—';
     const id=escapeHTML(trade.contractId||'pending');
     return `
       <div class="txrow txrow-active" data-active-contract="${id}">
-        <div class="txrowMain">
+        <div class="txcell">
           <div class="txmarketLine"><span class="txmarketIcon" aria-hidden="true">✣</span><div class="txmarket">${escapeHTML(trade.marketName||trade.symbol||'Deriv market')}</div></div>
-          <div class="txmeta">${escapeHTML(time)} · ${metadata.join(' · ')}</div>
-          <div class="txmeta">Contract #${id}${spots.length?' · '+spots.join(' · '):''} · <span class="txlive">LIVE</span></div>
+          <span class="txdetail">${escapeHTML(time)} · ${escapeHTML(trade.strategy||'Strategy')} · ${escapeHTML(trade.direction||'')}</span>
+          <span class="txdetail">Contract #${id} · <span class="txlive">${plValue===null?'LIVE':'SETTLED'}</span></span>
         </div>
-        <div class="txrowRight">
-          <div class="txpl ${plClass}">${plText}</div>
+        <div class="txcell">
+          <span class="txdetail">Entry</span><strong>${escapeHTML(entry)}</strong>
+          <span class="txdetail">Exit / current</span><strong>${escapeHTML(exit)}</strong>
+        </div>
+        <div class="txcell">
+          <span class="txdetail">Buy price</span><strong>${escapeHTML(buyPrice)}</strong>
+          <span class="txdetail">Quoted payout</span><strong>${escapeHTML(quotedPayout)}</strong>
+          <span class="txdetail">Current contract value</span><strong>${escapeHTML(currentValue)}</strong>
+          <span class="txdetail">Profit / loss</span><strong class="txpl ${plClass}">${plText}</strong>
         </div>
       </div>`;
   }
@@ -4891,13 +4935,27 @@ window.CASPER_ENGINE = (() => {
         ? new Date(record.timestamp).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
         : '--:--';
       const result=record.status==='won'?'WIN':record.status==='lost'?'LOSS':'CLOSED';
+      const entry=formatSpot(record.entrySpot)||'—';
+      const exit=formatSpot(record.exitSpot)||'—';
+      const buyPrice=Number.isFinite(Number(record.buyPrice))?formatMoney(Number(record.buyPrice),record.currency||'USD'):'—';
+      const payout=Number.isFinite(Number(record.payout))?formatMoney(Number(record.payout),record.currency||'USD'):'—';
+      const id=escapeHTML(record.contractId||'—');
       return `
         <div class="txrow">
-          <div class="txrowMain">
+          <div class="txcell">
             <div class="txmarketLine"><span class="txmarketIcon" aria-hidden="true">✣</span><div class="txmarket">${escapeHTML(record.marketName||record.market||'Deriv market')}</div></div>
-            <div class="txmeta">${escapeHTML(time)} · Stake ${formatMoney(record.stake,record.currency||'USD')} · ${escapeHTML(record.strategy||'Strategy')} · ${escapeHTML(record.direction||'')} · ${result}</div>
+            <span class="txdetail">${escapeHTML(time)} · ${escapeHTML(record.strategy||'Strategy')} · ${escapeHTML(record.direction||'')} · ${result}</span>
+            <span class="txdetail">Contract #${id}</span>
           </div>
-          <div class="txpl ${cls}">${sign}${pl.toFixed(2)} ${escapeHTML(record.currency||'USD')}</div>
+          <div class="txcell">
+            <span class="txdetail">Entry</span><strong>${escapeHTML(entry)}</strong>
+            <span class="txdetail">Exit</span><strong>${escapeHTML(exit)}</strong>
+          </div>
+          <div class="txcell">
+            <span class="txdetail">Buy price</span><strong>${escapeHTML(buyPrice)}</strong>
+            <span class="txdetail">Realized payout</span><strong>${escapeHTML(payout)}</strong>
+            <span class="txdetail">Profit / loss</span><strong class="txpl ${cls}">${sign}${pl.toFixed(2)} ${escapeHTML(record.currency||'USD')}</strong>
+          </div>
         </div>`;
     }).join('');
     list.innerHTML=activeMarkup+historyMarkup;
@@ -5694,14 +5752,22 @@ window.CASPER_ENGINE = (() => {
           throw new Error(`Smart AI skipped before purchase: recent ${recentSamples}-sample accuracy ${(recentAccuracy*100).toFixed(1)}% is below the quoted break-even rate. No contract was bought.`);
         }
       }else{
-        /* Calibration tier is strictly Demo-only. The stronger live signal and
-           positive quoted payout are required, but an immature Wilson bound is
-           not falsely treated as evidence of a proven edge. */
-        if(Number(candidate.confidence||0)<.64||Number(candidate.score||0)<.60){
-          throw new Error('Demo calibration skipped: the live signal is below the stricter exploratory threshold.');
+        /* Calibration is Demo-only. Use contract-aware thresholds: a digit
+           contract's observed hit rate must be compared with its own quoted
+           break-even probability, not a blanket 40–50% directional threshold. */
+        const digitContractStrategy=candidate.strategy==='Matches Printer'||candidate.strategy==='Over 8 Killer';
+        const minConfidence=digitContractStrategy
+          ? (candidate.strategy==='Matches Printer'?.50:.59)
+          : .64;
+        const minScore=digitContractStrategy?.50:.60;
+        if(Number(candidate.confidence||0)<minConfidence||Number(candidate.score||0)<minScore){
+          throw new Error('Demo calibration skipped: the live signal is below this strategy’s entry threshold.');
         }
-        if(recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<Math.max(.40,breakEvenRate-.05)){
-          throw new Error('Demo calibration paused: recent validation is deteriorating below the exploratory floor.');
+        const recentFloor=digitContractStrategy
+          ? Math.max(.03,breakEvenRate-.05)
+          : Math.max(.40,breakEvenRate-.05);
+        if(recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<recentFloor){
+          throw new Error(`Demo calibration paused: recent validation ${(recentAccuracy*100).toFixed(1)}% is below this contract’s exploratory floor ${(recentFloor*100).toFixed(1)}%.`);
         }
       }
 
@@ -5807,6 +5873,7 @@ window.CASPER_ENGINE = (() => {
         timestamp:new Date().toISOString(),
         status:'open',
         buyPrice:Number(buy.buy_price)||askPrice,
+        quotedPayout:Number(buy.payout)>0?Number(buy.payout):(Number(proposal.payout)>0?Number(proposal.payout):null),
         value:Number(buy.payout)>0?Number(buy.payout):(Number(proposal.payout)>0?Number(proposal.payout):null),
         profit:null,
         entrySpot:null,
@@ -6116,34 +6183,35 @@ window.CASPER_ENGINE = (() => {
      MARKET FEED
      ========================================================== */
 
-  function subscribeMarkets(){
-
-    if(
-      !ws||
-      ws.readyState!==WebSocket.OPEN
-    ){
-      return;
-    }
-
+  function subscribeMarkets(symbolList=availableSymbols){
+    if(!ws||ws.readyState!==WebSocket.OPEN)return;
+    const list=[...new Set([...symbolList])].filter(symbol=>names[symbol]);
     subIds.clear();
+    for(const symbol of list){
+      try{ ws.send(JSON.stringify({ticks:symbol,subscribe:1})); }
+      catch(error){ console.warn('[CASPER] Tick subscription failed for',symbol,error); }
+    }
+  }
 
-    for(
-      const symbol
-      of premiumSymbols
-    ){
-
-      try{
-
-        ws.send(
-          JSON.stringify({
-
-            ticks:symbol,
-
-            subscribe:1
-          })
-        );
-
-      }catch{}
+  function syncPremiumMarketOptions(){
+    if(!marketPremium)return;
+    // Remove stale hard-coded entries not confirmed by Deriv. Never leave an
+    // unavailable instrument looking executable in the Premium selector.
+    for(const option of [...marketPremium.options]){
+      if(names[option.value]&&!availableSymbols.has(option.value))option.remove();
+    }
+    for(const symbol of premiumSymbols){
+      if(!names[symbol]||!availableSymbols.has(symbol))continue;
+      if(![...marketPremium.options].some(option=>option.value===symbol)){
+        marketPremium.add(new Option(names[symbol],symbol));
+      }
+      premiumMarketOptions.add(symbol);
+    }
+    const allOption=[...marketPremium.options].find(option=>option.value===SMART_VALUE);
+    const count=[...availableSymbols].filter(symbol=>names[symbol]).length;
+    if(allOption)allOption.textContent=`Scan all ${count} available Deriv Volatility markets`;
+    if(![...marketPremium.options].some(option=>option.value===marketPremium.value)){
+      marketPremium.value=[...availableSymbols][0]||SMART_VALUE;
     }
   }
 
@@ -6194,7 +6262,6 @@ window.CASPER_ENGINE = (() => {
             })
           );
 
-          subscribeMarkets();
 
         }catch{
 
@@ -6259,36 +6326,41 @@ window.CASPER_ENGINE = (() => {
         ){
           availableSymbols.clear();
           for(const item of d.active_symbols){
-            const symbol=item.underlying_symbol||item.symbol;
-            const places=decimalPlaces(item.pip_size??item.pip);
-            if(symbol&&names[symbol]){
-              const suspended=Number(item.is_trading_suspended||0)===1;
-              if(!suspended)availableSymbols.add(symbol);
-              if(places!==null)pipSizes.set(symbol,places);
+            const symbol=String(item.underlying_symbol||item.symbol||'');
+            const displayName=String(item.underlying_symbol_name||item.display_name||'').trim();
+            // Deriv is the source of truth: discover current and newly launched
+            // Volatility indices dynamically; exclude unrelated synthetic markets.
+            const isVolatility=/\bvolatility\b/i.test(displayName) &&
+              (/^R_\d+$/i.test(symbol)||/^1HZ\d+V$/i.test(symbol));
+            if(!isVolatility)continue;
+            names[symbol]=displayName||symbol;
+            if(!premiumSymbolSet.has(symbol)){
+              premiumSymbolSet.add(symbol);
+              premiumSymbols.push(symbol);
             }
+            const places=decimalPlaces(item.pip_size??item.pip);
+            const suspended=Number(item.is_trading_suspended||0)===1;
+            if(!suspended)availableSymbols.add(symbol);
+            if(places!==null)pipSizes.set(symbol,places);
           }
           activeSymbolRegistryReady=true;
+          syncPremiumMarketOptions();
           const missing=premiumSymbols.filter(symbol=>!availableSymbols.has(symbol));
-          if(missing.length){
-            console.info('[CASPER] Premium markets not currently confirmed active by Deriv and will be skipped:',missing);
-          }
-          // Discover supported contracts per market before allowing a Premium
-          // candidate to reach the proposal endpoint. This prevents blindly
-          // sending DIGITMATCH/DIGITOVER/Rise-Fall to unsupported instruments.
+          if(missing.length)console.info('[CASPER] Symbols not confirmed active by Deriv and skipped:',missing);
+          // Subscribe only after the live market list is known, including new indices.
+          subscribeMarkets(availableSymbols);
           let requestIndex=0;
-          for(const symbol of premiumSymbols){
-            if(!availableSymbols.has(symbol))continue;
+          for(const symbol of availableSymbols){
             const reqId=contractDiscoveryRequestId++;
             contractRequestToSymbol.set(reqId,symbol);
-            try{
-              ws.send(JSON.stringify({contracts_for:symbol,req_id:reqId}));
-            }catch(error){
+            try{ws.send(JSON.stringify({contracts_for:symbol,req_id:reqId}));}
+            catch(error){
               contractRequestToSymbol.delete(reqId);
               console.warn('[CASPER] Could not request contract availability for',symbol,error);
             }
             requestIndex++;
           }
-          console.info(`[CASPER] Requested contract availability for ${requestIndex} active Premium markets.`);
+          console.info(`[CASPER] Requested contract availability for ${requestIndex} Deriv-active Volatility markets.`);
           return;
         }
 
@@ -6586,6 +6658,11 @@ window.CASPER_ENGINE = (() => {
 
 
           activeStrategy=newStrategy;
+          if(p==='premium'){
+            const premiumPanel=$('#premium');
+            if(premiumPanel)premiumPanel.classList.remove('transaction-focus');
+            transactionViewEstablished=false;
+          }
 
 
           if(p==='free'){
