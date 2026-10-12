@@ -1014,14 +1014,19 @@
       .transactions{overflow-x:hidden}
     }
 
-    /* Compact floating transaction control: users can hide/show the live ledger without stopping Demo execution. */
-    #txFloatingToggle{position:fixed;right:14px;bottom:18px;z-index:10000;border:1px solid #28b8c9;border-radius:999px;background:#08252d;color:#eafcff;box-shadow:0 8px 28px #0008;padding:10px 14px;font-size:12px;font-weight:850;letter-spacing:.02em;display:none;align-items:center;gap:7px;min-height:40px}
-    #txFloatingToggle[aria-expanded="true"]{background:#0b3842;border-color:#55e5ee}
-    #premium.tx-panel-hidden #transactionsPremium{display:none!important}
-    #premium.tx-panel-hidden.transaction-focus{display:block;max-width:1000px;margin:12px auto;padding:12px 14px;box-shadow:none}
-    #premium.tx-panel-hidden.transaction-focus>:not(#premiumMessage){display:none!important}
-    #premium.tx-panel-hidden #premiumMessage{margin:0;padding:10px;font-size:11px}
-    @media(max-width:520px){#txFloatingToggle{right:10px;bottom:12px;padding:9px 12px;min-height:38px}}
+    /* Reference-video behaviour: a compact floating handle opens the transaction drawer upward;
+       tapping it again slides the drawer down without hiding the trading screen or stopping the bot. */
+    #txFloatingToggle{position:fixed;right:14px;bottom:16px;z-index:10002;border:1px solid #28b8c9;border-radius:999px;background:#08252d;color:#eafcff;box-shadow:0 8px 28px #0008;padding:9px 13px;font-size:12px;font-weight:850;letter-spacing:.02em;display:none;align-items:center;gap:7px;min-height:38px;cursor:pointer}
+    #txFloatingToggle .txToggleArrow{font-size:17px;line-height:1;display:inline-block;transition:transform .22s ease}
+    #txFloatingToggle[aria-expanded="true"]{background:#0b3842;border-color:#55e5ee;bottom:min(64vh,560px)}
+    #txFloatingToggle[aria-expanded="true"] .txToggleArrow{transform:rotate(180deg)}
+    #transactionsPremium.tx-drawer{position:fixed!important;z-index:10001;left:0;right:0;bottom:0;width:min(100%,1000px);max-width:1000px;margin:0 auto!important;max-height:min(62vh,560px);overflow:auto;overscroll-behavior:contain;border:1px solid #1d5d69;border-bottom:0;border-radius:16px 16px 0 0;background:#06171d;box-shadow:0 -14px 45px #0009;padding:10px 12px calc(14px + env(safe-area-inset-bottom));transform:translateY(105%);visibility:hidden;pointer-events:none;transition:transform .24s ease,visibility .24s ease}
+    #transactionsPremium.tx-drawer.tx-drawer-open{transform:translateY(0);visibility:visible;pointer-events:auto}
+    #transactionsPremium.tx-drawer .txlist{max-height:26vh;overflow:auto}
+    #transactionsPremium.tx-drawer .transactionsHead{position:sticky;top:-10px;z-index:2;background:#06171d;padding:7px 2px 10px}
+    #transactionsPremium.tx-drawer .txstats{padding-bottom:4px}
+    @media(max-width:520px){#txFloatingToggle{right:10px;bottom:12px;padding:8px 11px;min-height:36px}#txFloatingToggle[aria-expanded="true"]{bottom:min(64vh,560px)}#transactionsPremium.tx-drawer{max-height:64vh;padding:8px 9px calc(12px + env(safe-area-inset-bottom))}#transactionsPremium.tx-drawer .txlist{max-height:29vh}}
+    @media(prefers-reduced-motion:reduce){#transactionsPremium.tx-drawer,#txFloatingToggle .txToggleArrow{transition:none}}
   </style>
 </head>
 
@@ -1270,7 +1275,7 @@
 </section>
 
 
-<button id="txFloatingToggle" type="button" aria-controls="transactionsPremium" aria-expanded="false" title="Show or hide transactions">☷ <span>Transactions</span></button>
+<button id="txFloatingToggle" type="button" aria-controls="transactionsPremium" aria-expanded="false" title="Show transactions"><span class="txToggleArrow" aria-hidden="true">⌃</span><span>Transactions</span></button>
 
 <section class="card panels" id="premium">
 
@@ -3536,28 +3541,28 @@ window.CASPER_ENGINE = (() => {
     logs.style.animationPlayState='running';
   }
 
-  let premiumTransactionsManuallyHidden=false;
+  let premiumTransactionsManuallyHidden=true;
   function syncPremiumTransactionToggle(){
     const btn=$('#txFloatingToggle');
-    const panel=$('#premium');
-    if(!btn||!panel)return;
-    const premiumActive=panel.classList.contains('active')||activeStrategy==='Matches Printer'||activeStrategy==='Over 8 Killer'||activeStrategy==='TickStrike Pro'||activeStrategy==='Auto Switcher';
+    const panel=$('#transactionsPremium');
+    const premium=$('#premium');
+    if(!btn||!panel||!premium)return;
+    const premiumActive=premium.classList.contains('active')||premiumStrategyNames.has(activeStrategy);
     btn.style.display=premiumActive?'inline-flex':'none';
-    const expanded=!premiumTransactionsManuallyHidden;
-    btn.setAttribute('aria-expanded',String(expanded));
-    const label=btn.querySelector('span');
-    if(label)label.textContent=expanded?'Hide Transactions':'Transactions';
-    panel.classList.toggle('tx-panel-hidden',premiumTransactionsManuallyHidden);
+    panel.classList.add('tx-drawer');
+    panel.classList.toggle('tx-drawer-open',!premiumTransactionsManuallyHidden);
+    btn.setAttribute('aria-expanded',String(!premiumTransactionsManuallyHidden));
+    btn.title=premiumTransactionsManuallyHidden?'Show transactions':'Hide transactions';
+    const label=btn.querySelector('span:not(.txToggleArrow)');
+    if(label)label.textContent=premiumTransactionsManuallyHidden?'Transactions':'Hide';
   }
   $('#txFloatingToggle')?.addEventListener('click',()=>{
     premiumTransactionsManuallyHidden=!premiumTransactionsManuallyHidden;
-    const panel=$('#premium');
-    if(panel){
-      if(premiumTransactionsManuallyHidden)panel.classList.remove('transaction-focus');
-      else panel.classList.add('transaction-focus');
-    }
     syncPremiumTransactionToggle();
-    if(!premiumTransactionsManuallyHidden){renderTransactions();$('#transactionsPremium')?.scrollIntoView({behavior:'smooth',block:'nearest'});}
+    if(!premiumTransactionsManuallyHidden){
+      renderTransactions();
+      requestAnimationFrame(()=>$('#transactionsPremium')?.scrollTo({top:0,behavior:'smooth'}));
+    }
   });
 
   function activateTransactionFocus(){
@@ -3567,19 +3572,11 @@ window.CASPER_ENGINE = (() => {
     if(overlay)overlay.classList.add('hidden');
     if(scanView)scanView.classList.remove('hidden');
     if(transactionView)transactionView.classList.add('hidden');
-
-    // A Premium run must keep the Premium panel visible. The previous code
-    // always focused the Free transaction list, hiding the Premium feedback.
     if(premiumStrategyNames.has(activeStrategy)){
-      const freePanel=$('#free');
-      const premiumPanel=$('#premium');
-      if(freePanel)freePanel.classList.remove('transaction-focus');
-      if(premiumPanel&&!premiumTransactionsManuallyHidden)premiumPanel.classList.add('transaction-focus');
-      if(premiumPanel&&premiumTransactionsManuallyHidden)premiumPanel.classList.add('tx-panel-hidden');
+      /* Keep the actual trading UI in place; transaction history is a separate slide-up drawer. */
+      premiumTransactionsManuallyHidden=false;
       syncPremiumTransactionToggle();
       renderTransactions();
-      const premiumList=$('#transactionsPremium');
-      if(premiumList)premiumList.scrollIntoView({behavior:'smooth',block:'start'});
       return;
     }
     const freePanel=$('#free');
@@ -4832,6 +4829,8 @@ window.CASPER_ENGINE = (() => {
 
     if(scanTransitionTimer){clearTimeout(scanTransitionTimer);scanTransitionTimer=null;}
     transactionViewEstablished=false;
+    premiumTransactionsManuallyHidden=true;
+    syncPremiumTransactionToggle();
     sessionSummaryShown=false;
     $('#free').classList.remove('transaction-focus');
     if(overlay){
@@ -4987,7 +4986,7 @@ window.CASPER_ENGINE = (() => {
       ? Number(trade.profit)
       : (Number.isFinite(buy)&&Number.isFinite(value)?value-buy:null);
     const plClass=plValue===null?'flat':plValue>0?'win':plValue<0?'loss':'flat';
-    const plText=plValue===null?'LIVE':`${plValue>0?'+':''}${plValue.toFixed(2)} ${escapeHTML(trade.currency||'USD')}`;
+    const plText=plValue===null?'LIVE':`${plValue>0?'+':''}${plValue.toFixed(2)} ${escapeHTML(trade.currency||'USD')} · LIVE`; 
     const quotedPayout=Number.isFinite(Number(trade.quotedPayout))?formatMoney(Number(trade.quotedPayout),trade.currency||'USD'):'—';
     const currentValue=Number.isFinite(value)?formatMoney(value,trade.currency||'USD'):'—';
     const time=trade.timestamp?new Date(trade.timestamp).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Live';
@@ -5080,6 +5079,8 @@ window.CASPER_ENGINE = (() => {
     sessionSummaryShown=false;
     hideSessionSummary();
     transactionViewEstablished=false;
+    premiumTransactionsManuallyHidden=true;
+    syncPremiumTransactionToggle();
     if(scanTransitionTimer){clearTimeout(scanTransitionTimer);scanTransitionTimer=null;}
     $('#free').classList.remove('transaction-focus');
 
