@@ -3415,6 +3415,11 @@ window.CASPER_ENGINE = (() => {
   let demoAutoRun=false;
   let demoRunSerial=0;
 
+  // Avoid repeatedly attempting the same rejected Premium setup. A rejected
+  // market/direction is temporarily sidelined so the scanner can rank the other
+  // configured markets; cooldowns never bypass the payout or validation gates.
+  const premiumCandidateCooldowns=new Map();
+
   let demoSessionPL=0;
 
   let demoSessionStake=0;
@@ -4200,7 +4205,15 @@ window.CASPER_ENGINE = (() => {
         const recentAccuracy=Number(validation.recentAccuracy);
         if(total<8){scanDiag.validation++;continue;}
         const digitContractStrategy=activeStrategy==='Matches Printer'||activeStrategy==='Over 8 Killer';
-        if(digitContractStrategy){
+        const autoSwitcherDemoCalibration=activeStrategy==='Auto Switcher';
+        if(autoSwitcherDemoCalibration){
+          /* Auto Switcher is Demo-only. Its purpose during calibration is to
+             gather forward-validation evidence; applying the mature Wilson
+             lower-bound gate before it can collect a new observation creates a
+             deadlock when early accuracy is below 50%. Keep a live-signal gate
+             here and label execution as exploratory Demo, never validated. */
+          if(Number(signal.confidence||0)<.54||Number(signal.score||0)<.48){scanDiag.quality++;continue;}
+        }else if(digitContractStrategy){
           /* Digit contracts have lower natural hit rates and often larger payouts.
              A universal 50% accuracy gate incorrectly makes them ineligible even
              when the offered payout could make their expected value positive.
@@ -4226,13 +4239,13 @@ window.CASPER_ENGINE = (() => {
         let direction=signal.direction;
         if(activeStrategy==='Auto Switcher'){
           const directionScore=Number(features.direction?.direction20||0);
-          if(Number(signal.confidence||0)<.58||Math.abs(directionScore)<.04)continue;
+          if(Number(signal.confidence||0)<.54||Math.abs(directionScore)<.025)continue;
           direction=directionScore>0?'RISE':'FALL';
-          // Require momentum alignment too; do not buy simply because a tiny
-          // directional score has a sign.
+          // Keep direction and momentum aligned, but don't require a strong
+          // mature-history threshold before Demo calibration can gather data.
           const momentum=Number(features.price?.momentum||0);
           const stability=Number(features.direction?.stability||0);
-          if(stability<.20||Math.abs(momentum)<.005)continue;
+          if(stability<.15||Math.abs(momentum)<.003)continue;
           if(direction==='RISE'&&momentum<=0)continue;
           if(direction==='FALL'&&momentum>=0)continue;
         }
@@ -4245,12 +4258,19 @@ window.CASPER_ENGINE = (() => {
           symbol, strategy:activeStrategy, baseStrategy:activeStrategy, direction,
           digit:signal.digit, confidence:Number(signal.confidence||0), score:Number(signal.score||0),
           reason:signal.reason||'premium_strategy_signal', snapshot:snap, validation,
-          executionTier:total<60?'demo_calibration':'validated'
+          executionTier:activeStrategy==='Auto Switcher'?'demo_calibration':(total<60?'demo_calibration':'validated')
         };
         // Never ask Deriv for a proposal on a market/contract combination until
         // contracts_for has confirmed that exact contract type is offered.
         const offeredTypes=contractTypesBySymbol.get(symbol);
         if(!(offeredTypes instanceof Set)||!offeredTypes.has(strategyToContract(candidate))){scanDiag.contract++;continue;}
+        const cooldownKey=smartComboKey(candidate);
+        const cooldownUntil=Number(premiumCandidateCooldowns.get(cooldownKey)||0);
+        if(cooldownUntil>Date.now()){
+          scanDiag.quality++;
+          continue;
+        }
+        if(cooldownUntil)premiumCandidateCooldowns.delete(cooldownKey);
         scanDiag.qualified++;
         // Prefer proven out-of-sample performance when mature, while still
         // ranking live confidence, score, stability and sample maturity.
@@ -4711,7 +4731,18 @@ window.CASPER_ENGINE = (() => {
 
       if(result.error){
         if(activeStrategy==='Smart AI')clearSmartCandidateLock(candidate);
-        if(demoAutoRun&&serial===demoRunSerial&&isRecoverableDemoError(result.message||result.reason||'')){
+        const failedText=String(result.message||result.reason||'');
+        if(premiumStrategyNames.has(activeStrategy)){
+          const cooldownKey=smartComboKey(candidate);
+          const isCalibrationRejection=/validation|calibration|exploratory floor|entry threshold|break-even|payout|lower bound|below this contract/i.test(failedText);
+          // Keep the same rejected market/direction out of the candidate pool
+          // long enough to let the scanner assess the other configured markets.
+          premiumCandidateCooldowns.set(cooldownKey,Date.now()+(isCalibrationRejection?60000:12000));
+        }
+        // A failed attempt on this exact tick is not a reason to hammer the
+        // same quote again. The next loop scans a different qualified setup.
+        if(candidateKey)lastExecutedCandidateKey=candidateKey;
+        if(demoAutoRun&&serial===demoRunSerial&&isRecoverableDemoError(failedText)){
           executionRecoveryAttempts++;
           $('#runMessage').textContent=
             `Demo execution connection recovered · resuming ${activeStrategy} scan (${executionRecoveryAttempts})…`;
@@ -5760,7 +5791,7 @@ window.CASPER_ENGINE = (() => {
       const observedLowerBound=Number(validation.lowerBound);
       const validationSamples=Number(validation.total||0);
       if(!Number.isFinite(quotedPayout)||quotedPayout<=askPrice){
-        throw new Error('Smart AI skipped this setup: Deriv did not quote a usable payout above the stake.');
+        throw new Error(`${candidate.strategy} skipped this setup: Deriv did not quote a usable payout above the stake.`);
       }
       let breakEvenRate=askPrice/quotedPayout;
       const requiredLowerBound=breakEvenRate+0.025;
@@ -5769,14 +5800,15 @@ window.CASPER_ENGINE = (() => {
       if(validationSamples<8){
         throw new Error('Demo calibration skipped: fewer than eight forward-validation observations are available for this strategy.');
       }
-      if(validationSamples>=60){
+      const autoSwitcherDemoExploration=candidate.strategy==='Auto Switcher'&&selectedAccountIsDemo();
+      if(validationSamples>=60&&!autoSwitcherDemoExploration){
         if(!Number.isFinite(observedLowerBound)||observedLowerBound<requiredLowerBound){
-          throw new Error(`Smart AI skipped before purchase: mature validation lower bound ${(Number.isFinite(observedLowerBound)?observedLowerBound*100:0).toFixed(1)}% does not clear quoted break-even ${(breakEvenRate*100).toFixed(1)}% plus safety margin. No contract was bought.`);
+          throw new Error(`${candidate.strategy} skipped before purchase: mature validation lower bound ${(Number.isFinite(observedLowerBound)?observedLowerBound*100:0).toFixed(1)}% does not clear quoted break-even ${(breakEvenRate*100).toFixed(1)}% plus safety margin. No contract was bought.`);
         }
         if(recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<breakEvenRate){
-          throw new Error(`Smart AI skipped before purchase: recent ${recentSamples}-sample accuracy ${(recentAccuracy*100).toFixed(1)}% is below the quoted break-even rate. No contract was bought.`);
+          throw new Error(`${candidate.strategy} skipped before purchase: recent ${recentSamples}-sample accuracy ${(recentAccuracy*100).toFixed(1)}% is below the quoted break-even rate. No contract was bought.`);
         }
-      }else{
+      }else if(!autoSwitcherDemoExploration){
         /* Calibration is Demo-only. Use contract-aware thresholds: a digit
            contract's observed hit rate must be compared with its own quoted
            break-even probability, not a blanket 40–50% directional threshold. */
@@ -5824,15 +5856,17 @@ window.CASPER_ENGINE = (() => {
         }else if(candidate.strategy==='Auto Switcher'){
           const f=latestSnapshot?.features||{};
           const directionalScore=Number(f.direction?.direction20||0);
-          premiumFreshFilter=Math.abs(directionalScore)>=.04&&
-            (freshDirection==='RISE'?directionalScore>0:freshDirection==='FALL'?directionalScore<0:false);
+          const momentum=Number(f.price?.momentum||0);
+          const stability=Number(f.direction?.stability||0);
+          premiumFreshFilter=Math.abs(directionalScore)>=.025&&stability>=.15&&Math.abs(momentum)>=.003&&
+            (freshDirection==='RISE'?directionalScore>0&&momentum>0:freshDirection==='FALL'?directionalScore<0&&momentum<0:false);
         }
         const sameDirection=Boolean(latestSignal?.actionable)&&premiumFreshFilter&&
           String(freshDirection||'').toUpperCase()===String(candidate.direction||'').toUpperCase()&&
           strategyToContract({...candidate, direction:freshDirection, digit:latestSignal?.digit??candidate.digit})===contractType;
         const freshConfidence=Number(latestSignal?.confidence||0);
         const freshScore=Number(latestSignal?.score||0);
-        const freshMinimum=candidate.executionTier==='demo_calibration' ? .64 : .585;
+        const freshMinimum=candidate.strategy==='Auto Switcher' ? .54 : (candidate.executionTier==='demo_calibration' ? .64 : .585);
         if(!latestSnapshot.ready||!sameDirection||freshConfidence<freshMinimum){
           throw new Error('Signal changed while the Demo proposal was loading. No contract was bought; scanning the newest market state.');
         }
@@ -5841,9 +5875,11 @@ window.CASPER_ENGINE = (() => {
         candidate.score=freshScore||candidate.score;
       }
 
-      const evidenceStatus=validationSamples>=60
-        ? `Validated lower bound ${(observedLowerBound*100).toFixed(1)}% · break-even ${(breakEvenRate*100).toFixed(1)}%`
-        : `Demo calibration · ${validationSamples} validation samples · break-even ${(breakEvenRate*100).toFixed(1)}%`;
+      const evidenceStatus=candidate.strategy==='Auto Switcher'
+        ? `Demo exploratory calibration · ${validationSamples} validation samples · break-even ${(breakEvenRate*100).toFixed(1)}% · not yet profitability-validated`
+        : validationSamples>=60
+          ? `Validated lower bound ${(observedLowerBound*100).toFixed(1)}% · break-even ${(breakEvenRate*100).toFixed(1)}%`
+          : `Demo calibration · ${validationSamples} validation samples · break-even ${(breakEvenRate*100).toFixed(1)}%`;
       updateTransactionOverlay({
         heading:'Evidence and payout confirmed',
         status:`${evidenceStatus} · buying Demo contract…`,
@@ -5874,49 +5910,64 @@ window.CASPER_ENGINE = (() => {
         });
       }catch(firstBuyError){
         const firstBuyText=String(firstBuyError?.message||firstBuyError||'');
-        /* Deriv can invalidate a proposal before BUY reaches its server-side
-           handler. If it explicitly says the proposal is unknown, request a
-           fresh quote for the exact same contract parameters and retry BUY
-           once only. Never loop or pretend the first BUY succeeded. */
         if(!/InvalidContractProposal|Unknown contract proposal/i.test(firstBuyText)){
           throw firstBuyError;
         }
-        $('#runMessage').textContent='Deriv no longer recognizes the quote. Refreshing the same Demo proposal once…';
-        if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent='Refreshing the same Demo proposal once…';
-        console.warn('[CASPER] Deriv rejected the proposal ID at BUY; requesting one fresh quote for the same Demo contract.',{
-          market:symbol, strategy:candidate.strategy, direction:candidate.direction,
-          duration:proposalPayload.duration, firstBuyError:firstBuyText
+
+        /* An unknown proposal ID must not be retried blindly and must not be
+           converted into a different contract request. Fetch a new quote for
+           the identical market/contract/stake/duration, re-check its price and
+           payout, then buy its fresh ID immediately (one retry only). */
+        const premiumLabel=premiumStrategyNames.has(activeStrategy)?activeStrategy:candidate.strategy;
+        const refreshMessage=`Deriv rejected an expired/unknown quote for ${premiumLabel}; requesting one fresh quote for the same Demo setup.`;
+        $('#runMessage').textContent=refreshMessage;
+        if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=refreshMessage;
+        console.warn('[CASPER] Unknown proposal ID. Refreshing the same quote once before retrying BUY.',{
+          market:symbol,strategy:candidate.strategy,direction:candidate.direction,
+          contractType:contractType,duration:proposalPayload.duration,firstBuyError:firstBuyText
         });
-        let refreshedResponse;
+
+        const freshResponse=await sendTradeRequest(proposalPayload);
+        if(freshResponse?.error){
+          throw new Error(`Deriv rejected the refreshed proposal: ${freshResponse.error.code||'API error'} — ${freshResponse.error.message||'no details returned'}. No contract was bought. Original BUY error: ${firstBuyText}`);
+        }
+        const freshProposal=freshResponse?.proposal;
+        if(freshResponse?.msg_type!=='proposal'||!freshProposal?.id){
+          throw new Error(`Deriv did not return a valid fresh proposal after rejecting the old ID. No contract was bought. Original BUY error: ${firstBuyText}`);
+        }
+        const freshAskPrice=Number(freshProposal.ask_price);
+        const freshPayout=Number(freshProposal.payout);
+        if(!Number.isFinite(freshAskPrice)||freshAskPrice<=0||!Number.isFinite(freshPayout)||freshPayout<=freshAskPrice){
+          throw new Error('The refreshed Deriv quote has an invalid price or payout. No contract was bought.');
+        }
+        if(freshAskPrice>askPrice+0.01){
+          throw new Error(`The refreshed quote costs ${freshAskPrice.toFixed(2)}, above the original maximum ${askPrice.toFixed(2)}. No contract was bought.`);
+        }
+        const freshBreakEven=freshAskPrice/freshPayout;
+        if(validationSamples>=60&&candidate.strategy!=='Auto Switcher'){
+          if(!Number.isFinite(observedLowerBound)||observedLowerBound<freshBreakEven+0.025){
+            throw new Error(`Refreshed quote skipped: validation lower bound does not clear the refreshed break-even threshold. No contract was bought.`);
+          }
+          if(recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<freshBreakEven){
+            throw new Error(`Refreshed quote skipped: recent validation is below the refreshed break-even rate. No contract was bought.`);
+          }
+        }else if(candidate.strategy!=='Auto Switcher'&&recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<Math.max(.40,freshBreakEven-.05)){
+          throw new Error(`Refreshed quote skipped: recent validation ${(recentAccuracy*100).toFixed(1)}% is below the refreshed contract's exploratory floor ${(Math.max(.40,freshBreakEven-.05)*100).toFixed(1)}%. No contract was bought.`);
+        }
+        if(enforceDemoRiskStop()){
+          throw new Error('Demo risk limit reached before the refreshed contract purchase.');
+        }
+        proposal=freshProposal;
+        askPrice=freshAskPrice;
         try{
-          refreshedResponse=await sendTradeRequest(proposalPayload);
-        }catch(refreshError){
-          throw new Error(`Deriv rejected the original proposal and the fresh-quote request also failed. No contract was bought. Original BUY error: ${firstBuyText}. Refresh error: ${String(refreshError?.message||refreshError)}`);
+          buyResponse=await sendTradeRequest({
+            buy:String(freshProposal.id),
+            price:askPrice
+          });
+        }catch(secondBuyError){
+          const secondText=String(secondBuyError?.message||secondBuyError||'Unknown BUY error');
+          throw new Error(`Deriv rejected both the original proposal ID and one freshly issued proposal ID. No contract was bought. Original BUY error: ${firstBuyText}. Fresh proposal BUY error: ${secondText}`);
         }
-        const refreshedProposal=refreshedResponse?.proposal;
-        const refreshedAsk=Number(refreshedProposal?.ask_price);
-        const refreshedPayout=Number(refreshedProposal?.payout);
-        if(refreshedResponse?.error||refreshedResponse?.msg_type!=='proposal'||!refreshedProposal?.id||!Number.isFinite(refreshedAsk)||refreshedAsk<=0||!Number.isFinite(refreshedPayout)||refreshedPayout<=refreshedAsk){
-          const reason=refreshedResponse?.error?`${refreshedResponse.error.code||'ProposalError'}: ${refreshedResponse.error.message||'fresh proposal rejected'}`:'Deriv did not return a valid fresh proposal with payout above stake';
-          throw new Error(`Deriv rejected the original proposal and the fresh quote could not be used. No contract was bought. ${reason}`);
-        }
-        const refreshedBreakEven=refreshedAsk/refreshedPayout;
-        if(validationSamples>=60&&(!Number.isFinite(observedLowerBound)||observedLowerBound<refreshedBreakEven+0.025)){
-          throw new Error('Fresh Deriv quote changed the break-even threshold; the validation gate no longer passes. No contract was bought.');
-        }
-        if(validationSamples>=60&&recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<refreshedBreakEven){
-          throw new Error('Fresh Deriv quote changed the break-even threshold; recent validation no longer passes. No contract was bought.');
-        }
-        proposal=refreshedProposal;
-        askPrice=refreshedAsk;
-        quotedPayout=refreshedPayout;
-        breakEvenRate=refreshedBreakEven;
-        $('#runMessage').textContent='Fresh Demo quote received. Sending one final BUY request…';
-        if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent='Fresh Demo quote received. Sending one final BUY request…';
-        buyResponse=await sendTradeRequest({
-          buy:String(proposal.id),
-          price:askPrice
-        });
       }
 
       const buy=
@@ -6129,7 +6180,7 @@ window.CASPER_ENGINE = (() => {
 
         currency,
 
-        proposalId:String(proposal.id),
+        proposalId:boughtViaDirectParameters?'direct-parameters':String(proposal?.id||''),
 
         contractId:String(contractId),
 
