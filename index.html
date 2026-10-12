@@ -5673,7 +5673,41 @@ window.CASPER_ENGINE = (() => {
         throw new Error(`Unsupported contract type: ${String(proposalPayload.contract_type)}. No proposal was sent.`);
       }
 
-      const proposalResponse=await sendTradeRequest(proposalPayload);
+      let proposalResponse;
+      try{
+        proposalResponse=await sendTradeRequest(proposalPayload);
+      }catch(firstError){
+        /* sendTradeRequest deliberately rejects on Deriv API errors. Handle the
+           rejection here (rather than checking proposalResponse.error, which can
+           never be reached for a rejected request) so the one permitted fallback
+           actually runs when a one-tick Rise/Fall proposal is refused. */
+        const firstText=String(firstError?.message||firstError||'');
+        const isDirectionalPremium=['Auto Switcher','TickStrike Pro','Rise & Fall'].includes(candidate.strategy);
+        const canRetryDuration=isDirectionalPremium&&
+          Number(proposalPayload.duration)===1&&
+          /invalidcontractproposal|invalid.{0,30}proposal|proposal.{0,30}(duration|invalid)|duration.{0,30}(invalid|unavailable|unsupported)/i.test(firstText);
+        if(!canRetryDuration)throw firstError;
+
+        const retryPayload={...proposalPayload,duration:5};
+        const retryText=`Deriv rejected the 1-tick proposal for ${names[symbol]||symbol}; retrying the same Demo Rise/Fall setup at 5 ticks.`;
+        $('#runMessage').textContent=retryText;
+        if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=retryText;
+        console.warn('[CASPER] One-tick proposal rejected; retrying same market, direction, stake and Demo account at five ticks.',{
+          request:proposalPayload,
+          firstError:firstText
+        });
+        try{
+          proposalResponse=await sendTradeRequest(retryPayload);
+          Object.assign(proposalPayload,retryPayload);
+        }catch(secondError){
+          const secondText=String(secondError?.message||secondError||'');
+          console.error('[CASPER] Both one-tick and five-tick proposals were rejected.',{
+            oneTick:{request:proposalPayload,error:firstText},
+            fiveTicks:{request:retryPayload,error:secondText}
+          });
+          throw new Error(`Deriv rejected both 1-tick and 5-tick proposals for ${names[symbol]||symbol}. No contract was bought. 1 tick: ${firstText}. 5 ticks: ${secondText}`);
+        }
+      }
 
       const proposal=
         proposalResponse.proposal;
