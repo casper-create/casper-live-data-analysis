@@ -1013,20 +1013,6 @@
       input,select,button{max-width:100%;font-size:16px}
       .transactions{overflow-x:hidden}
     }
-
-    /* Reference-video behaviour: a compact floating handle opens the transaction drawer upward;
-       tapping it again slides the drawer down without hiding the trading screen or stopping the bot. */
-    #txFloatingToggle{position:fixed;right:14px;bottom:16px;z-index:10002;border:1px solid #28b8c9;border-radius:999px;background:#08252d;color:#eafcff;box-shadow:0 8px 28px #0008;padding:9px 13px;font-size:12px;font-weight:850;letter-spacing:.02em;display:none;align-items:center;gap:7px;min-height:38px;cursor:pointer}
-    #txFloatingToggle .txToggleArrow{font-size:17px;line-height:1;display:inline-block;transition:transform .22s ease}
-    #txFloatingToggle[aria-expanded="true"]{background:#0b3842;border-color:#55e5ee;bottom:min(64vh,560px)}
-    #txFloatingToggle[aria-expanded="true"] .txToggleArrow{transform:rotate(180deg)}
-    #transactionsPremium.tx-drawer{position:fixed!important;z-index:10001;left:0;right:0;bottom:0;width:min(100%,1000px);max-width:1000px;margin:0 auto!important;max-height:min(62vh,560px);overflow:auto;overscroll-behavior:contain;border:1px solid #1d5d69;border-bottom:0;border-radius:16px 16px 0 0;background:#06171d;box-shadow:0 -14px 45px #0009;padding:10px 12px calc(14px + env(safe-area-inset-bottom));transform:translateY(105%);visibility:hidden;pointer-events:none;transition:transform .24s ease,visibility .24s ease}
-    #transactionsPremium.tx-drawer.tx-drawer-open{transform:translateY(0);visibility:visible;pointer-events:auto}
-    #transactionsPremium.tx-drawer .txlist{max-height:26vh;overflow:auto}
-    #transactionsPremium.tx-drawer .transactionsHead{position:sticky;top:-10px;z-index:2;background:#06171d;padding:7px 2px 10px}
-    #transactionsPremium.tx-drawer .txstats{padding-bottom:4px}
-    @media(max-width:520px){#txFloatingToggle{right:10px;bottom:12px;padding:8px 11px;min-height:36px}#txFloatingToggle[aria-expanded="true"]{bottom:min(64vh,560px)}#transactionsPremium.tx-drawer{max-height:64vh;padding:8px 9px calc(12px + env(safe-area-inset-bottom))}#transactionsPremium.tx-drawer .txlist{max-height:29vh}}
-    @media(prefers-reduced-motion:reduce){#transactionsPremium.tx-drawer,#txFloatingToggle .txToggleArrow{transition:none}}
   </style>
 </head>
 
@@ -1274,8 +1260,6 @@
 
 </section>
 
-
-<button id="txFloatingToggle" type="button" aria-controls="transactionsPremium" aria-expanded="false" title="Show transactions"><span class="txToggleArrow" aria-hidden="true">⌃</span><span>Transactions</span></button>
 
 <section class="card panels" id="premium">
 
@@ -3541,30 +3525,6 @@ window.CASPER_ENGINE = (() => {
     logs.style.animationPlayState='running';
   }
 
-  let premiumTransactionsManuallyHidden=true;
-  function syncPremiumTransactionToggle(){
-    const btn=$('#txFloatingToggle');
-    const panel=$('#transactionsPremium');
-    const premium=$('#premium');
-    if(!btn||!panel||!premium)return;
-    const premiumActive=premium.classList.contains('active')||premiumStrategyNames.has(activeStrategy);
-    btn.style.display=premiumActive?'inline-flex':'none';
-    panel.classList.add('tx-drawer');
-    panel.classList.toggle('tx-drawer-open',!premiumTransactionsManuallyHidden);
-    btn.setAttribute('aria-expanded',String(!premiumTransactionsManuallyHidden));
-    btn.title=premiumTransactionsManuallyHidden?'Show transactions':'Hide transactions';
-    const label=btn.querySelector('span:not(.txToggleArrow)');
-    if(label)label.textContent=premiumTransactionsManuallyHidden?'Transactions':'Hide';
-  }
-  $('#txFloatingToggle')?.addEventListener('click',()=>{
-    premiumTransactionsManuallyHidden=!premiumTransactionsManuallyHidden;
-    syncPremiumTransactionToggle();
-    if(!premiumTransactionsManuallyHidden){
-      renderTransactions();
-      requestAnimationFrame(()=>$('#transactionsPremium')?.scrollTo({top:0,behavior:'smooth'}));
-    }
-  });
-
   function activateTransactionFocus(){
     if(scanTransitionTimer){clearTimeout(scanTransitionTimer);scanTransitionTimer=null;}
     transactionViewEstablished=true;
@@ -3572,11 +3532,17 @@ window.CASPER_ENGINE = (() => {
     if(overlay)overlay.classList.add('hidden');
     if(scanView)scanView.classList.remove('hidden');
     if(transactionView)transactionView.classList.add('hidden');
+
+    // A Premium run must keep the Premium panel visible. The previous code
+    // always focused the Free transaction list, hiding the Premium feedback.
     if(premiumStrategyNames.has(activeStrategy)){
-      /* Keep the actual trading UI in place. The drawer stays in the user's
-         chosen open/closed state; only the floating button may open or close it. */
-      syncPremiumTransactionToggle();
+      const freePanel=$('#free');
+      const premiumPanel=$('#premium');
+      if(freePanel)freePanel.classList.remove('transaction-focus');
+      if(premiumPanel)premiumPanel.classList.add('transaction-focus');
       renderTransactions();
+      const premiumList=$('#transactionsPremium');
+      if(premiumList)premiumList.scrollIntoView({behavior:'smooth',block:'start'});
       return;
     }
     const freePanel=$('#free');
@@ -4246,7 +4212,7 @@ window.CASPER_ENGINE = (() => {
              lower-bound gate before it can collect a new observation creates a
              deadlock when early accuracy is below 50%. Keep a live-signal gate
              here and label execution as exploratory Demo, never validated. */
-          if(Number(signal.confidence||0)<.54||Number(signal.score||0)<.48){scanDiag.quality++;continue;}
+          if(Number(signal.confidence||0)<.50||Number(signal.score||0)<.40){scanDiag.quality++;continue;}
         }else if(digitContractStrategy){
           /* Digit contracts have lower natural hit rates and often larger payouts.
              A universal 50% accuracy gate incorrectly makes them ineligible even
@@ -4273,13 +4239,13 @@ window.CASPER_ENGINE = (() => {
         let direction=signal.direction;
         if(activeStrategy==='Auto Switcher'){
           const directionScore=Number(features.direction?.direction20||0);
-          if(Number(signal.confidence||0)<.54||Math.abs(directionScore)<.025)continue;
+          if(Number(signal.confidence||0)<.50||Math.abs(directionScore)<.008){scanDiag.quality++;continue;}
           direction=directionScore>0?'RISE':'FALL';
           // Keep direction and momentum aligned, but don't require a strong
           // mature-history threshold before Demo calibration can gather data.
           const momentum=Number(features.price?.momentum||0);
           const stability=Number(features.direction?.stability||0);
-          if(stability<.15||Math.abs(momentum)<.003)continue;
+          if(stability<.05||Math.abs(momentum)<.001){scanDiag.quality++;continue;}
           if(direction==='RISE'&&momentum<=0)continue;
           if(direction==='FALL'&&momentum>=0)continue;
         }
@@ -4698,14 +4664,6 @@ window.CASPER_ENGINE = (() => {
 
       if(!demoAutoRun||serial!==demoRunSerial)break;
 
-      // A settled contract can remain in memory only if a post-settlement UI or
-      // ledger operation was interrupted. It is safe to clear that stale row;
-      // never clear a genuinely open/unresolved contract.
-      if(activeDemoContract&&String(activeDemoContract.status||'').toLowerCase()==='settled'){
-        activeDemoContract=null;
-        renderTransactions();
-      }
-
       // Never place a second contract while a previously bought contract is
       // still open or unresolved. This guard also protects against a monitor
       // disconnect/timeout accidentally returning control to the scan loop.
@@ -4815,7 +4773,7 @@ window.CASPER_ENGINE = (() => {
         break;
       }
 
-      const settledMessage=`Demo result · ${result.profit>=0?'+':''}${Number(result.profit||0).toFixed(2)} USD · ${candidate.strategy} · ${names[candidate.symbol]||candidate.symbol} · ${demoSessionTrades} trades · ${continuousScanMessage()} · continues after this result unless Target / Max Loss is reached or Stop is pressed.`;
+      const settledMessage=`Demo result · ${result.profit>=0?'+':''}${Number(result.profit||0).toFixed(2)} USD · ${candidate.strategy} · ${names[candidate.symbol]||candidate.symbol} · ${demoSessionTrades} trades · ${continuousScanMessage()}`;
       $('#runMessage').textContent=settledMessage;
       if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=settledMessage;
 
@@ -4829,8 +4787,6 @@ window.CASPER_ENGINE = (() => {
 
     if(scanTransitionTimer){clearTimeout(scanTransitionTimer);scanTransitionTimer=null;}
     transactionViewEstablished=false;
-    premiumTransactionsManuallyHidden=true;
-    syncPremiumTransactionToggle();
     sessionSummaryShown=false;
     $('#free').classList.remove('transaction-focus');
     if(overlay){
@@ -4918,43 +4874,50 @@ window.CASPER_ENGINE = (() => {
      LOCAL DEMO TRADE HISTORY
      ========================================================== */
 
+  /*
+    Settlement history must not depend on browser storage being writable.
+    A privacy setting, quota error, or restricted browser context can make
+    localStorage throw. Keep an in-memory ledger as the live-session source
+    of truth, de-duplicate by Deriv contract ID, and persist best-effort.
+  */
+  let demoHistoryMemory=[];
+
   function readDemoHistory(){
-
     try{
-
-      const data=
-        JSON.parse(
-          localStorage.getItem(
-            DEMO_HISTORY_KEY
-          )||'[]'
-        );
-
-      return Array.isArray(data)
-        ? data
-        : [];
-
+      const data=JSON.parse(localStorage.getItem(DEMO_HISTORY_KEY)||'[]');
+      if(Array.isArray(data)){
+        // Merge persisted rows into memory without duplicating contract IDs.
+        const byId=new Map();
+        for(const row of [...data,...demoHistoryMemory]){
+          const id=String(row?.contractId||'');
+          const key=id||`${row?.timestamp||''}|${row?.market||''}|${row?.profit||''}`;
+          if(!byId.has(key))byId.set(key,row);
+        }
+        demoHistoryMemory=[...byId.values()].slice(0,100);
+      }
     }catch{
-
-      return [];
+      // Keep the in-memory ledger available for this page session.
     }
+    return demoHistoryMemory.slice();
   }
 
-
   function saveDemoTrade(record){
-
-    const history=
-      readDemoHistory();
-
-    history.unshift(record);
-
-    localStorage.setItem(
-      DEMO_HISTORY_KEY,
-      JSON.stringify(
-        history.slice(0,100)
-      )
-    );
-
+    const contractId=String(record?.contractId||'');
+    const history=readDemoHistory();
+    if(contractId&&history.some(row=>String(row?.contractId||'')===contractId)){
+      console.warn('[CASPER] Duplicate settled contract ignored:',contractId);
+      renderTransactions();
+      return false;
+    }
+    demoHistoryMemory=[record,...history].slice(0,100);
+    try{
+      localStorage.setItem(DEMO_HISTORY_KEY,JSON.stringify(demoHistoryMemory));
+    }catch(error){
+      console.warn('[CASPER] Could not persist history; result remains in the in-page ledger:',error);
+    }
+    // Always repaint even if persistence fails; the settled result is real.
     renderTransactions();
+    return true;
   }
 
 
@@ -4986,7 +4949,7 @@ window.CASPER_ENGINE = (() => {
       ? Number(trade.profit)
       : (Number.isFinite(buy)&&Number.isFinite(value)?value-buy:null);
     const plClass=plValue===null?'flat':plValue>0?'win':plValue<0?'loss':'flat';
-    const plText=plValue===null?'LIVE':`${plValue>0?'+':''}${plValue.toFixed(2)} ${escapeHTML(trade.currency||'USD')} · LIVE`; 
+    const plText=plValue===null?'LIVE':`${plValue>0?'+':''}${plValue.toFixed(2)} ${escapeHTML(trade.currency||'USD')}`;
     const quotedPayout=Number.isFinite(Number(trade.quotedPayout))?formatMoney(Number(trade.quotedPayout),trade.currency||'USD'):'—';
     const currentValue=Number.isFinite(value)?formatMoney(value,trade.currency||'USD'):'—';
     const time=trade.timestamp?new Date(trade.timestamp).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Live';
@@ -5079,13 +5042,13 @@ window.CASPER_ENGINE = (() => {
     sessionSummaryShown=false;
     hideSessionSummary();
     transactionViewEstablished=false;
-    premiumTransactionsManuallyHidden=true;
-    syncPremiumTransactionToggle();
     if(scanTransitionTimer){clearTimeout(scanTransitionTimer);scanTransitionTimer=null;}
     $('#free').classList.remove('transaction-focus');
 
     if(clearHistory){
-      localStorage.removeItem(DEMO_HISTORY_KEY);
+      demoHistoryMemory=[];
+      try{ localStorage.removeItem(DEMO_HISTORY_KEY); }
+      catch(error){ console.warn('[CASPER] Could not clear persisted history; in-page history was cleared.',error); }
     }
 
     renderTransactions();
@@ -5904,7 +5867,7 @@ window.CASPER_ENGINE = (() => {
           const directionalScore=Number(f.direction?.direction20||0);
           const momentum=Number(f.price?.momentum||0);
           const stability=Number(f.direction?.stability||0);
-          premiumFreshFilter=Math.abs(directionalScore)>=.025&&stability>=.15&&Math.abs(momentum)>=.003&&
+          premiumFreshFilter=Math.abs(directionalScore)>=.008&&stability>=.05&&Math.abs(momentum)>=.001&&
             (freshDirection==='RISE'?directionalScore>0&&momentum>0:freshDirection==='FALL'?directionalScore<0&&momentum<0:false);
         }
         const sameDirection=Boolean(latestSignal?.actionable)&&premiumFreshFilter&&
@@ -5912,7 +5875,7 @@ window.CASPER_ENGINE = (() => {
           strategyToContract({...candidate, direction:freshDirection, digit:latestSignal?.digit??candidate.digit})===contractType;
         const freshConfidence=Number(latestSignal?.confidence||0);
         const freshScore=Number(latestSignal?.score||0);
-        const freshMinimum=candidate.strategy==='Auto Switcher' ? .54 : (candidate.executionTier==='demo_calibration' ? .64 : .585);
+        const freshMinimum=candidate.strategy==='Auto Switcher' ? .50 : (candidate.executionTier==='demo_calibration' ? .64 : .585);
         if(!latestSnapshot.ready||!sameDirection||freshConfidence<freshMinimum){
           throw new Error('Signal changed while the Demo proposal was loading. No contract was bought; scanning the newest market state.');
         }
@@ -5949,10 +5912,36 @@ window.CASPER_ENGINE = (() => {
         Buy only on the authenticated Demo socket.
       */
       let buyResponse;
+      /* Refresh the quote immediately before BUY. Deriv proposal IDs can become
+         unknown/expired while the earlier payout and signal checks run. Keep the
+         same Demo market, direction, stake, currency, duration and barrier; never
+         silently change the intended contract. */
+      let boughtViaDirectParameters=false;
       try{
+        const immediateQuoteResponse=await sendTradeRequest(proposalPayload);
+        if(immediateQuoteResponse?.error){
+          throw new Error(`${immediateQuoteResponse.error.code||'Proposal error'}: ${immediateQuoteResponse.error.message||'Deriv rejected the fresh quote'}`);
+        }
+        const immediateQuote=immediateQuoteResponse?.proposal;
+        if(immediateQuoteResponse?.msg_type!=='proposal'||!immediateQuote?.id){
+          throw new Error(`Deriv did not return a fresh proposal immediately before BUY (received ${immediateQuoteResponse?.msg_type||'unknown response'}).`);
+        }
+        const immediateAsk=Number(immediateQuote.ask_price);
+        const immediatePayout=Number(immediateQuote.payout);
+        if(!Number.isFinite(immediateAsk)||immediateAsk<=0||!Number.isFinite(immediatePayout)||immediatePayout<=immediateAsk){
+          throw new Error('Deriv fresh pre-buy quote has an invalid stake or payout. No contract was bought.');
+        }
+        if(immediateAsk>askPrice+0.01){
+          throw new Error(`Fresh pre-buy quote rose from ${askPrice.toFixed(2)} to ${immediateAsk.toFixed(2)}; refusing the higher price. No contract was bought.`);
+        }
+        if(enforceDemoRiskStop()){
+          throw new Error('Demo risk limit reached before fresh-quote purchase.');
+        }
+        proposal=immediateQuote;
+        askPrice=immediateAsk;
         buyResponse=await sendTradeRequest({
-          buy:String(proposal.id),
-          price:askPrice
+          buy:String(immediateQuote.id),
+          price:immediateAsk
         });
       }catch(firstBuyError){
         const firstBuyText=String(firstBuyError?.message||firstBuyError||'');
@@ -6043,6 +6032,7 @@ window.CASPER_ENGINE = (() => {
             if(!buyResponse?.buy?.contract_id){
               throw new Error('Deriv direct-parameter purchase response did not include a contract_id.');
             }
+            boughtViaDirectParameters=true;
             console.info('[CASPER] Direct-parameter Demo purchase accepted after proposal-ID rejection.',{
               contractId:buyResponse.buy.contract_id,
               market:symbol,
@@ -6141,25 +6131,6 @@ window.CASPER_ENGINE = (() => {
             });
           }
         );
-
-      /*
-        SETTLEMENT LIFECYCLE GUARD:
-        Once Deriv has returned a final contract update, this contract is no
-        longer an open position. Mark it settled before doing any bookkeeping.
-        If a later UI/history operation throws, the continuous loop must not
-        mistake this already-closed contract for a live one and wait forever.
-      */
-      if(activeDemoContract&&normalizeContractId(activeDemoContract.contractId)===normalizeContractId(contractId)){
-        activeDemoContract.status='settled';
-        activeDemoContract.canSell=false;
-        activeDemoContract.sellPending=false;
-        const settledProfit=Number(finalContract.profit);
-        if(Number.isFinite(settledProfit))activeDemoContract.profit=settledProfit;
-        const settledEntry=Number(finalContract.entry_spot);
-        const settledExit=Number(finalContract.exit_spot);
-        if(Number.isFinite(settledEntry)&&settledEntry!==0)activeDemoContract.entrySpot=settledEntry;
-        if(Number.isFinite(settledExit)&&settledExit!==0)activeDemoContract.exitSpot=settledExit;
-      }
 
       const profit=
         Number(
@@ -6285,7 +6256,7 @@ window.CASPER_ENGINE = (() => {
 
         currency,
 
-        proposalId:String(proposal?.id||''),
+        proposalId:boughtViaDirectParameters?'direct-parameters':String(proposal?.id||''),
 
         contractId:String(contractId),
 
@@ -6375,35 +6346,19 @@ window.CASPER_ENGINE = (() => {
 
     }catch(error){
 
-      /*
-        A confirmed settlement is not an open contract. If a later formatting,
-        storage, or UI operation fails, clear only the already-settled row so
-        Auto Switcher can recover and continue. An actually open/unresolved
-        contract remains protected and is never replaced by another trade.
-      */
-      const settlementWasConfirmed=Boolean(activeDemoContract&&String(activeDemoContract.status||'').toLowerCase()==='settled');
-      if(settlementWasConfirmed){
-        activeDemoContract=null;
-        try{renderTransactions();}catch(renderError){console.warn('[CASPER] Transaction redraw after settled-contract recovery failed:',renderError);}
-      }
-
       console.error(
         '[CASPER] Demo execution error:',
         error
       );
 
-      const executionErrorMessage=settlementWasConfirmed
-        ? `Demo settlement received · recovering transaction bookkeeping and resuming scan · ${error.message||'post-settlement operation failed'}`
-        : `Demo execution stopped · ${error.message||'Unknown Deriv error'}`;
+      const executionErrorMessage=`Demo execution stopped · ${error.message||'Unknown Deriv error'}`;
       $('#runMessage').textContent=executionErrorMessage;
       if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=executionErrorMessage;
 
       updateTransactionOverlay({
-        heading:settlementWasConfirmed?'Settlement received · recovering':'Execution retry',
-        status:settlementWasConfirmed
-          ? `Deriv confirmed the contract result; recovering the transaction ledger and continuing the scan · ${error.message||'post-settlement operation failed'}`
-          : `Setup not purchased · ${error.message||'check Deriv response'} · scanning for the next qualified setup`,
-        contract:settlementWasConfirmed?'Contract settled · ledger recovery':'No completed contract recorded',
+        heading:'Execution retry',
+        status:`Setup not purchased · ${error.message||'check Deriv response'} · scanning for the next qualified setup`,
+        contract:'No completed contract recorded',
         progress:100
       });
 
@@ -7666,9 +7621,6 @@ window.CASPER_ENGINE = (() => {
       $('#stake').value=$('#stakePremium').value;
       $('#target').value=$('#targetPremium').value;
       $('#maxloss').value=$('#lossPremium').value;
-      premiumTransactionsManuallyHidden=false;
-      $('#premium').classList.remove('tx-panel-hidden');
-      syncPremiumTransactionToggle();
       $('#premiumMessage').textContent=`${activeStrategy} Demo session running · results use confirmed Deriv settlements; no win rate is guaranteed.`;
       startDemoRun();
     }
@@ -7851,7 +7803,6 @@ window.CASPER_ENGINE = (() => {
   );
 
   renderTransactions();
-  syncPremiumTransactionToggle();
 
   console.info(
     '[CASPER] Demo trade history:',
