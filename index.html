@@ -3573,8 +3573,8 @@ window.CASPER_ENGINE = (() => {
     if(scanView)scanView.classList.remove('hidden');
     if(transactionView)transactionView.classList.add('hidden');
     if(premiumStrategyNames.has(activeStrategy)){
-      /* Keep the actual trading UI in place; transaction history is a separate slide-up drawer. */
-      premiumTransactionsManuallyHidden=false;
+      /* Keep the actual trading UI in place. The drawer stays in the user's
+         chosen open/closed state; only the floating button may open or close it. */
       syncPremiumTransactionToggle();
       renderTransactions();
       return;
