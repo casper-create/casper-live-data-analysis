@@ -5578,6 +5578,10 @@ window.CASPER_ENGINE = (() => {
 
   async function executeDemoTradeOnce(candidateOverride=null){
 
+    /* Keep this flag in the execution function's outer scope. The direct-BUY
+       fallback may set it, and the completed transaction ledger reads it later. */
+    let boughtViaDirectParameters=false;
+
     if(demoTradeInProgress){
       return;
     }
@@ -5916,7 +5920,6 @@ window.CASPER_ENGINE = (() => {
          unknown/expired while the earlier payout and signal checks run. Keep the
          same Demo market, direction, stake, currency, duration and barrier; never
          silently change the intended contract. */
-      let boughtViaDirectParameters=false;
       try{
         const immediateQuoteResponse=await sendTradeRequest(proposalPayload);
         if(immediateQuoteResponse?.error){
