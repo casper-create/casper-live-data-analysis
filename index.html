@@ -5037,8 +5037,9 @@ window.CASPER_ENGINE = (() => {
     const sellButton=canSell?`<button class="txsell" type="button" data-sell-contract="${id}">× Sell</button>`:'';
     return `<div class="txrow txrow-active" data-active-contract="${id}">
       <div class="txcell"><div class="txmarketLine"><span class="txmarketIcon" aria-hidden="true">↗</span><div class="txmarket">${escapeHTML(trade.marketName||trade.symbol||'Deriv market')}</div></div>
-      <span class="txdetail">${escapeHTML(casperAt(trade.timestamp))} · Stake ${Number.isFinite(buy)?buy.toFixed(2):'—'} · Value ${Number.isFinite(value)?value.toFixed(2):'—'}</span></div>
-      <div class="txrowRight"><strong class="txpl ${plClass}">${plText}</strong>${sellButton}<span class="txlive">LIVE</span></div>
+      <span class="txdetail">${escapeHTML(casperAt(trade.timestamp))} · ${escapeHTML(trade.strategy||'Strategy')} ${escapeHTML(trade.direction||'')} · Stake ${Number.isFinite(buy)?buy.toFixed(2):'—'} ${escapeHTML(trade.currency||'USD')}</span>
+      <span class="txdetail">Entry ${trade.entrySpot!==null&&trade.entrySpot!==undefined?escapeHTML(formatSpot(trade.entrySpot,trade.symbol)):'—'} · Current ${trade.currentSpot!==null&&trade.currentSpot!==undefined?escapeHTML(formatSpot(trade.currentSpot,trade.symbol)):'—'} · Value ${Number.isFinite(value)?escapeHTML(formatMoney(value,trade.currency||'USD')):'—'}</span></div>
+      <div class="txrowRight"><strong class="txpl ${plClass}">${plText}</strong><span class="txdetail">Payout ${escapeHTML(quotedPayout)}</span>${sellButton}<span class="txlive">LIVE · #${id}</span></div>
     </div>`;
   }
 
@@ -5064,7 +5065,9 @@ window.CASPER_ENGINE = (() => {
       const strategy=escapeHTML(record.strategy||'Strategy');
       const status=record.status==='won'?'WIN':record.status==='lost'?'LOSS':'CLOSED';
       const stakeNum=Number.isFinite(Number(record.buyPrice))?Number(record.buyPrice).toFixed(2):'—';
-      return `<div class="txrow" title="${strategy} · ${direction} · ${status} · Payout ${payout}"><div class="txcell"><div class="txmarketLine"><span class="txmarketIcon" aria-hidden="true">↗</span><div class="txmarket">${market}</div></div><span class="txdetail">${escapeHTML(time)} · Stake ${stakeNum}</span></div><div class="txrowRight"><strong class="txpl ${cls}">${sign}${pl.toFixed(2)}</strong></div></div>`;
+      const entry=record.entrySpot!==null&&record.entrySpot!==undefined?formatSpot(record.entrySpot,record.market):'—';
+      const exit=record.exitSpot!==null&&record.exitSpot!==undefined?formatSpot(record.exitSpot,record.market):'—';
+      return `<div class="txrow" title="${strategy} · ${direction} · ${status} · Payout ${payout}"><div class="txcell"><div class="txmarketLine"><span class="txmarketIcon" aria-hidden="true">↗</span><div class="txmarket">${market}</div></div><span class="txdetail">${escapeHTML(time)} · ${strategy} ${direction} · ${status} · Stake ${stakeNum} ${escapeHTML(record.currency||'USD')}</span><span class="txdetail">Entry ${escapeHTML(entry)} · Exit ${escapeHTML(exit)} · Payout ${escapeHTML(payout)}</span></div><div class="txrowRight"><strong class="txpl ${cls}">${sign}${pl.toFixed(2)}</strong><span class="txdetail">${status}</span></div></div>`;
     }).join('');
     list.innerHTML=activeMarkup+historyMarkup;
   }
@@ -5123,6 +5126,7 @@ window.CASPER_ENGINE = (() => {
     transactionViewEstablished=false;
     if(scanTransitionTimer){clearTimeout(scanTransitionTimer);scanTransitionTimer=null;}
     $('#free').classList.remove('transaction-focus');
+    $('#premium').classList.remove('transaction-focus');
 
     if(clearHistory){
       demoHistoryMemory=[];
@@ -7042,8 +7046,29 @@ window.CASPER_ENGINE = (() => {
         ()=>{
 
           const p=b.dataset.panel;
+          /* Strategy cards are panel-specific. On tab change, use the card
+             visibly selected in that panel instead of carrying the other
+             panel's active strategy into RUN. */
+          if(!demoAutoRun&&(p==='free'||p==='premium')){
+            const selectedCard=$(`#${p} .strategy.selected`);
+            const panelStrategy=selectedCard?.dataset.strategy;
+            if(panelStrategy){
+              if(panelStrategy==='Smart AI'){
+                activeStrategy='Smart AI';
+                enterSmartMode();
+              }else{
+                if(activeStrategy==='Smart AI')leaveSmartMode();
+                activeStrategy=panelStrategy;
+              }
+              updateRunButton();
+            }
+          }
           if(p==='free'&&$('#free').classList.contains('transaction-focus')&&!demoAutoRun){
             $('#free').classList.remove('transaction-focus');
+            transactionViewEstablished=false;
+          }
+          if(p==='premium'&&$('#premium').classList.contains('transaction-focus')&&!demoAutoRun){
+            $('#premium').classList.remove('transaction-focus');
             transactionViewEstablished=false;
           }
 
