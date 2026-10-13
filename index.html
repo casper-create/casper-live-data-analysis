@@ -4284,7 +4284,7 @@ window.CASPER_ENGINE = (() => {
              lower-bound gate before it can collect a new observation creates a
              deadlock when early accuracy is below 50%. Keep a live-signal gate
              here and label execution as exploratory Demo, never validated. */
-          if(Number(signal.confidence||0)<.50||Number(signal.score||0)<.40){scanDiag.quality++;continue;}
+          if(Number(signal.confidence||0)<.68||Number(signal.score||0)<.60){scanDiag.quality++;continue;}
         }else if(digitContractStrategy){
           /* Digit contracts have lower natural hit rates and often larger payouts.
              A universal 50% accuracy gate incorrectly makes them ineligible even
@@ -4311,15 +4311,17 @@ window.CASPER_ENGINE = (() => {
         let direction=signal.direction;
         if(activeStrategy==='Auto Switcher'){
           const directionScore=Number(features.direction?.direction20||0);
-          if(Number(signal.confidence||0)<.50||Math.abs(directionScore)<.008){scanDiag.quality++;continue;}
+          if(Number(signal.confidence||0)<.68||Math.abs(directionScore)<.020){scanDiag.quality++;continue;}
           direction=directionScore>0?'RISE':'FALL';
           // Keep direction and momentum aligned, but don't require a strong
           // mature-history threshold before Demo calibration can gather data.
           const momentum=Number(features.price?.momentum||0);
           const stability=Number(features.direction?.stability||0);
-          if(stability<.05||Math.abs(momentum)<.001){scanDiag.quality++;continue;}
-          if(direction==='RISE'&&momentum<=0)continue;
-          if(direction==='FALL'&&momentum>=0)continue;
+          if(stability<.35||Math.abs(momentum)<.020){scanDiag.quality++;continue;}
+          if(direction==='RISE'&&(momentum<=0||directionScore<.020))continue;
+          if(direction==='FALL'&&(momentum>=0||directionScore>-.020))continue;
+          // Require the model's direct signal to agree with the independently ranked trend.
+          if(String(signal.direction||'').toUpperCase()!==direction)continue;
         }
         if(activeStrategy==='Matches Printer'){
           const digit=Number(signal.digit);
@@ -5896,6 +5898,13 @@ window.CASPER_ENGINE = (() => {
         throw new Error('Demo calibration skipped: fewer than eight forward-validation observations are available for this strategy.');
       }
       const autoSwitcherDemoExploration=candidate.strategy==='Auto Switcher'&&selectedAccountIsDemo();
+      if(autoSwitcherDemoExploration){
+        const autoRecentAccuracy=Number(validation.recentAccuracy);
+        const autoRecentSamples=Number(validation.recentTotal||0);
+        if(validationSamples<30||autoRecentSamples<12||!Number.isFinite(autoRecentAccuracy)||autoRecentAccuracy < breakEvenRate + 0.05){
+          throw new Error(`Auto Switcher skipped: it needs at least 30 validation observations and 12 recent outcomes, with recent accuracy at least 5 percentage points above this contract's ${ (breakEvenRate*100).toFixed(1) }% break-even rate. No contract was bought.`);
+        }
+      }
       if(validationSamples>=60&&!autoSwitcherDemoExploration){
         if(!Number.isFinite(observedLowerBound)||observedLowerBound<requiredLowerBound){
           throw new Error(`${candidate.strategy} skipped before purchase: mature validation lower bound ${(Number.isFinite(observedLowerBound)?observedLowerBound*100:0).toFixed(1)}% does not clear quoted break-even ${(breakEvenRate*100).toFixed(1)}% plus safety margin. No contract was bought.`);
@@ -5961,7 +5970,7 @@ window.CASPER_ENGINE = (() => {
           strategyToContract({...candidate, direction:freshDirection, digit:latestSignal?.digit??candidate.digit})===contractType;
         const freshConfidence=Number(latestSignal?.confidence||0);
         const freshScore=Number(latestSignal?.score||0);
-        const freshMinimum=candidate.strategy==='Auto Switcher' ? .50 : (candidate.executionTier==='demo_calibration' ? .64 : .585);
+        const freshMinimum=candidate.strategy==='Auto Switcher' ? .68 : (candidate.executionTier==='demo_calibration' ? .64 : .585);
         if(!latestSnapshot.ready||!sameDirection||freshConfidence<freshMinimum){
           throw new Error('Signal changed while the Demo proposal was loading. No contract was bought; scanning the newest market state.');
         }
