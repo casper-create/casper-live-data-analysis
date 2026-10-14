@@ -1149,7 +1149,7 @@
     <button class="strategy" data-strategy="Mix Both">
       <span class="ico">⤨</span>
       <b>Mix Both</b>
-      <p>Compare direction and parity signals</p>
+      <p>Mixes Rise/Fall and Even/Odd: trades whichever is stronger</p>
     </button>
 
     <button class="strategy selected" data-strategy="Smart AI">
@@ -1192,7 +1192,7 @@
       <div class="risknote" id="riskNote">
         ▱ &nbsp;Martingale ×1.6 on loss (capped at 2 steps)
       </div>
-      <label class="edgeToggle"><input type="checkbox" class="edgeGate" checked><span>Only trade when this card's own results beat break-even (sit out otherwise)</span></label>
+      <label class="edgeToggle"><input type="checkbox" class="edgeGate"><span>Evidence gate: sit out unless this card's own results beat break-even (OFF = Demo explores every signal)</span></label>
     </div>
 
   </div>
@@ -1357,8 +1357,7 @@
       <span class="lock">▣ ALPHA</span>
       <b>Matches Printer</b>
       <p>
-        Smart digit-match analysis with probability concentration, stability and forward-validation filters.
-      </p>
+        Smart digit matching: locks onto the digit that is most concentrated right now and trades only when its own results beat break-even.</p>
     </button>
 
     <button class="strategy" data-strategy="Over 8 Killer">
@@ -1366,8 +1365,7 @@
       <span class="lock">▣ QUANTUM</span>
       <b>Over 8 Killer</b>
       <p>
-        Over 8 sniper: filters live digit distribution and forward validation before entry.
-      </p>
+        Over 8 sniper: waits until digit 9 is over-represented, then trades only when its own results beat break-even.</p>
     </button>
 
     <button class="strategy" data-strategy="TickStrike Pro">
@@ -1375,8 +1373,7 @@
       <span class="lock">▣ APEX</span>
       <b>TickStrike Pro</b>
       <p>
-        High-speed tick momentum plays using direction persistence, trend and live-tick stability.
-      </p>
+        High-speed tick momentum plays: 3+ same-direction ticks with aligned momentum and a stable direction.</p>
     </button>
 
     <button class="strategy" data-strategy="Auto Switcher">
@@ -1384,8 +1381,7 @@
       <span class="lock">▣ APEX</span>
       <b>Auto Switcher</b>
       <p>
-        Automatically switches between Rise and Fall using the current live directional signal.
-      </p>
+        Switches between Rise and Fall: scores following the trend against fading it on every tick, trades the one that has been right lately, and sits out when neither is.</p>
     </button>
 
   </div>
@@ -1431,7 +1427,7 @@
 
   </div>
 
-  <div class="control" style="margin-top:14px"><label class="edgeToggle"><input type="checkbox" class="edgeGate" checked><span>Only trade when this card's own results beat break-even (sit out otherwise)</span></label></div>
+  <div class="control" style="margin-top:14px"><label class="edgeToggle"><input type="checkbox" class="edgeGate"><span>Evidence gate: sit out unless this card's own results beat break-even (OFF = Demo explores every signal)</span></label></div>
 
   <button class="run" id="premiumRunBtn"
     style="background:linear-gradient(100deg,#ffc629,#a450ef);color:#111">
@@ -1509,7 +1505,7 @@
 
 <p class="foot">
   CASPER LIVE DATA ANALYSIS · Premium transaction-focus build ·
-  Demo execution enabled · Four strategies available for testing · Real trading disabled · build 2026-10-16
+  Demo execution enabled · Four strategies available for testing · Real trading disabled · build 2026-10-19
 </p>
 
 </main>
@@ -1646,7 +1642,7 @@ window.CASPER_ENGINE = (() => {
     const m=(1+c)/(2+n),sd=Math.sqrt(m*(1-m)/(3+n));
     return normCdf((m-be)/sd);
   }
-  let EDGE_GATE=true; /* user switch: true = only trade with measured evidence; false = trade every signal (Demo exploration) */
+  let EDGE_GATE=false; /* user switch: true = only trade with measured evidence; false = trade every signal (Demo exploration) */
   function edgeCheck(rec,key){
     const be=BREAK_EVEN[key],need=EDGE_MIN_N[key];
     if(!EDGE_GATE){
@@ -3390,6 +3386,8 @@ window.CASPER_ENGINE = (() => {
 
       setEdgeGate:v=>{EDGE_GATE=Boolean(v);},
 
+      getEdgeGate:()=>EDGE_GATE,
+
       decide,
 
       snapshot,
@@ -3620,6 +3618,9 @@ window.CASPER_ENGINE = (() => {
   const tradePending=new Map();
 
   const contractWatchers=new Map();
+  /* Speed: reuse a very recent quote for the same market/contract/stake instead of waiting for a new one.
+     The buy carries a max price, so a stale quote can never overpay; a rejection falls back to the slow path. */
+  const quoteCache=new Map();
 
   let demoTradeInProgress=false;
   let demoAutoRun=false;
@@ -4830,7 +4831,7 @@ window.CASPER_ENGINE = (() => {
       }
 
       $('#runMessage').textContent=
-        `${candidate.strategy} selected ${names[candidate.symbol]||candidate.symbol} · ${candidate.direction||''} · ${(candidate.confidence*100).toFixed(1)}% · ${candidate.executionTier||'validated'} · executing Demo`;
+        `${candidate.strategy} selected ${names[candidate.symbol]||candidate.symbol} · ${candidate.direction||''} · ${(candidate.confidence*100).toFixed(1)}% · ${candidate.reason||''} · ${candidate.executionTier||'validated'} · executing Demo`;
 
       const result=await executeDemoTradeOnce(candidate);
 
@@ -5789,7 +5790,7 @@ window.CASPER_ENGINE = (() => {
 
     updateRunButton();
 
-    const proposalStatus=`Preparing Demo proposal · ${names[symbol]||symbol} · ${candidate.strategy} · ${candidate.direction||''} · confidence ${(candidate.confidence*100).toFixed(1)}%`;
+    const proposalStatus=`Preparing Demo proposal · ${names[symbol]||symbol} · ${candidate.strategy} · ${candidate.direction||''} · confidence ${(candidate.confidence*100).toFixed(1)}% · ${candidate.reason||''}`;
     $('#runMessage').textContent=proposalStatus;
     if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=proposalStatus;
 
@@ -5838,8 +5839,15 @@ window.CASPER_ENGINE = (() => {
       }
 
       let proposalResponse;
+      const __ck=JSON.stringify(proposalPayload),__cq=quoteCache.get(__ck);
       try{
-        proposalResponse=await sendTradeRequest(proposalPayload);
+        if(__cq&&Date.now()-__cq.t<15000){
+          proposalResponse=__cq.r;
+        }else{
+          proposalResponse=await sendTradeRequest(proposalPayload);
+          if(quoteCache.size>60)quoteCache.clear();
+          quoteCache.set(__ck,{t:Date.now(),r:proposalResponse});
+        }
       }catch(firstError){
         /* sendTradeRequest deliberately rejects on Deriv API errors. Handle the
            rejection here (rather than checking proposalResponse.error, which can
@@ -5933,7 +5941,7 @@ window.CASPER_ENGINE = (() => {
       if(validationSamples<8){
         throw new Error('Demo calibration skipped: fewer than eight forward-validation observations are available for this strategy.');
       }
-      const autoSwitcherDemoExploration=false; /* every card now obeys its own edge gate */
+      const autoSwitcherDemoExploration=!casperEngine.getEdgeGate(); /* gate OFF = Demo exploration: skip the mature-edge checks too */
       if(validationSamples>=60&&!autoSwitcherDemoExploration){
         if(!Number.isFinite(observedLowerBound)||observedLowerBound<requiredLowerBound){
           throw new Error(`${candidate.strategy} skipped before purchase: mature validation lower bound ${(Number.isFinite(observedLowerBound)?observedLowerBound*100:0).toFixed(1)}% does not clear quoted break-even ${(breakEvenRate*100).toFixed(1)}% plus safety margin. No contract was bought.`);
@@ -6021,7 +6029,23 @@ window.CASPER_ENGINE = (() => {
       /*
         Buy only on the authenticated Demo socket.
       */
-      let buyResponse;
+      let buyResponse=null;
+      /* FAST PATH: buy straight from the contract terms with a max price. Fallback = the original quote-then-buy path. */
+      try{
+        const fastParams={
+          amount:Number(proposalPayload.amount),basis:String(proposalPayload.basis),
+          contract_type:String(proposalPayload.contract_type),currency:String(proposalPayload.currency),
+          duration:Number(proposalPayload.duration),duration_unit:String(proposalPayload.duration_unit),
+          underlying_symbol:String(proposalPayload.underlying_symbol)
+        };
+        if(proposalPayload.barrier!==undefined)fastParams.barrier=String(proposalPayload.barrier);
+        const fast=await sendTradeRequest({buy:'1',parameters:fastParams,price:Number((askPrice+0.01).toFixed(2))});
+        if(fast?.buy?.contract_id){buyResponse=fast;buyResponse.__casperBoughtViaDirectParameters=true;}
+      }catch(fastError){
+        console.info('[CASPER] fast buy declined, using the standard quote-then-buy path:',String(fastError?.message||fastError).slice(0,160));
+        quoteCache.delete(__ck);
+      }
+      if(!buyResponse){
       /* Refresh the quote immediately before BUY. Deriv proposal IDs can become
          unknown/expired while the earlier payout and signal checks run. Keep the
          same Demo market, direction, stake, currency, duration and barrier; never
@@ -6088,14 +6112,14 @@ window.CASPER_ENGINE = (() => {
           throw new Error(`The refreshed quote costs ${freshAskPrice.toFixed(2)}, above the original maximum ${askPrice.toFixed(2)}. No contract was bought.`);
         }
         const freshBreakEven=freshAskPrice/freshPayout;
-        if(validationSamples>=60&&candidate.strategy!=='Auto Switcher'){
+        if(validationSamples>=60&&casperEngine.getEdgeGate()){
           if(!Number.isFinite(observedLowerBound)||observedLowerBound<freshBreakEven+0.025){
             throw new Error(`Refreshed quote skipped: validation lower bound does not clear the refreshed break-even threshold. No contract was bought.`);
           }
           if(recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<freshBreakEven){
             throw new Error(`Refreshed quote skipped: recent validation is below the refreshed break-even rate. No contract was bought.`);
           }
-        }else if(candidate.strategy!=='Auto Switcher'&&recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<Math.max(.40,freshBreakEven-.05)){
+        }else if(casperEngine.getEdgeGate()&&recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<Math.max(.40,freshBreakEven-.05)){
           throw new Error(`Refreshed quote skipped: recent validation ${(recentAccuracy*100).toFixed(1)}% is below the refreshed contract's exploratory floor ${(Math.max(.40,freshBreakEven-.05)*100).toFixed(1)}%. No contract was bought.`);
         }
         if(enforceDemoRiskStop()){
@@ -6154,6 +6178,8 @@ window.CASPER_ENGINE = (() => {
             throw new Error(`Deriv rejected both proposal IDs and the documented direct-parameter Demo purchase. No confirmed contract was returned. Original BUY error: ${firstBuyText}. Fresh proposal BUY error: ${secondText}. Direct BUY error: ${directText}`);
           }
         }
+      }
+
       }
 
       const __t2=performance.now();
