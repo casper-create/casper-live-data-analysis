@@ -1013,6 +1013,12 @@
       input,select,button{max-width:100%;font-size:16px}
       .transactions{overflow-x:hidden}
     }
+    .tab .ti{margin-right:8px}
+    .txscore{padding:8px 14px 11px;font-size:11px;line-height:1.45;color:var(--muted)}
+    .txscore b{font-weight:800}.txscore .bad{color:#d4445a}.txscore .good{color:#16806c}
+    .transaction-focus .txscore{color:#5d6d77}
+    .edgeToggle{display:flex;gap:10px;align-items:flex-start;margin-top:10px;color:var(--muted);font-size:13px;line-height:1.35}
+    .edgeToggle input{margin-top:2px;width:auto;min-height:0}
     /* Manual Trading card (standalone) */
     .mtTop{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
     .mtTop select,.mtTop input,.mtPanel input,.mtPanel select{background:#091d25;border:1px solid var(--line);border-radius:12px;color:#fff;padding:12px 14px;font-weight:650;min-width:0;width:100%}
@@ -1055,9 +1061,11 @@
       .login{padding:10px 11px;font-size:13px;white-space:nowrap}
     }
     @media(max-width:850px){
-      body{padding-bottom:74px}
-      .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:8px;border-top:1px solid var(--line);border-bottom:0}
-      .tab{min-width:0;padding:9px 4px;font-size:11.5px;line-height:1.2;white-space:normal;border-radius:16px}
+      body{padding-bottom:66px}
+      .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;padding:0;border-top:1px solid var(--line);border-bottom:0}
+      .tab{min-width:0;display:flex;flex-direction:column;align-items:center;padding:7px 2px 8px;font-size:10.5px;font-weight:650;line-height:1.15;white-space:normal;text-align:center;background:transparent;border:0;border-top:2px solid transparent;border-radius:0;box-shadow:none;color:#9bb3c2}
+      .tab.active{background:transparent;box-shadow:none;border-top-color:var(--cyan);color:#fff}
+      .tab .ti{display:block;margin:0 0 3px;font-size:19px;line-height:1}
       .toast{bottom:86px}
     }
   </style>
@@ -1144,7 +1152,7 @@
     <button class="strategy" data-strategy="Mix Both">
       <span class="ico">⤨</span>
       <b>Mix Both</b>
-      <p>Compare direction and parity signals</p>
+      <p>Mixes Rise/Fall and Even/Odd: trades whichever is stronger</p>
     </button>
 
     <button class="strategy selected" data-strategy="Smart AI">
@@ -1185,8 +1193,9 @@
       </div>
 
       <div class="risknote" id="riskNote">
-        ▱ &nbsp;Medium risk preset · stake escalation disabled during validation
+        ▱ &nbsp;Martingale ×1.6 on loss (capped at 2 steps)
       </div>
+      <label class="edgeToggle"><input type="checkbox" class="edgeGate"><span>Evidence gate: sit out unless this card's own results beat break-even (OFF = Demo explores every signal)</span></label>
     </div>
 
   </div>
@@ -1303,6 +1312,7 @@
       <div class="txstat"><small>Contracts Won</small><strong id="txWinsFree" class="good">0</strong></div>
       <div class="txstat"><small>Total P/L</small><strong id="txPLFree">0.00 USD</strong></div>
     </div>
+    <div class="txscore" id="txScoreFree">Hit rate vs break-even appears after your first settled trades.</div>
   </div>
 
 </section>
@@ -1351,8 +1361,7 @@
       <span class="lock">▣ ALPHA</span>
       <b>Matches Printer</b>
       <p>
-        Smart digit-match analysis with probability concentration, stability and forward-validation filters.
-      </p>
+        Smart digit matching: locks onto the digit that is most concentrated right now and trades only when its own results beat break-even.</p>
     </button>
 
     <button class="strategy" data-strategy="Over 8 Killer">
@@ -1360,8 +1369,7 @@
       <span class="lock">▣ QUANTUM</span>
       <b>Over 8 Killer</b>
       <p>
-        Over 8 sniper: filters live digit distribution and forward validation before entry.
-      </p>
+        Over 8 sniper: waits until digit 9 is over-represented, then trades only when its own results beat break-even.</p>
     </button>
 
     <button class="strategy" data-strategy="TickStrike Pro">
@@ -1369,8 +1377,7 @@
       <span class="lock">▣ APEX</span>
       <b>TickStrike Pro</b>
       <p>
-        High-speed tick momentum plays using direction persistence, trend and live-tick stability.
-      </p>
+        High-speed tick momentum plays: 3+ same-direction ticks with aligned momentum and a stable direction.</p>
     </button>
 
     <button class="strategy" data-strategy="Auto Switcher">
@@ -1378,8 +1385,7 @@
       <span class="lock">▣ APEX</span>
       <b>Auto Switcher</b>
       <p>
-        Automatically switches between Rise and Fall using the current live directional signal.
-      </p>
+        Switches between Rise and Fall: scores following the trend against fading it on every tick, trades the one that has been right lately, and sits out when neither is.</p>
     </button>
 
   </div>
@@ -1425,6 +1431,8 @@
 
   </div>
 
+  <div class="control" style="margin-top:14px"><label class="edgeToggle"><input type="checkbox" class="edgeGate"><span>Evidence gate: sit out unless this card's own results beat break-even (OFF = Demo explores every signal)</span></label></div>
+
   <button class="run" id="premiumRunBtn"
     style="background:linear-gradient(100deg,#ffc629,#a450ef);color:#111">
     ▣ &nbsp;Start Premium Demo Run
@@ -1454,6 +1462,7 @@
       <div class="txstat"><small>Contracts Won</small><strong id="txWinsPremium" class="good">0</strong></div>
       <div class="txstat"><small>Total P/L</small><strong id="txPLPremium">0.00 USD</strong></div>
     </div>
+    <div class="txscore" id="txScorePremium">Hit rate vs break-even appears after your first settled trades.</div>
   </div>
 
 </section>
@@ -1501,7 +1510,7 @@
 
 <p class="foot">
   CASPER LIVE DATA ANALYSIS · Premium transaction-focus build ·
-  Demo execution enabled · Four strategies available for testing · Real trading disabled · build 2026-10-13
+  Demo execution enabled · Four strategies available for testing · Real trading disabled · build 2026-10-21
 </p>
 
 </main>
@@ -1624,6 +1633,32 @@ window.CASPER_ENGINE = (() => {
      This is not a claim of profitability; the mature tier still needs 60 samples. */
   const DEMO_CALIBRATION_MINIMUM = 8;
   const SMART_MIN_LOWER_BOUND = 0.52;
+  /* Break-even hit rates for 1-tick contracts at typical Deriv quotes (1/payout). A card only
+     trades when ITS OWN measured forward hit rate beats this; otherwise it sits out. */
+  const BREAK_EVEN={rf:.56,parity:.52,match:.108,over8:.108};
+  const EDGE_MIN_N={rf:50,parity:50,match:150,over8:150};
+  /* A card must be at least this sure (Bayesian posterior) that its true hit rate beats break-even.
+     0.99 because the check runs on every tick, and repeated looks make a lower bar pass by luck. */
+  const EDGE_CONFIDENCE=.99;
+  const normCdf=z=>{const t=1/(1+.2316419*Math.abs(z)),d=.3989423*Math.exp(-z*z/2),p=d*t*(.3193815+t*(-.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return z>0?1-p:p;};
+  /* Posterior P(true hit rate > break-even), flat Beta(1,1) prior, normal approximation. */
+  function pEdge(rec,be){
+    const n=Number(rec.total||0),c=rec.correct!==undefined?Number(rec.correct):Math.round(Number(rec.accuracy||0)*n);
+    const m=(1+c)/(2+n),sd=Math.sqrt(m*(1-m)/(3+n));
+    return normCdf((m-be)/sd);
+  }
+  let EDGE_GATE=false; /* user switch: true = only trade with measured evidence; false = trade every signal (Demo exploration) */
+  function edgeCheck(rec,key){
+    const be=BREAK_EVEN[key],need=EDGE_MIN_N[key];
+    if(!EDGE_GATE){
+      return rec&&rec.total>=8?{ok:true,be,why:''}:{ok:false,be,why:`warming up (${rec?rec.total:0}/8 validated calls)`};
+    }
+    if(!rec||!(rec.total>=need))return {ok:false,be,why:`warming up (${rec?rec.total:0}/${need} validated calls)`};
+    const pe=pEdge(rec,be);
+    if(pe<EDGE_CONFIDENCE)return {ok:false,be,pEdge:pe,why:`measured ${(rec.accuracy*100).toFixed(1)}% vs break-even ${(be*100).toFixed(1)}% · only ${(pe*100).toFixed(0)}% sure of a real edge (needs ${(EDGE_CONFIDENCE*100).toFixed(0)}%)`};
+    if(rec.recentTotal>=12&&rec.recentAccuracy!==null&&rec.recentAccuracy<be-.05)return {ok:false,be,why:`recent hit rate ${(rec.recentAccuracy*100).toFixed(1)}% is fading`};
+    return {ok:true,be,pEdge:pEdge(rec,be),why:''};
+  }
 
   const clamp = (v,min,max) =>
     Math.max(min,Math.min(max,v));
@@ -1723,7 +1758,9 @@ window.CASPER_ENGINE = (() => {
         even:{total:0,correct:0},
         odd:{total:0,correct:0},
         over8:{total:0,correct:0},
-        match:{total:0,correct:0}
+        match:{total:0,correct:0},
+        tickStrike:{total:0,correct:0},
+        autoSwitch:{total:0,correct:0}
       },
 
       /* Rolling walk-forward accuracy.  These samples are deliberately
@@ -1734,8 +1771,13 @@ window.CASPER_ENGINE = (() => {
         even:[],
         odd:[],
         over8:[],
-        match:[]
-      }
+        match:[],
+        tickStrike:[],
+        autoSwitch:[]
+      },
+
+      /* Auto Switcher's own memory: how often 'follow the lean' vs 'fade the lean' was right. */
+      switcher:{pred:null,w:[1,1,1,1,1,1],acc:[[],[],[],[],[],[]]}
     };
   }
 
@@ -2319,10 +2361,60 @@ window.CASPER_ENGINE = (() => {
       return {strategy:'Mix Both',baseStrategy:best.strategy,actionable:best.actionable&&confidence>=.61,direction:best.direction,confidence,score:best.score,reason:'cross_strategy_free_comparison',component:best};
     }
 
-    function calculateSignals(features){
+    /* TickStrike Pro: its OWN engine. Short-burst continuation: 3+ same-direction ticks,
+       momentum aligned, stable direction. Shares nothing with the Rise/Fall card. */
+    const SW_NAMES=['follow20','fade20','follow5','fade5','follow1','fade1'];
+    /* +1 = RISE, -1 = FALL, 0 = abstain. Each expert is a simple, different Rise/Fall rule. */
+    function swPredict(state){
+      const d20=windowDirections(state,20),d5=windowDirections(state,5),last=state.ticks[state.ticks.length-1].direction;
+      const m20=d20.length>=10?mean(d20):0,m5=d5.length>=4?mean(d5):0;
+      const s20=Math.abs(m20)>=.05?Math.sign(m20):0,s5=Math.abs(m5)>=.2?Math.sign(m5):0;
+      return [s20,-s20,s5,-s5,last,-last];
+    }
+
+    function calculateTickStrike(features,state){
+      const none={strategy:'TickStrike Pro',actionable:false,direction:null,confidence:0,score:0,reason:'insufficient_data'};
+      if(!features.ready)return none;
+      const dirs=state.ticks.slice(-6).map(t=>t.direction);
+      let run=0,sign=0;
+      for(let i=dirs.length-1;i>=0;i--){
+        if(dirs[i]===0)break;
+        if(!sign)sign=dirs[i];
+        if(dirs[i]!==sign)break;
+        run++;
+      }
+      const mom=features.price.momentum,st=features.direction.stability;
+      const aligned=sign>0?mom>0:sign<0?mom<0:false;
+      const confidence=clamp(.5+run*.03+Math.min(.08,Math.abs(mom)*.02)+(st-.5)*.06,.5,.9);
+      const actionable=run>=3&&aligned&&st>=.35&&Math.abs(mom)>=.02&&confidence>=.60;
+      return {strategy:'TickStrike Pro',actionable,direction:sign>0?'RISE':'FALL',confidence,score:confidence,reason:actionable?'tick_burst_continuation':'no_burst'};
+    }
+
+    /* Auto Switcher: its OWN engine, an online-learning ensemble. Six Rise/Fall experts (follow or fade the
+       20-, 5- and 1-tick lean) are re-weighted after every tick by how right they were. It trades the
+       weighted vote, only when the best expert has been right lately AND the experts mostly agree. */
+    function calculateAutoSwitch(features,state){
+      const none=r=>({strategy:'Auto Switcher',actionable:false,direction:null,confidence:0,score:0,reason:r});
+      if(!features.ready)return none('insufficient_data');
+      const sw=state.switcher;if(!sw.pred)return none('switcher_warming_up');
+      let up=0,tot=0,topI=-1,topAcc=0;
+      for(let i=0;i<SW_NAMES.length;i++){
+        if(!sw.pred[i])continue;
+        tot+=sw.w[i];if(sw.pred[i]>0)up+=sw.w[i];
+        const a=sw.acc[i];
+        if(a.length>=20){const acc=a.filter(Boolean).length/a.length;if(acc>topAcc){topAcc=acc;topI=i;}}
+      }
+      if(tot===0||topI<0)return none('switcher_warming_up');
+      const pUp=up/tot,direction=pUp>=.5?'RISE':'FALL',agree=Math.abs(pUp-.5)*2;
+      const confidence=clamp(topAcc,.5,.9);
+      return {strategy:'Auto Switcher',actionable:topAcc>=.56&&agree>=.4,direction,confidence,score:confidence,mode:SW_NAMES[topI],reason:`switched_to_${SW_NAMES[topI]}`};
+    }
+
+    function calculateSignals(features,state){
       const riseFall=calculateRiseFall(features);
       const parity=calculateParity(features);
-      return {riseFall,parity,mixBoth:calculateMixBoth(features),over8:calculateOver8(features),match:calculateDigitMatch(features)};
+      return {riseFall,parity,mixBoth:calculateMixBoth(features),over8:calculateOver8(features),match:calculateDigitMatch(features),
+        tickStrike:calculateTickStrike(features,state),autoSwitch:calculateAutoSwitch(features,state)};
     }
 
 
@@ -2419,17 +2511,17 @@ window.CASPER_ENGINE = (() => {
         let correct=false;
         let validated=false;
 
-        if(p.type==='riseFall'){
+        if(p.type==='riseFall'||p.type==='tickStrike'||p.type==='autoSwitch'){
 
           correct=actualRiseFall===p.direction;
           validated=true;
 
-          state.strategyValidation.riseFall.total++;
+          state.strategyValidation[p.type].total++;
 
           if(correct){
-            state.strategyValidation.riseFall.correct++;
+            state.strategyValidation[p.type].correct++;
           }
-          state.recentValidation.riseFall.push(correct);
+          state.recentValidation[p.type].push(correct);
         }
 
         if(p.type==='even'){
@@ -2625,6 +2717,15 @@ window.CASPER_ENGINE = (() => {
         });
       }
 
+      const ts=result.signals.tickStrike;
+      if(ts&&ts.actionable){
+        state.predictions.push({type:'tickStrike',direction:ts.direction,confidence:ts.confidence,quote:state.lastQuote,epoch:state.lastEpoch});
+      }
+      const asw=result.signals.autoSwitch;
+      if(asw&&asw.actionable){
+        state.predictions.push({type:'autoSwitch',direction:asw.direction,confidence:asw.confidence,quote:state.lastQuote,epoch:state.lastEpoch});
+      }
+
       if(state.predictions.length>16){
 
         state.predictions=
@@ -2708,7 +2809,11 @@ window.CASPER_ENGINE = (() => {
 
           over8:strategyRecord('over8'),
 
-          match:strategyRecord('match')
+          match:strategyRecord('match'),
+
+          tickStrike:strategyRecord('tickStrike'),
+
+          autoSwitch:strategyRecord('autoSwitch')
         }
       };
     }
@@ -2819,6 +2924,23 @@ window.CASPER_ENGINE = (() => {
       state.lastDigit=digit;
       state.accepted++;
 
+      {
+        /* Auto Switcher learning step: score every expert on the tick that just arrived, re-weight them
+           (Hedge / multiplicative weights), then let each expert call the NEXT tick. */
+        const sw=state.switcher,last=state.ticks[state.ticks.length-1];
+        if(last.direction!==0&&sw.pred){
+          for(let i=0;i<SW_NAMES.length;i++){
+            const p=sw.pred[i];if(!p)continue;
+            const ok=p===last.direction;
+            sw.w[i]*=Math.exp(ok?.12:-.12);
+            sw.acc[i].push(ok);if(sw.acc[i].length>40)sw.acc[i].shift();
+          }
+          const tot=sw.w.reduce((x,y)=>x+y,0);
+          sw.w=sw.w.map(x=>Math.min(20,Math.max(.05,x/tot*SW_NAMES.length)));   /* keep it able to switch */
+        }
+        sw.pred=swPredict(state);
+      }
+
       while(state.ticks.length>maxTicks){
         state.ticks.shift();
       }
@@ -2861,7 +2983,9 @@ window.CASPER_ENGINE = (() => {
             parity:null,
             mixBoth:null,
             over8:null,
-            match:null
+            match:null,
+            tickStrike:null,
+            autoSwitch:null
           },
 
           bestSignal:{
@@ -2876,7 +3000,7 @@ window.CASPER_ENGINE = (() => {
       }
 
       const signals=
-        calculateSignals(features);
+        calculateSignals(features,state);
 
       return {
 
@@ -3178,7 +3302,8 @@ window.CASPER_ENGINE = (() => {
             entropy<.975&&
             concentration<.30;
 
-          const eligible=strictEligible||balancedEligible||earlyLiveEligible;
+          const edgeOk=edgeCheck(v,c.baseStrategy==='Even & Odd'?'parity':'rf').ok;
+          const eligible=(strictEligible||balancedEligible||earlyLiveEligible)&&edgeOk;
 
           return {
             symbol:snap.symbol,
@@ -3233,6 +3358,32 @@ window.CASPER_ENGINE = (() => {
       return ranked;
     }
 
+    /* One function per card, each reading ONLY its own signal and its own validation record. */
+    function decide(card,symbol,snapIn){
+      const snap=snapIn||snapshot(symbol);
+      if(!snap||!snap.ready)return null;
+      const S=snap.signals,V=snap.validation.strategies;
+      let sig,rec,key,base=card;
+      if(card==='Rise & Fall'){sig=S.riseFall;rec=V.riseFall;key='rf';}
+      else if(card==='Even & Odd'){sig=S.parity;rec=sig&&sig.direction==='EVEN'?V.even:V.odd;key='parity';}
+      else if(card==='Mix Both'){
+        sig=S.mixBoth;
+        if(sig&&sig.baseStrategy==='Even & Odd'){rec=sig.direction==='EVEN'?V.even:V.odd;key='parity';base='Even & Odd';}
+        else{rec=V.riseFall;key='rf';base='Rise & Fall';}
+      }
+      else if(card==='Matches Printer'){sig=S.match;rec=V.match;key='match';}
+      else if(card==='Over 8 Killer'){sig=S.over8;rec=V.over8;key='over8';}
+      else if(card==='TickStrike Pro'){sig=S.tickStrike;rec=V.tickStrike;key='rf';}
+      else if(card==='Auto Switcher'){sig=S.autoSwitch;rec=V.autoSwitch;key='rf';}
+      else return null;
+      if(!sig)return null;
+      const edge=edgeCheck(rec,key);
+      return {symbol,card,strategy:card,baseStrategy:base,direction:sig.direction,digit:sig.digit,
+        confidence:sig.confidence,score:sig.score,reason:sig.reason,snapshot:snap,
+        validation:{...rec,lowerBound:wilsonLowerBound(rec.accuracy,rec.total)},key,
+        signalOk:Boolean(sig.actionable),edgeOk:edge.ok,edgeWhy:edge.why,breakEven:edge.be,pEdge:edge.pEdge};
+    }
+
     function onTick(input){
       return addTick(input);
     }
@@ -3257,6 +3408,12 @@ window.CASPER_ENGINE = (() => {
     return {
 
       onTick,
+
+      setEdgeGate:v=>{EDGE_GATE=Boolean(v);},
+
+      getEdgeGate:()=>EDGE_GATE,
+
+      decide,
 
       snapshot,
 
@@ -3486,6 +3643,9 @@ window.CASPER_ENGINE = (() => {
   const tradePending=new Map();
 
   const contractWatchers=new Map();
+  /* Speed: reuse a very recent quote for the same market/contract/stake instead of waiting for a new one.
+     The buy carries a max price, so a stale quote can never overpay; a rejection falls back to the slow path. */
+  const quoteCache=new Map();
 
   let demoTradeInProgress=false;
   let demoAutoRun=false;
@@ -4241,107 +4401,32 @@ window.CASPER_ENGINE = (() => {
     // Premium strategies use their own candidate ranking and the full Premium
     // registry. Free Smart AI remains on its original ten-market candidate path.
     if(['Matches Printer','Over 8 Killer','TickStrike Pro','Auto Switcher'].includes(activeStrategy)){
-      const allMarketMode=activeStrategy==='Auto Switcher'||marketPremium.value===SMART_VALUE;
+      const allMarketMode=marketPremium.value===SMART_VALUE; /* every card, Auto Switcher included, stays on the market you pick */
       const scanSymbols=allMarketMode
         ? premiumSymbols
         : [marketPremium.value||market.value].filter(symbol=>Boolean(names[symbol]));
       const candidates=[];
-      const scanDiag={markets:scanSymbols.length,registry:0,snapshot:0,signal:0,validation:0,quality:0,contract:0,qualified:0};
+      const scanDiag={markets:scanSymbols.length,registry:0,snapshot:0,signal:0,validation:0,quality:0,edge:0,contract:0,qualified:0};
 
       for(const symbol of scanSymbols){
         if(!activeSymbolRegistryReady||!availableSymbols.has(symbol)){scanDiag.registry++;continue;}
         const snap=casperEngine.snapshot(symbol);
         if(!snap||!snap.ready||!snap.features?.ready){scanDiag.snapshot++;continue;}
 
-        let signal=null, validationRecord=null;
-        if(activeStrategy==='Matches Printer'){
-          signal=snap.signals?.match;
-          validationRecord=snap.validation?.strategies?.match;
-        }else if(activeStrategy==='Over 8 Killer'){
-          signal=snap.signals?.over8;
-          validationRecord=snap.validation?.strategies?.over8;
-        }else{
-          signal=snap.signals?.riseFall;
-          validationRecord=snap.validation?.strategies?.riseFall;
-        }
-        if(!signal?.actionable||!validationRecord){scanDiag.signal++;continue;}
-        const hasLowerBound=validationRecord.lowerBound!==null&&validationRecord.lowerBound!==undefined&&Number.isFinite(Number(validationRecord.lowerBound));
-        const validation={
-          ...validationRecord,
-          lowerBound:hasLowerBound
-            ? Number(validationRecord.lowerBound)
-            : smartWilsonLowerBound(validationRecord.accuracy,validationRecord.total)
-        };
+        const decision=casperEngine.decide(activeStrategy,symbol,snap);
+        if(!decision||!decision.signalOk){scanDiag.signal++;continue;}
+        if(!decision.edgeOk){scanDiag.edge++;window.CASPER_SITOUT={why:`${names[symbol]||symbol}: ${decision.edgeWhy}`,at:Date.now()};continue;}
+        const validation=decision.validation;
         const total=Number(validation.total||0);
         const recentTotal=Number(validation.recentTotal||0);
         const recentAccuracy=Number(validation.recentAccuracy);
-        if(total<8){scanDiag.validation++;continue;}
-        const digitContractStrategy=activeStrategy==='Matches Printer'||activeStrategy==='Over 8 Killer';
-        const autoSwitcherDemoCalibration=activeStrategy==='Auto Switcher';
-        if(autoSwitcherDemoCalibration){
-          /* Auto Switcher is Demo-only. Its purpose during calibration is to
-             gather forward-validation evidence; applying the mature Wilson
-             lower-bound gate before it can collect a new observation creates a
-             deadlock when early accuracy is below 50%. Keep a live-signal gate
-             here and label execution as exploratory Demo, never validated. */
-          if(Number(signal.confidence||0)<.50||Number(signal.score||0)<.40){scanDiag.quality++;continue;}
-        }else if(digitContractStrategy){
-          /* Digit contracts have lower natural hit rates and often larger payouts.
-             A universal 50% accuracy gate incorrectly makes them ineligible even
-             when the offered payout could make their expected value positive.
-             Their actual break-even test is applied after Deriv returns a quote. */
-          const minDigitSignal=activeStrategy==='Matches Printer'?.50:.59;
-          if(Number(signal.confidence||0)<minDigitSignal||Number(signal.score||0)<.50){scanDiag.quality++;continue;}
-        }else if(total>=60){
-          if(!Number.isFinite(Number(validation.lowerBound))||Number(validation.lowerBound)<.52){scanDiag.quality++;continue;}
-          if(Number(validation.accuracy)<.50){scanDiag.quality++;continue;}
-          if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.45){scanDiag.quality++;continue;}
-        }else{
-          if(Number(signal.confidence||0)<.64||Number(signal.score||0)<.60){scanDiag.quality++;continue;}
-          if(recentTotal>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<.40){scanDiag.quality++;continue;}
-        }
-
         const features=snap.features;
-        if(activeStrategy==='TickStrike Pro'){
-          const momentum=Number(features.price?.momentum||0);
-          const stability=Number(features.direction?.stability||0);
-          const aligned=signal.direction==='RISE'?momentum>0:signal.direction==='FALL'?momentum<0:false;
-          if(Number(signal.confidence||0)<.68||stability<.35||Math.abs(momentum)<.02||!aligned)continue;
-        }
-        let direction=signal.direction;
-        if(activeStrategy==='Auto Switcher'){
-          // Use the strategy engine's actual Rise/Fall signal as the decision
-          // source. Trend/momentum are independent confirmation checks, not a
-          // replacement direction that can silently disagree with the signal.
-          const directionScore=Number(features.direction?.direction20||0);
-          const direction50=Number(features.direction?.direction50||0);
-          const momentum=Number(features.price?.momentum||0);
-          const stability=Number(features.direction?.stability||0);
-          const aligned=direction==='RISE'
-            ? directionScore>=.008&&momentum>=.001
-            : direction==='FALL'
-              ? directionScore<=-.008&&momentum<=-.001
-              : false;
-          const broaderTrendAligned=direction==='RISE'
-            ? direction50>-.10
-            : direction==='FALL'
-              ? direction50<.10
-              : false;
-          if(Number(signal.confidence||0)<.50||Number(signal.score||0)<.40||!aligned||!broaderTrendAligned||stability<.05){
-            scanDiag.quality++;
-            continue;
-          }
-        }
-        if(activeStrategy==='Matches Printer'){
-          const digit=Number(signal.digit);
-          if(!Number.isInteger(digit)||digit<0||digit>9)continue;
-        }
-
+        const direction=decision.direction;
         const candidate={
           symbol, strategy:activeStrategy, baseStrategy:activeStrategy, direction,
-          digit:signal.digit, confidence:Number(signal.confidence||0), score:Number(signal.score||0),
-          reason:signal.reason||'premium_strategy_signal', snapshot:snap, validation,
-          executionTier:activeStrategy==='Auto Switcher'?'demo_calibration':(total<60?'demo_calibration':'validated')
+          digit:decision.digit, confidence:Number(decision.confidence||0), score:Number(decision.score||0),
+          reason:decision.reason||'premium_strategy_signal', snapshot:snap, validation,
+          executionTier:total<60?'demo_calibration':'validated'
         };
         // Never ask Deriv for a proposal on a market/contract combination until
         // contracts_for has confirmed that exact contract type is offered.
@@ -4394,74 +4479,23 @@ window.CASPER_ENGINE = (() => {
       return null;
     }
 
-    const snap=
-      casperEngine.snapshot(symbol);
-
-    if(!snap.ready){
+    /* Rise & Fall, Even & Odd and Mix Both each decide through their own engine only. */
+    const decision=casperEngine.decide(activeStrategy,symbol);
+    if(!decision||!decision.signalOk)return null;
+    if(!decision.edgeOk){
+      window.CASPER_SITOUT={why:`${activeStrategy}: ${decision.edgeWhy}`,at:Date.now()};
       return null;
     }
-
-    let signal=null;
-
-    if(activeStrategy==='Rise & Fall'){
-
-      signal=snap.signals.riseFall;
-
-    }else if(activeStrategy==='Even & Odd'){
-
-      signal=snap.signals.parity;
-
-    }else if(activeStrategy==='Mix Both'){
-      signal=snap.signals.mixBoth;
-    }
-
-    if(!signal?.actionable){
-      return null;
-    }
-
-    const validationRecord=
-      (activeStrategy==='Even & Odd' || (activeStrategy==='Mix Both' && signal.baseStrategy==='Even & Odd'))
-        ? (
-            signal.direction==='EVEN'
-              ? snap.validation.strategies.even
-              : snap.validation.strategies.odd
-          )
-        : (
-            (activeStrategy==='Rise & Fall' || (activeStrategy==='Mix Both' && signal.baseStrategy==='Rise & Fall'))
-              ? snap.validation.strategies.riseFall
-              : null
-          );
-
-    const validation=validationRecord?{
-      ...validationRecord,
-      lowerBound:Number.isFinite(Number(validationRecord.lowerBound))
-        ? Number(validationRecord.lowerBound)
-        : smartWilsonLowerBound(validationRecord.accuracy,validationRecord.total)
-    }:null;
-
-    /* Individual Free strategies need to be testable in Demo too. Use a guarded
-       calibration threshold until enough forward outcomes exist, then apply the
-       mature statistical gate. This must never enable Real-account execution. */
-    if(!validation||Number(validation.total||0)<8)return null;
-    if(Number(validation.total||0)>=60){
-      if(!Number.isFinite(Number(validation.lowerBound))||Number(validation.lowerBound)<.52)return null;
-      if(Number(validation.accuracy)<.50)return null;
-      if(Number(validation.recentTotal||0)>=12&&Number.isFinite(Number(validation.recentAccuracy))&&Number(validation.recentAccuracy)<.45)return null;
-    }else{
-      if(Number(signal.confidence||0)<.64||Number(signal.score||0)<.60)return null;
-      if(Number(validation.recentTotal||0)>=12&&Number.isFinite(Number(validation.recentAccuracy))&&Number(validation.recentAccuracy)<.40)return null;
-    }
-
     return {
       symbol,
-      strategy:signal.strategy,
-      baseStrategy:signal.baseStrategy||signal.strategy,
-      direction:signal.direction,
-      confidence:signal.confidence,
-      score:signal.score,
-      reason:signal.reason,
-      snapshot:snap,
-      validation
+      strategy:decision.strategy,
+      baseStrategy:decision.baseStrategy,
+      direction:decision.direction,
+      confidence:decision.confidence,
+      score:decision.score,
+      reason:decision.reason,
+      snapshot:decision.snapshot,
+      validation:decision.validation
     };
   }
 
@@ -4469,6 +4503,25 @@ window.CASPER_ENGINE = (() => {
   /* ==========================================================
      DEMO RISK CONTROL
      ========================================================== */
+
+  /* RISK PRESETS (as in the reference): the stake grows after consecutive losses, capped; a win resets it.
+     This changes how losses are distributed. It does not create an edge. */
+  const RISK_PRESETS={
+    Low:{mult:1,cap:0,note:'Flat stake · no escalation after a loss'},
+    Medium:{mult:1.6,cap:2,note:'Martingale ×1.6 on loss (capped at 2 steps)'},
+    High:{mult:2,cap:3,note:'Martingale ×2 on loss (capped at 3 steps)'}
+  };
+  let riskLevel='Medium';
+  let lossStreak=0;
+  function nextStake(base){
+    if(premiumStrategyNames.has(activeStrategy))return base;
+    const p=RISK_PRESETS[riskLevel]||RISK_PRESETS.Medium;
+    let v=base*Math.pow(p.mult,Math.min(lossStreak,p.cap));
+    const maxLoss=numericInput('#maxloss');
+    if(maxLoss>0){const room=maxLoss+demoSessionPL;if(room>=.35)v=Math.min(v,room)}
+    return Math.max(.35,Math.round(v*100)/100);
+  }
+  window.CASPER_RISK_STATE=()=>({riskLevel,lossStreak});
 
   function numericInput(selector){
 
@@ -4695,8 +4748,8 @@ window.CASPER_ENGINE = (() => {
       return `Smart AI is continuously reading all ${symbols.length} live Volatility markets × Rise/Fall × Even/Odd × Mix Both.`;
     }
 
-    if(activeStrategy==='Auto Switcher'||marketPremium.value===SMART_VALUE){
-      return `${activeStrategy} is continuously comparing the 10 configured Volatility markets for the strongest qualified Rise/Fall setup.`;
+    if(marketPremium.value===SMART_VALUE){
+      return `${activeStrategy} is continuously comparing the 10 configured Volatility markets for the strongest qualified setup.`;
     }
     const premiumSymbol=marketPremium.value||market.value;
     const marketLabel=names[premiumSymbol]||premiumSymbol||'selected market';
@@ -4779,11 +4832,11 @@ window.CASPER_ENGINE = (() => {
             $('#txOverlayProgress').style.width='18%';
           }
         }
-        $('#runMessage').textContent=continuousScanMessage();
+        $('#runMessage').textContent=continuousScanMessage()+((window.CASPER_SITOUT&&Date.now()-window.CASPER_SITOUT.at<5000)?` · sitting out — ${window.CASPER_SITOUT.why}`:'');
         if(premiumStrategyNames.has(activeStrategy)){
           const diag=window.CASPER_PREMIUM_SCAN_DIAGNOSTICS;
           const detail=diag&&diag.strategy===activeStrategy
-            ? `Scan ${diag.qualified}/${diag.markets} qualified · waiting for data/validation: ${diag.snapshot} · no actionable signal: ${diag.signal} · insufficient validation: ${diag.validation} · quality filter: ${diag.quality} · contract not verified: ${diag.contract} · market not active/registry pending: ${diag.registry}.`
+            ? `Scan ${diag.qualified}/${diag.markets} qualified · waiting for data/validation: ${diag.snapshot} · no actionable signal: ${diag.signal} · insufficient validation: ${diag.validation} · quality filter: ${diag.quality} · sat out (own hit rate below break-even): ${diag.edge} · contract not verified: ${diag.contract} · market not active/registry pending: ${diag.registry}.`
             : 'Waiting for the live market registry and first valid tick snapshots.';
           $('#premiumMessage').textContent=`${activeStrategy} · ${continuousScanMessage()} · ${detail} No trade has been placed.`;
         }
@@ -4803,7 +4856,7 @@ window.CASPER_ENGINE = (() => {
       }
 
       $('#runMessage').textContent=
-        `${candidate.strategy} selected ${names[candidate.symbol]||candidate.symbol} · ${candidate.direction||''} · ${(candidate.confidence*100).toFixed(1)}% · ${candidate.executionTier||'validated'} · executing Demo`;
+        `${candidate.strategy} selected ${names[candidate.symbol]||candidate.symbol} · ${candidate.direction||''} · ${(candidate.confidence*100).toFixed(1)}% · ${candidate.reason||''} · ${candidate.executionTier||'validated'} · executing Demo`;
 
       const result=await executeDemoTradeOnce(candidate);
 
@@ -4908,9 +4961,7 @@ window.CASPER_ENGINE = (() => {
 
     showScanOverlay(
       premiumStrategyNames.has(activeStrategy)
-        ? (activeStrategy==='Auto Switcher'
-            ? 'Auto Switcher · scanning the 10 configured Volatility markets for Rise/Fall'
-            : continuousScanMessage())
+        ? continuousScanMessage()
         : activeStrategy==='Smart AI'
           ? `Smart AI · scanning all ${symbols.length} configured Free markets and Free strategies`
           : continuousScanMessage()
@@ -4922,7 +4973,7 @@ window.CASPER_ENGINE = (() => {
       if(demoAutoRun&&serial===demoRunSerial&&!transactionViewEstablished){
         activateTransactionFocus();
       }
-    },2000);
+    },3000);
 
     $('#runMessage').textContent=
       'Continuous Demo session started · scanning live data for the next qualified setup.';
@@ -5106,6 +5157,23 @@ window.CASPER_ENGINE = (() => {
       `${demoSessionPL>=0?'+':''}${demoSessionPL.toFixed(2)} ${currency}`;
     pl.classList.toggle('good',demoSessionPL>0);
     pl.classList.toggle('bad',demoSessionPL<0);
+
+    /* Scoreboard: real hit rate with its 95% range, against the break-even rate your ACTUAL payouts require. */
+    const sc=$(`#txScore${prefix}`);
+    if(sc){
+      const n=demoSessionWins+demoSessionLosses;
+      const wins=readDemoHistory().filter(r=>r&&r.status==='won'&&Number(r.buyPrice)>0&&Number(r.payout)>0).slice(0,30);
+      if(!n||!wins.length){
+        sc.textContent='Hit rate vs break-even appears after your first settled win.';
+      }else{
+        const mult=wins.reduce((a,r)=>a+Number(r.payout)/Number(r.buyPrice),0)/wins.length;
+        const be=1/mult,ph=demoSessionWins/n,z=1.96,z2=z*z;
+        const c=(ph+z2/(2*n))/(1+z2/n),h=z*Math.sqrt(ph*(1-ph)/n+z2/(4*n*n))/(1+z2/n);
+        const lo=Math.max(0,c-h),hi=Math.min(1,c+h);
+        const verdict=hi<be?'<span class="bad">below break-even</span>':lo>be?'<span class="good">above break-even</span>':'too early to tell';
+        sc.innerHTML=`Hit rate <b>${(ph*100).toFixed(1)}%</b> (95% range ${(lo*100).toFixed(0)}–${(hi*100).toFixed(0)}%) · break-even <b>${(be*100).toFixed(1)}%</b> (wins pay ×${mult.toFixed(2)}) · ${n} settled · ${verdict}`;
+      }
+    }
   }
 
 
@@ -5126,6 +5194,7 @@ window.CASPER_ENGINE = (() => {
     demoSessionTrades=0;
     demoSessionWins=0;
     demoSessionLosses=0;
+    lossStreak=0;
     demoSessionStarted=
       new Date().toISOString();
     demoTradingStopped=false;
@@ -5134,6 +5203,7 @@ window.CASPER_ENGINE = (() => {
     transactionViewEstablished=false;
     if(scanTransitionTimer){clearTimeout(scanTransitionTimer);scanTransitionTimer=null;}
     $('#free').classList.remove('transaction-focus');
+    $('#premium').classList.remove('transaction-focus');
 
     if(clearHistory){
       demoHistoryMemory=[];
@@ -5710,8 +5780,8 @@ window.CASPER_ENGINE = (() => {
       return {error:true,reason:'risk'};
     }
 
-    const stake=
-      numericInput('#stake');
+    const baseStake=numericInput('#stake');
+    const stake=baseStake>=.35?nextStake(baseStake):baseStake;
 
     if(
       !Number.isFinite(stake)||
@@ -5749,6 +5819,7 @@ window.CASPER_ENGINE = (() => {
       )||'USD';
 
     demoTradeInProgress=true;
+    const __t0=performance.now();
 
     showTransactionOverlay(candidate,stake,currency);
     updateTransactionOverlay({
@@ -5759,7 +5830,7 @@ window.CASPER_ENGINE = (() => {
 
     updateRunButton();
 
-    const proposalStatus=`Preparing Demo proposal · ${names[symbol]||symbol} · ${candidate.strategy} · ${candidate.direction||''} · confidence ${(candidate.confidence*100).toFixed(1)}%`;
+    const proposalStatus=`Preparing Demo proposal · ${names[symbol]||symbol} · ${candidate.strategy} · ${candidate.direction||''} · confidence ${(candidate.confidence*100).toFixed(1)}% · ${candidate.reason||''}`;
     $('#runMessage').textContent=proposalStatus;
     if(premiumStrategyNames.has(activeStrategy))$('#premiumMessage').textContent=proposalStatus;
 
@@ -5808,8 +5879,15 @@ window.CASPER_ENGINE = (() => {
       }
 
       let proposalResponse;
+      const __ck=JSON.stringify(proposalPayload),__cq=quoteCache.get(__ck);
       try{
-        proposalResponse=await sendTradeRequest(proposalPayload);
+        if(__cq&&Date.now()-__cq.t<15000){
+          proposalResponse=__cq.r;
+        }else{
+          proposalResponse=await sendTradeRequest(proposalPayload);
+          if(quoteCache.size>60)quoteCache.clear();
+          quoteCache.set(__ck,{t:Date.now(),r:proposalResponse});
+        }
       }catch(firstError){
         /* sendTradeRequest deliberately rejects on Deriv API errors. Handle the
            rejection here (rather than checking proposalResponse.error, which can
@@ -5843,6 +5921,7 @@ window.CASPER_ENGINE = (() => {
         }
       }
 
+      const __t1=performance.now();
       let proposal=
         proposalResponse.proposal;
 
@@ -5902,7 +5981,7 @@ window.CASPER_ENGINE = (() => {
       if(validationSamples<8){
         throw new Error('Demo calibration skipped: fewer than eight forward-validation observations are available for this strategy.');
       }
-      const autoSwitcherDemoExploration=candidate.strategy==='Auto Switcher'&&selectedAccountIsDemo();
+      const autoSwitcherDemoExploration=!casperEngine.getEdgeGate(); /* gate OFF = Demo exploration: skip the mature-edge checks too */
       if(validationSamples>=60&&!autoSwitcherDemoExploration){
         if(!Number.isFinite(observedLowerBound)||observedLowerBound<requiredLowerBound){
           throw new Error(`${candidate.strategy} skipped before purchase: mature validation lower bound ${(Number.isFinite(observedLowerBound)?observedLowerBound*100:0).toFixed(1)}% does not clear quoted break-even ${(breakEvenRate*100).toFixed(1)}% plus safety margin. No contract was bought.`);
@@ -5940,34 +6019,15 @@ window.CASPER_ENGINE = (() => {
       const latestEpoch=Number(latestSnapshot?.lastEpoch||0);
       if(candidateEpoch>0&&latestEpoch>0&&latestEpoch!==candidateEpoch){
         let latestSignal=null;
-        if(candidate.strategy==='Rise & Fall'||candidate.strategy==='TickStrike Pro'||candidate.strategy==='Auto Switcher') latestSignal=latestSnapshot.signals?.riseFall;
+        if(candidate.strategy==='Rise & Fall') latestSignal=latestSnapshot.signals?.riseFall;
+        else if(candidate.strategy==='TickStrike Pro') latestSignal=latestSnapshot.signals?.tickStrike;
+        else if(candidate.strategy==='Auto Switcher') latestSignal=latestSnapshot.signals?.autoSwitch;
         else if(candidate.strategy==='Matches Printer') latestSignal=latestSnapshot.signals?.match;
         else if(candidate.strategy==='Over 8 Killer') latestSignal=latestSnapshot.signals?.over8;
         else if(candidate.strategy==='Even & Odd') latestSignal=latestSnapshot.signals?.parity;
         else if(candidate.strategy==='Mix Both') latestSignal=latestSnapshot.signals?.mixBoth;
         const freshDirection=candidate.strategy==='Over 8 Killer'?'OVER_8':latestSignal?.direction;
-        let premiumFreshFilter=true;
-        if(candidate.strategy==='TickStrike Pro'){
-          const f=latestSnapshot?.features||{};
-          const momentum=Number(f.price?.momentum||0);
-          premiumFreshFilter=Number(f.direction?.stability||0)>=.35&&Math.abs(momentum)>=.02&&
-            (freshDirection==='RISE'?momentum>0:freshDirection==='FALL'?momentum<0:false);
-        }else if(candidate.strategy==='Auto Switcher'){
-          const f=latestSnapshot?.features||{};
-          const directionalScore=Number(f.direction?.direction20||0);
-          const broaderDirection=Number(f.direction?.direction50||0);
-          const momentum=Number(f.price?.momentum||0);
-          const stability=Number(f.direction?.stability||0);
-          // Re-check the same direction the strategy engine selected on the
-          // freshest tick. Reject disagreement instead of buying a different
-          // direction simply because the generic trend changed sign.
-          premiumFreshFilter=Math.abs(directionalScore)>=.008&&stability>=.05&&Math.abs(momentum)>=.001&&
-            (freshDirection==='RISE'
-              ? directionalScore>=.008&&momentum>=.001&&broaderDirection>-.10
-              : freshDirection==='FALL'
-                ? directionalScore<=-.008&&momentum<=-.001&&broaderDirection<.10
-                : false);
-        }
+        const premiumFreshFilter=true;
         const sameDirection=Boolean(latestSignal?.actionable)&&premiumFreshFilter&&
           String(freshDirection||'').toUpperCase()===String(candidate.direction||'').toUpperCase()&&
           strategyToContract({...candidate, direction:freshDirection, digit:latestSignal?.digit??candidate.digit})===contractType;
@@ -6009,7 +6069,23 @@ window.CASPER_ENGINE = (() => {
       /*
         Buy only on the authenticated Demo socket.
       */
-      let buyResponse;
+      let buyResponse=null;
+      /* FAST PATH: buy straight from the contract terms with a max price. Fallback = the original quote-then-buy path. */
+      try{
+        const fastParams={
+          amount:Number(proposalPayload.amount),basis:String(proposalPayload.basis),
+          contract_type:String(proposalPayload.contract_type),currency:String(proposalPayload.currency),
+          duration:Number(proposalPayload.duration),duration_unit:String(proposalPayload.duration_unit),
+          underlying_symbol:String(proposalPayload.underlying_symbol)
+        };
+        if(proposalPayload.barrier!==undefined)fastParams.barrier=String(proposalPayload.barrier);
+        const fast=await sendTradeRequest({buy:'1',parameters:fastParams,price:Number((askPrice+0.01).toFixed(2))});
+        if(fast?.buy?.contract_id){buyResponse=fast;buyResponse.__casperBoughtViaDirectParameters=true;}
+      }catch(fastError){
+        console.info('[CASPER] fast buy declined, using the standard quote-then-buy path:',String(fastError?.message||fastError).slice(0,160));
+        quoteCache.delete(__ck);
+      }
+      if(!buyResponse){
       /* Refresh the quote immediately before BUY. Deriv proposal IDs can become
          unknown/expired while the earlier payout and signal checks run. Keep the
          same Demo market, direction, stake, currency, duration and barrier; never
@@ -6076,14 +6152,14 @@ window.CASPER_ENGINE = (() => {
           throw new Error(`The refreshed quote costs ${freshAskPrice.toFixed(2)}, above the original maximum ${askPrice.toFixed(2)}. No contract was bought.`);
         }
         const freshBreakEven=freshAskPrice/freshPayout;
-        if(validationSamples>=60&&candidate.strategy!=='Auto Switcher'){
+        if(validationSamples>=60&&casperEngine.getEdgeGate()){
           if(!Number.isFinite(observedLowerBound)||observedLowerBound<freshBreakEven+0.025){
             throw new Error(`Refreshed quote skipped: validation lower bound does not clear the refreshed break-even threshold. No contract was bought.`);
           }
           if(recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<freshBreakEven){
             throw new Error(`Refreshed quote skipped: recent validation is below the refreshed break-even rate. No contract was bought.`);
           }
-        }else if(candidate.strategy!=='Auto Switcher'&&recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<Math.max(.40,freshBreakEven-.05)){
+        }else if(casperEngine.getEdgeGate()&&recentSamples>=12&&Number.isFinite(recentAccuracy)&&recentAccuracy<Math.max(.40,freshBreakEven-.05)){
           throw new Error(`Refreshed quote skipped: recent validation ${(recentAccuracy*100).toFixed(1)}% is below the refreshed contract's exploratory floor ${(Math.max(.40,freshBreakEven-.05)*100).toFixed(1)}%. No contract was bought.`);
         }
         if(enforceDemoRiskStop()){
@@ -6144,6 +6220,9 @@ window.CASPER_ENGINE = (() => {
         }
       }
 
+      }
+
+      const __t2=performance.now();
       const buy=
         buyResponse.buy;
 
@@ -6230,6 +6309,8 @@ window.CASPER_ENGINE = (() => {
           }
         );
 
+      const __t3=performance.now();
+      console.info(`[CASPER][timing] ${symbol} ${contractType} · quote ${Math.round(__t1-__t0)} ms · buy ${Math.round(__t2-__t1)} ms · settle ${Math.round(__t3-__t2)} ms · total ${Math.round(__t3-__t0)} ms`);
       const profit=
         Number(
           finalContract.profit
@@ -6305,8 +6386,10 @@ window.CASPER_ENGINE = (() => {
 
       if(finalPL>0){
         demoSessionWins++;
+        lossStreak=0;
       }else if(finalPL<0){
         demoSessionLosses++;
+        lossStreak++;
       }
 
       const resultRecord={
@@ -6755,8 +6838,11 @@ window.CASPER_ENGINE = (() => {
 
             state(true);
 
-            const best=
-              analysis?.bestSignal;
+            /* Show the SELECTED card's own reading, never another card's. */
+            const own=(analysis&&analysis.ready)?casperEngine.decide(activeStrategy,symbol,analysis):null;
+            const best=own
+              ? {strategy:activeStrategy,actionable:own.signalOk,direction:own.direction,confidence:own.confidence,reason:own.edgeOk?own.reason:own.edgeWhy}
+              : analysis?.bestSignal;
 
             if(!(demoAutoRun&&premiumStrategyNames.has(activeStrategy))){
                 if(best){
@@ -6898,8 +6984,8 @@ window.CASPER_ENGINE = (() => {
             risk==='Low'
           );
 
-          note.textContent=
-            `▱  ${risk} risk preset · stake escalation disabled`;
+          riskLevel=risk;lossStreak=0;
+          note.textContent='▱  '+((RISK_PRESETS[risk]||{}).note||'');
         }
       );
     }
@@ -7060,6 +7146,10 @@ window.CASPER_ENGINE = (() => {
           const p=b.dataset.panel;
           if(p==='free'&&$('#free').classList.contains('transaction-focus')&&!demoAutoRun){
             $('#free').classList.remove('transaction-focus');
+            transactionViewEstablished=false;
+          }
+          if(p==='premium'&&$('#premium').classList.contains('transaction-focus')&&!demoAutoRun){
+            $('#premium').classList.remove('transaction-focus');
             transactionViewEstablished=false;
           }
 
@@ -7898,7 +7988,8 @@ window.CASPER_ENGINE = (() => {
     function connectPub(){
       const s=new WebSocket('wss://api.derivws.com/trading/v1/options/ws/public');
       m.pub=s;
-      s.onopen=()=>s.send(JSON.stringify({active_symbols:'brief',req_id:40001}));
+      s.onopen=()=>{note('Connected to Deriv · loading markets…');s.send(JSON.stringify({active_symbols:'brief',product_type:'basic',req_id:40001}))};
+      s.onerror=()=>note('Could not reach Deriv market data. Retrying…');
       s.onmessage=e=>{let d;try{d=JSON.parse(e.data)}catch{return}onPub(d)};
       s.onclose=()=>{if(m.pub===s){m.pub=null;setTimeout(()=>{if(m.on&&!m.pub)connectPub()},2500)}};
     }
@@ -7907,6 +7998,8 @@ window.CASPER_ENGINE = (() => {
         const q=d.echo_req||{};
         if(q.ticks_history&&String(q.ticks_history)===m.sym&&!m.agg){m.agg=true;m.pub.send(JSON.stringify({ticks:m.sym,subscribe:1}));note('Candle feed unavailable; building candles from live ticks.');return}
         if(q.contracts_for){note(`Could not load contracts: ${d.error.message||d.error.code}`);return}
+        if(q.proposal&&Number(q.req_id)===41000+m.qn){g('mtBuy').disabled=true;g('mtPayout').textContent='Payout —';note(d.error.message||d.error.code);return}
+        if(q.active_symbols){note(`Could not load markets: ${d.error.message||d.error.code}`);return}
         return;
       }
       if(d.msg_type==='active_symbols'&&Array.isArray(d.active_symbols)){
@@ -7918,8 +8011,14 @@ window.CASPER_ENGINE = (() => {
         }
         fillMarkets();
         if(!m.mk.size){note('Deriv returned no tradable markets.');return}
+        note(`${m.mk.size} markets loaded from Deriv`);
         select(m.sym&&m.mk.has(m.sym)?m.sym:(m.mk.has('1HZ100V')?'1HZ100V':[...m.mk.keys()][0]));
         return;
+      }
+      if(d.msg_type==='proposal'&&d.proposal&&Number(d.echo_req?.req_id)===41000+m.qn){
+        g('mtPayout').textContent=`Payout ${Number(d.proposal.payout).toFixed(2)} ${d.echo_req.currency||''}`;
+        const ok=signedIn&&selectedAccountIsDemo();g('mtBuy').disabled=!ok;
+        note(ok?'':(signedIn?'Choose a Demo account to buy. Manual buying is Demo only.':'Payout is live from Deriv. Sign in with a Demo account to buy.'));return;
       }
       if(d.msg_type==='candles'&&String(d.echo_req?.ticks_history)===m.sym&&Array.isArray(d.candles)){
         m.candles=d.candles.map(c=>({t:+c.epoch,o:+c.open,h:+c.high,l:+c.low,c:+c.close}));head();draw();return;
@@ -8070,16 +8169,13 @@ window.CASPER_ENGINE = (() => {
 
     function quote(){
       clearTimeout(m.qt);
-      m.qt=setTimeout(async()=>{
+      m.qt=setTimeout(()=>{
         const b=g('mtBuy'),po=g('mtPayout'),pl=payload(),n=++m.qn;
         b.disabled=true;po.textContent='Payout —';
-        if(!pl){return}
-        if(!signedIn){note('Sign in with Deriv to see live payouts and buy.');return}
-        if(!selectedAccountIsDemo()){note('Choose a Demo account. Manual trading is Demo only.');return}
-        try{
-          const r=await req(pl);if(n!==m.qn)return;
-          po.textContent=`Payout ${Number(r.proposal.payout).toFixed(2)} ${pl.currency}`;b.disabled=false;note('');
-        }catch(e){if(n===m.qn)note(e.message)}
+        if(!pl)return;
+        const s=m.pub;if(!s||s.readyState!==1){note('Connecting to Deriv…');return}
+        const {req_id,...q}=pl;
+        s.send(JSON.stringify({...q,req_id:41000+n}));
       },350);
     }
 
@@ -8159,6 +8255,15 @@ window.CASPER_ENGINE = (() => {
     $('#accountSelect').addEventListener('change',()=>{authClose();quote()});
     window.addEventListener('resize',draw);
     setInterval(()=>{if(m.on&&signedIn&&selectedAccountIsDemo()&&g('mtBuy').disabled&&!m.auth&&!m.authP)quote()},4000);
+    document.querySelectorAll('.tab').forEach(b=>{
+      const t=b.textContent.replace(/\s+/g,' ').trim(),i=t.indexOf(' ');
+      if(i>0)b.innerHTML=`<span class="ti">${t.slice(0,i)}</span><span class="tl">${t.slice(i+1)}</span>`;
+    });
+    document.querySelectorAll('.edgeGate').forEach(cb=>cb.addEventListener('change',()=>{
+      casperEngine.setEdgeGate(cb.checked);
+      document.querySelectorAll('.edgeGate').forEach(o=>{o.checked=cb.checked});
+      showToast(cb.checked?'Evidence gate ON: cards sit out unless their own results beat break-even.':'Evidence gate OFF: cards trade every signal (Demo exploration).');
+    }));
     render();
   })();
 
