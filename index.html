@@ -3603,8 +3603,8 @@ window.CASPER_ENGINE = (() => {
     const allOption=[...marketPremium.options].find(option=>option.value===SMART_VALUE);
     if(allOption)allOption.textContent='Scan all 10 configured Volatility markets';
   }
-  // Auto Switcher always compares the full Premium registry, regardless of
-  // the single-market selection used by the other selectable strategies.
+  // Premium starts on a concrete market. Auto Switcher is restricted to this
+  // selected market and may only choose RISE or FALL within that instrument.
   marketPremium.value='1HZ100V';
 
 
@@ -4401,10 +4401,18 @@ window.CASPER_ENGINE = (() => {
     // Premium strategies use their own candidate ranking and the full Premium
     // registry. Free Smart AI remains on its original ten-market candidate path.
     if(['Matches Printer','Over 8 Killer','TickStrike Pro','Auto Switcher'].includes(activeStrategy)){
-      const allMarketMode=marketPremium.value===SMART_VALUE; /* every card, Auto Switcher included, stays on the market you pick */
+      // Auto Switcher is a single-market Rise/Fall controller. It must never
+      // fan out across symbols: only the selected market is eligible. If the
+      // all-markets option is selected accidentally, fall back to the current
+      // market selector rather than silently scanning ten instruments.
+      const autoSwitcher=activeStrategy==='Auto Switcher';
+      const allMarketMode=!autoSwitcher&&marketPremium.value===SMART_VALUE;
+      const selectedSingleSymbol=names[marketPremium.value]
+        ? marketPremium.value
+        : (names[market.value] ? market.value : premiumSymbols[0]);
       const scanSymbols=allMarketMode
         ? premiumSymbols
-        : [marketPremium.value||market.value].filter(symbol=>Boolean(names[symbol]));
+        : [autoSwitcher ? selectedSingleSymbol : (marketPremium.value||market.value)].filter(symbol=>Boolean(names[symbol]));
       const candidates=[];
       const scanDiag={markets:scanSymbols.length,registry:0,snapshot:0,signal:0,validation:0,quality:0,edge:0,contract:0,qualified:0};
 
@@ -4412,6 +4420,17 @@ window.CASPER_ENGINE = (() => {
         if(!activeSymbolRegistryReady||!availableSymbols.has(symbol)){scanDiag.registry++;continue;}
         const snap=casperEngine.snapshot(symbol);
         if(!snap||!snap.ready||!snap.features?.ready){scanDiag.snapshot++;continue;}
+        // A valid-looking signal from an old cached tick is not a live entry.
+        // Deriv tick epochs are Unix seconds; allow more room for standard
+        // two-second Volatility indices than for 1-second variants.
+        const tickEpoch=Number(snap.lastEpoch||snap.features?.epoch||0);
+        const maxTickAgeSeconds=symbol.startsWith('1HZ')?5:8;
+        const tickAgeSeconds=tickEpoch>0?(Date.now()/1000-tickEpoch):Infinity;
+        if(!Number.isFinite(tickAgeSeconds)||tickAgeSeconds< -2||tickAgeSeconds>maxTickAgeSeconds){
+          scanDiag.quality++;
+          window.CASPER_STALE_FEED={symbol,ageSeconds:tickAgeSeconds,maxAgeSeconds:maxTickAgeSeconds,at:Date.now()};
+          continue;
+        }
 
         const decision=casperEngine.decide(activeStrategy,symbol,snap);
         if(!decision||!decision.signalOk){scanDiag.signal++;continue;}
@@ -5813,6 +5832,18 @@ window.CASPER_ENGINE = (() => {
     const symbol=
       candidate.symbol;
 
+    if(activeStrategy==='Auto Switcher'){
+      const selectedAutoSymbol=names[marketPremium.value]
+        ? marketPremium.value
+        : (names[market.value] ? market.value : premiumSymbols[0]);
+      if(symbol!==selectedAutoSymbol){
+        throw new Error(`Auto Switcher safety stop: candidate market ${names[symbol]||symbol} does not match your selected market ${names[selectedAutoSymbol]||selectedAutoSymbol}. No contract was bought.`);
+      }
+      if(!['RISE','FALL'].includes(candidate.direction)){
+        throw new Error('Auto Switcher safety stop: only RISE or FALL is allowed. No contract was bought.');
+      }
+    }
+
     const currency=
       accountTypes.get(
         `${selectedAccountId()}:currency`
@@ -5879,15 +5910,10 @@ window.CASPER_ENGINE = (() => {
       }
 
       let proposalResponse;
-      const __ck=JSON.stringify(proposalPayload),__cq=quoteCache.get(__ck);
+      // Request a live proposal for every entry. Reusing a cached quote for
+      // up to 15 seconds can mismatch current payout/ask price on fast markets.
       try{
-        if(__cq&&Date.now()-__cq.t<15000){
-          proposalResponse=__cq.r;
-        }else{
-          proposalResponse=await sendTradeRequest(proposalPayload);
-          if(quoteCache.size>60)quoteCache.clear();
-          quoteCache.set(__ck,{t:Date.now(),r:proposalResponse});
-        }
+        proposalResponse=await sendTradeRequest(proposalPayload);
       }catch(firstError){
         /* sendTradeRequest deliberately rejects on Deriv API errors. Handle the
            rejection here (rather than checking proposalResponse.error, which can
