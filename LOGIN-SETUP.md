@@ -1,6 +1,6 @@
 # Deriv sign-in and account selection
 
-This project is deployed as a Render Node.js web service. After Deriv OAuth returns, the server redirects the browser to `/`, which is the trading dashboard.
+After Deriv OAuth returns, the server redirects the browser to `/`, which is the trading dashboard.
 
 ## Deriv OAuth app
 
@@ -16,6 +16,12 @@ To unlock the Premium strategy controls for your own account, set `CASPER_PREMIU
 
 ## Current implementation boundary
 
-Login, account listing/selection, and account balance updates are implemented. The four Premium cards have separate strategy roles, but their signal filters and execution are not complete or accuracy-validated. Order placement remains disabled. The owner allowlist unlocks the Premium controls for this account; it does not bypass validation or start trades.
+Login, account listing/selection, account balance updates, live public-market scanning, manual quote/buy flow, and the Free/Premium scanner execution pipeline are implemented. Automated cards require an explicit start confirmation, only trade after a qualifying walk-forward screen and live Deriv proposal, and stop on their own target/loss controls or the two-step recovery cap.
+
+The four Premium cards are independent engines. Each owns state for the same 10 target Volatility markets: Volatility 10, 25, 50, 75 and 100, plus their 1-second variants. The cards do not share recovery counters or active-contract state.
+
+Each automated card supports three staking modes: Flat, Tims 1.6 (1.00× → 1.60× → 2.56×), and Tims 2 (1.00× → 2.00× → 4.00×). A win resets to the base stake. A third consecutive loss after the two recovery steps stops that card. The owner allowlist unlocks Premium controls; it does not bypass signal validation, risk controls, or the start confirmation.
+
+Transaction rows are created only after Deriv confirms a purchase and are updated from `proposal_open_contract` until settlement. The transaction panel shows the strategy/card, market, contract, stake, status, P/L, and recovery step so the live feed mirrors the demonstrated workflow.
 
 Do not store a Deriv password, OAuth access token, or personal trading token in this project or in GitHub.

@@ -11,5 +11,9 @@ services:
         value: production
       - key: DERIV_CLIENT_ID
         sync: false
+      - key: DERIV_REDIRECT_URI
+        sync: false
+      - key: SESSION_ENCRYPTION_KEY
+        generateValue: true
       - key: CASPER_PREMIUM_OWNER_IDS
         sync: false

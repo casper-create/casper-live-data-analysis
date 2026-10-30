@@ -1,46 +1,83 @@
 # CASPER Live Data Analysis
 
-Reference-based dashboard with Deriv OAuth login, implemented as a Cloudflare Pages Advanced Mode Worker.
+Dashboard with Deriv OAuth login. One shared auth module (`auth-core.js`) runs on both hosts, so Render and Cloudflare cannot drift apart again:
 
-## What is included
+- `server.mjs`: Node server (Render, or local development)
+- `build-pages.mjs`: builds `dist/` for Cloudflare Pages, assembling `_worker.js` from `auth-core.js`
 
-- The screenshot-based dashboard in `index.html`.
-- Cloudflare Worker routes for Deriv login, callback, session, account selection, and sign-out.
-- OAuth Authorization Code + PKCE, state validation, origin checks, and encrypted HttpOnly session cookies.
-- A build script that packages the dashboard and Worker entry file for deployment.
-- The original Node server for local development.
+Sessions are stateless: an AES-GCM encrypted HttpOnly cookie. Nothing is kept on the server, so restarts, sleeping instances and redeploys do not log anyone out. The Deriv access token never reaches page JavaScript.
 
-GitHub Pages can still show the static preview, but it cannot run the authentication functions. Use the Cloudflare Pages `pages.dev` address for Deriv login.
+## Environment variables
+
+| Name | Required | Notes |
+|---|---|---|
+| `DERIV_CLIENT_ID` | yes | Your Deriv OAuth app client ID |
+| `SESSION_ENCRYPTION_KEY` | yes | 32+ random characters. Keep it secret and keep it the same across deploys (changing it signs everyone out). `render.yaml` generates one automatically on Render. |
+| `DERIV_REDIRECT_URI` | no | Only for custom domains. Defaults to the address the site is served on. |
+| `CASPER_PREMIUM_OWNER_IDS` | no | Comma-separated Deriv account IDs that unlock Premium UI |
+
+Generate a key: `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`
+
+Register this exact callback in your Deriv OAuth app: `https://YOUR-ADDRESS/auth/callback`
 
 ## Deploy on Render
 
-This repository includes a Node.js server in `server.mjs` that serves the dashboard and handles Deriv OAuth on the same host. `render.yaml` configures a Render Web Service using `npm start`, a `/healthz` health check, and a dashboard prompt for the Deriv OAuth client ID. The server reads Render's `RENDER_EXTERNAL_URL` to build its callback URL.
+1. **New → Blueprint**, connect the repo. Enter `DERIV_CLIENT_ID` when prompted (the session key is generated for you).
+2. Register `https://YOUR-SERVICE.onrender.com/auth/callback` in the Deriv app.
+3. Open `https://YOUR-SERVICE.onrender.com/healthz`. It should show `"loginConfigured":true`.
 
-1. In Render, choose **New → Blueprint** and connect this GitHub repository.
-2. During setup, enter the Deriv OAuth app's client ID when prompted for `DERIV_CLIENT_ID`.
-3. Deploy the Blueprint. Render provides the service URL, for example `https://casper-live-data-analysis.onrender.com`.
-4. In the Deriv OAuth app settings, set the exact callback to `https://YOUR-RENDER-ADDRESS/auth/callback`.
-5. Open the Render service URL and choose **Login with Deriv**.
-6. To grant your own Deriv account free Premium UI access, open the Render service's **Environment** settings and set `CASPER_PREMIUM_OWNER_IDS` to your Deriv account ID (the account ID, not OAuth client ID or API token). Keep it private, then save and redeploy. Multiple owner account IDs can be comma-separated.
+The free plan sleeps after 15 minutes idle and takes about a minute to wake; logins survive this. Upgrade before relying on it for continuous live monitoring.
 
-The free Render instance is for checking the deployment and OAuth flow. It can sleep after 15 minutes without traffic and take about a minute to wake, so upgrade the service before relying on it for continuous live monitoring. The current Node server keeps login sessions in memory; a service restart requires signing in again.
+## Deploy on Cloudflare Pages
 
-## Deploy to Cloudflare Pages
+1. Create a Pages project from the repo. **Build command** `npm run build`, **Output directory** `dist`.
+2. Add `DERIV_CLIENT_ID` (variable) and `SESSION_ENCRYPTION_KEY` (secret), then redeploy.
+3. Register `https://YOUR-PROJECT.pages.dev/auth/callback` in the Deriv app and check `/healthz`.
 
-1. Make sure the files in this folder are in the root of the GitHub repository, including `worker.js`, `build-pages.mjs`, `package.json`, and `index.html`.
-2. In Cloudflare, create a **Pages** project and connect the GitHub repository.
-3. Set **Build command** to `npm run build` and **Build output directory** to `dist`. Leave the root directory as `/`. The build places the Worker entry file at `dist/_worker.js`; Cloudflare uses it to serve the page and handle `/auth/*` requests.
-4. Deploy once. Copy the production `pages.dev` address Cloudflare gives you.
-5. Register a Deriv OAuth app with this exact callback: `https://YOUR-PAGES-ADDRESS/auth/callback`.
-6. In Cloudflare Pages **Settings → Variables and Secrets**, add `DERIV_CLIENT_ID` as a production variable. Add `SESSION_ENCRYPTION_KEY` as a production secret, using a unique random value of at least 32 characters. Do not put that key in GitHub or send it in chat.
-7. Redeploy, open the Cloudflare Pages address, and choose **Login with Deriv**.
-
-The app requests the Deriv `trade` scope. After sign-in, choose the account explicitly; the app does not silently select a demo or real account. It reads each account's balance over its authenticated Deriv connection. The access token stays server-side in an HttpOnly session cookie and is never sent to page JavaScript. The site-owner Premium allowlist is server configuration, not a browser-side switch.
-
-Premium cards currently describe distinct strategy roles. Automated order placement remains disabled while their signal rules, payout/edge checks, and risk controls are being built and validated. No accuracy or profit rate is claimed by this build.
+GitHub Pages cannot run the login routes; use Render or Cloudflare.
 
 ## Local development
 
-Use Node.js 20.6 or newer. Copy `env.example` to `.env`, put your Deriv OAuth client ID in it, and register the local callback `http://127.0.0.1:8080/auth/callback` in the Deriv app. Then run `npm start` and open `http://127.0.0.1:8080`.
+Node 20.6+. Copy `env.example` to `.env`, fill it in, register `http://127.0.0.1:8080/auth/callback`, then `npm start`.
 
-More detail: [LOGIN-SETUP.md](LOGIN-SETUP.md).
+`npm test` runs the smoke tests (routes exist, PKCE redirect, origin checks, cookie encryption).
+
+## Behaviour notes
+
+- After login, a **demo** account is selected by default; a real account is only active after you choose it.
+- A Deriv outage does not end your session. Only an expired or rejected token does.
+- If login fails, the dashboard shows why (cancelled, expired, rejected by Deriv, network).
+- Order automation stays disabled; no accuracy or profit rate is claimed. See `LOGIN-SETUP.md`.
+
+
+## Recovery modes
+
+Every scanner has its own isolated recovery state and can scan the 10 target Volatility markets independently. The selected staking mode is one of:
+
+- **Flat:** base stake on every trade.
+- **Tims 1.6:** base → 1.60× base → 2.56× base, then capped.
+- **Tims 2:** base → 2.00× base → 4.00× base, then capped.
+
+A win resets the engine to base stake. A scanner stops at its configured profit target, max-loss limit, insufficient balance, or invalid/unusable Deriv quote. No mode is presented as a profit guarantee.
+
+## Premium scanner architecture
+
+The four Premium cards — Matches Printer, Over 8 Killer, TickStrike Pro, and Auto Switcher — are independent strategy engines. Each card receives the full set of 10 Volatility markets (Volatility 10/25/50/75/100, regular and 1-second variants) and maintains its own signal state, validation metrics, open-contract state, recovery counter, target, and max-loss controls. Multiple cards may run concurrently on the same authenticated account.
+
+
+## Nexora tier architecture
+
+### Manual Trading
+Live chart and the target Volatility markets with manual quote/confirm/buy flow.
+
+### Nexora AI Free
+Four independent strategy engines: Rise / Fall, Even / Odd, Mix Both, and Smart AI. Each engine maintains its own ten-market analysis state.
+
+### Nexora AI Premium
+Four independent strategy engines: Matches Printer, Over 8 Killer, TickStrike Pro, and Auto Switcher. Each engine maintains its own ten-market analysis state, active contract, P/L, recovery counter, and risk limits.
+
+### Staking
+Flat, Tims 1.6, or Tims 2. Recovery is capped at two recovery steps and resets to base after a win.
+
+### Transactions
+The live transaction feed records only confirmed Deriv purchases and updates them from the authenticated `proposal_open_contract` stream until settlement.
