@@ -81,3 +81,4 @@ Flat, Tims 1.6, or Tims 2. Recovery is capped at two recovery steps and resets t
 
 ### Transactions
 The live transaction feed records only confirmed Deriv purchases and updates them from the authenticated `proposal_open_contract` stream until settlement.
+V5 TEST
