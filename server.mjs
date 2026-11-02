@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { handleRequest, secureHeaders } from './auth-core.js';
+import { handleRequest, secureHeaders, APP_VERSION } from './auth-core.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -45,6 +45,7 @@ function toRequest(req) {
 async function sendResponse(res, response) {
   const headers = {};
   for (const [name, value] of response.headers) if (name !== 'set-cookie') headers[name] = value;
+  headers['X-Casper-Version'] = APP_VERSION;
   const cookies = response.headers.getSetCookie();
   if (cookies.length) headers['set-cookie'] = cookies;
   res.writeHead(response.status, headers);
@@ -77,4 +78,4 @@ const server = createServer(async (req, res) => {
 
 if (!env.DERIV_CLIENT_ID) console.warn('[CASPER] DERIV_CLIENT_ID is not set; login is disabled.');
 if (!env.SESSION_ENCRYPTION_KEY || env.SESSION_ENCRYPTION_KEY.length < 32) console.warn('[CASPER] SESSION_ENCRYPTION_KEY (32+ chars) is not set; login is disabled.');
-server.listen(PORT, HOST, () => console.log(`CASPER dashboard listening on ${HOST}:${PORT}`));
+server.listen(PORT, HOST, () => console.log(`CASPER dashboard v${APP_VERSION} listening on ${HOST}:${PORT}`));

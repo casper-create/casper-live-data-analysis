@@ -1,8 +1,9 @@
-# CASPER Live Data Analysis
+# CASPER Live Data Analysis — v0.5.1
 
 Dashboard with Deriv OAuth login. One shared auth module (`auth-core.js`) runs on both hosts, so Render and Cloudflare cannot drift apart again:
 
 - `server.mjs`: Node server (Render, or local development)
+- `VERSION.txt`: explicit build marker so every V5 bundle is easy to identify
 - `build-pages.mjs`: builds `dist/` for Cloudflare Pages, assembling `_worker.js` from `auth-core.js`
 
 Sessions are stateless: an AES-GCM encrypted HttpOnly cookie. Nothing is kept on the server, so restarts, sleeping instances and redeploys do not log anyone out. The Deriv access token never reaches page JavaScript.
@@ -47,7 +48,9 @@ Node 20.6+. Copy `env.example` to `.env`, fill it in, register `http://127.0.0.1
 - After login, a **demo** account is selected by default; a real account is only active after you choose it.
 - A Deriv outage does not end your session. Only an expired or rejected token does.
 - If login fails, the dashboard shows why (cancelled, expired, rejected by Deriv, network).
-- Order automation stays disabled; no accuracy or profit rate is claimed. See `LOGIN-SETUP.md`.
+- Automated cards are enabled only after explicit user confirmation, live Deriv quote validation, and the configured target/max-loss checks. Orders are real Deriv purchases only; there are no simulated transaction rows.
+- The current testing warm-up requires 40 observed validation results before a card can qualify a trade. This is a testing threshold, not an accuracy guarantee.
+- V4-compatible Deriv OAuth/session behavior is intentionally preserved in `auth-core.js`. Do not replace it with a different login implementation.
 
 
 ## Recovery modes
@@ -81,4 +84,22 @@ Flat, Tims 1.6, or Tims 2. Recovery is capped at two recovery steps and resets t
 
 ### Transactions
 The live transaction feed records only confirmed Deriv purchases and updates them from the authenticated `proposal_open_contract` stream until settlement.
-V5 TEST
+
+
+## V5.0.1 change control
+
+This bundle is intentionally delivered as a complete project, not a partial file patch. Replace the matching repository files together so GitHub Desktop sees the actual content changes as one coherent version. The login module remains the V4-compatible OAuth implementation.
+
+### Automated card behavior
+
+- Rise / Fall and Even / Odd use the selected Volatility market.
+- Mix Both and Smart AI can choose automatically from all 10 target Volatility markets.
+- Premium cards are available to a signed-in account for testing; owner-ID gating only controls the owner label.
+- Each card owns its own recovery counter, P/L, active contract, validation state and stop limits.
+- A completed losing trade advances Flat/Tims 1.6/Tims 2 recovery as configured, capped at two recovery steps; a win resets to base.
+- After settlement, a running card is scheduled to look for the next qualifying trade until its target, max-loss or safety condition stops it.
+- Transactions are created only after Deriv confirms the purchase and are updated from `proposal_open_contract` until settlement.
+
+### Change-control rule
+
+When a new version is prepared, the assistant will provide the full project ZIP and the version marker. Do not mix individual files from different versions, especially `auth-core.js`, `server.mjs`, `build-pages.mjs`, and `index.html`.

@@ -1,3 +1,5 @@
+export const APP_VERSION = '0.5.1';
+// V4-compatible Deriv OAuth/session implementation. Keep this module as the single auth source.
 // Shared Deriv OAuth + session logic. Web-standard APIs only (Request, Response, crypto.subtle, fetch),
 // so the exact same code runs in Node 20+ (server.mjs) and in a Cloudflare Worker (_worker.js).
 // Sessions are stateless: an AES-GCM encrypted HttpOnly cookie. Nothing is stored on the server,
@@ -296,7 +298,7 @@ async function handleAuth(request, env) {
 // Returns a Response for /healthz and /auth/*, or null for everything else (the host serves static files).
 export async function handleRequest(request, env) {
   const { pathname } = new URL(request.url);
-  if (pathname === '/healthz') return json({ ok: true, loginConfigured: configured(env) });
+  if (pathname === '/healthz') return json({ ok: true, loginConfigured: configured(env), version: APP_VERSION });
   if (pathname.startsWith('/auth/')) return handleAuth(request, env);
   return null;
 }

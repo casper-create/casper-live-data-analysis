@@ -6,7 +6,7 @@ const env = { DERIV_CLIENT_ID: 'abc123', SESSION_ENCRYPTION_KEY: 'x'.repeat(40),
 const call = (path, init = {}, e = env) => handleRequest(new Request('https://example.test' + path, init), e);
 
 test('healthz reports login configuration', async () => {
-  assert.deepEqual(await (await call('/healthz')).json(), { ok: true, loginConfigured: true });
+  assert.deepEqual(await (await call('/healthz')).json(), { ok: true, loginConfigured: true, version: '0.5.1' });
   assert.equal((await (await call('/healthz', {}, {})).json()).loginConfigured, false);
 });
 

@@ -1,3 +1,5 @@
+const APP_VERSION = '0.5.1';
+// V4-compatible Cloudflare auth copy. OAuth/session behavior is intentionally unchanged.
 const SESSION_COOKIE = '__Host-casper_sid';
 const STATE_COOKIE = '__Host-casper_oauth_state';
 const SESSION_TTL = 8 * 60 * 60;
@@ -227,6 +229,7 @@ async function handleAuth(request, env) {
 
 function secureHeaders(response) {
   const headers = new Headers(response.headers);
+  headers.set('X-Casper-Version', APP_VERSION);
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('X-Frame-Options', 'DENY');
   headers.set('Referrer-Policy', 'no-referrer');

@@ -30,6 +30,11 @@ test('transaction panel has the live fields required by the video workflow', () 
   assert.match(html, /Deriv confirmed contract/);
 });
 
+test('V5.0.1 uses an explicit validation warm-up and continuous retry loop', () => {
+  assert.match(html, /MIN_VALIDATION_TESTS=40/);
+  assert.match(html, /scheduleEngineRetry\(id,900\)/);
+});
+
 test('each strategy keeps its own state and active contract', () => {
   assert.match(html, /engineState=Object\.fromEntries/);
   assert.match(html, /activeEngineContracts=new Map/);

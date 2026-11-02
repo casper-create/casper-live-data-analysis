@@ -8,3 +8,5 @@ yarn-debug.log*
 pnpm-debug.log*
 .DS_Store
 Thumbs.db
+# Local/runtime artifacts
+*.log

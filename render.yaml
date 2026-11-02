@@ -17,3 +17,5 @@ services:
         generateValue: true
       - key: CASPER_PREMIUM_OWNER_IDS
         sync: false
+      - key: CASPER_APP_VERSION
+        value: 0.5.1

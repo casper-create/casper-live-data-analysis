@@ -25,3 +25,8 @@ Each automated card supports three staking modes: Flat, Tims 1.6 (1.00× → 1.6
 Transaction rows are created only after Deriv confirms a purchase and are updated from `proposal_open_contract` until settlement. The transaction panel shows the strategy/card, market, contract, stake, status, P/L, and recovery step so the live feed mirrors the demonstrated workflow.
 
 Do not store a Deriv password, OAuth access token, or personal trading token in this project or in GitHub.
+
+
+## V5.0.1 login preservation
+
+The V4-compatible OAuth flow remains the source of truth: `/auth/login` → Deriv OAuth → `/auth/callback` → encrypted HttpOnly session → Demo/Real account selection. The V5.0.1 changes do not alter that login flow.
