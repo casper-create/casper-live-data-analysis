@@ -286,7 +286,7 @@
 "use strict";
 const $=function(s){return document.querySelector(s)};
 const $$=function(s){return Array.from(document.querySelectorAll(s))};
-const APP_VERSION="0.5.4";
+const APP_VERSION="0.5.5";
 const MIN_VALIDATION_TESTS=12; // Keep the live-entry screen fast; accuracy remains based only on observed Deriv ticks.
 const FALLBACK_SCAN_MS=100; // Only a fallback retry; normal execution is tick-driven and settlement-driven.
 function minimumEntryEdge(id){
@@ -433,7 +433,22 @@ function stopEngine(id,reason){const wasRunning=running.has(id);running.delete(i
 
 function precisionOutcome(candidate,previous,next,m){return hitFor(candidate,previous,next,m)}
 function currentCandidate(id,symbol){const m=markets.get(symbol),s=metricsFor(id,symbol);if(!m||!m.latest)return null;return s.latest||adjustedCandidate(id,m.ticks.map(function(t){return t.quote}),m,symbol)}
-function bestSignal(id){const choice=engineMarketChoice.get(id);if(choice==="")return null;if(choice!=="__auto__"){const m=markets.get(choice),c=m&&currentCandidate(id,m.symbol);if(!m||!c)return null;const met=metricsFor(id,m.symbol).metrics;return {market:m,candidate:c,score:candidateScore(id,m.symbol,c),metrics:met}}let best=null;for(const m of markets.values()){const c=currentCandidate(id,m.symbol);if(!c)continue;const met=metricsFor(id,m.symbol).metrics;const sc=candidateScore(id,m.symbol,c);if(!best||sc>best.score)best={market:m,candidate:c,score:sc,metrics:met}}return best}
+function rankedSignals(id){
+  const choice=engineMarketChoice.get(id);
+  if(choice==="")return [];
+  const list=[];
+  const source=choice!=="__auto__"?[markets.get(choice)]:Array.from(markets.values());
+  for(const m of source){
+    if(!m)continue;
+    const c=currentCandidate(id,m.symbol);
+    if(!c)continue;
+    const met=metricsFor(id,m.symbol).metrics;
+    list.push({market:m,candidate:c,score:candidateScore(id,m.symbol,c),metrics:met});
+  }
+  list.sort(function(a,b){return b.score-a.score});
+  return list;
+}
+function bestSignal(id){return rankedSignals(id)[0]||null}
 function candidateSignature(m,c){return m.symbol+"|"+c.contractType+"|"+String(c.barrier==null?"":c.barrier)+"|"+c.label}
 async function considerEntry(id,symbol){
   if(!running.has(id)||!selectedAccount||activeEngineContracts.has(id)||engineBusy.has(id))return;
@@ -445,51 +460,51 @@ async function considerEntry(id,symbol){
   if(realized>=settings.target){stopEngine(id,"profit target reached");return}
   if(realized<=-settings.maxLoss){stopEngine(id,"max loss reached");return}
 
-  const best=bestSignal(id);
-  if(!best)return;
-  if(choice!=="__auto__"&&best.market.symbol!==choice)return;
-  if(choice==="__auto__"&&symbol&&best.market.symbol!==symbol)return;
-
-  const engine=metricsFor(id,best.market.symbol);
-  if(engine.activeContract||engine.inFlight)return;
-  const c=best.candidate,mt=best.metrics;
-  const observedRate=Number(mt.rate);
-  if(mt.n<MIN_VALIDATION_TESTS||!Number.isFinite(observedRate)||observedRate<=mt.baseline+minimumEntryEdge(id))return;
-
+  const candidates=rankedSignals(id);
+  if(!candidates.length)return;
   const plannedStake=stakeForNext(id,settings),riskLeft=remainingRisk(id,settings);
   if(plannedStake<0.35||(balance!==null&&plannedStake>balance)){
     log(engineDefs[id].name+" waiting · next stake cannot be supported by remaining risk or account balance","warn");
     return;
   }
 
-  const sig=candidateSignature(best.market,c);
-  if(engine.quoteKey===sig||engineBusy.has(id))return;
-  engine.quoteKey=sig;
-  engine.inFlight=true;
-  engineBusy.add(id);
-  try{
-    // Request the live Deriv proposal immediately after the signal clears the fast screen.
-    const quote=await requestProposal(best.market,c,plannedStake,id);
-    const ask=Number(quote.ask_price),payout=Number(quote.payout);
-    if(!Number.isFinite(ask)||!Number.isFinite(payout)||payout<=0)throw new Error("Deriv quote omitted a usable price or payout.");
-    if(ask>riskLeft)throw new Error("Live quote exceeds the remaining loss limit.");
-    const lower=Number.isFinite(mt.lower)?mt.lower:observedRate;
-    const breakEven=ask/payout;
-    // Use the live quote plus observed walk-forward rate for execution. The Wilson lower bound
-    // remains visible as a confidence metric, but it is not used as an artificial second gate.
-    const evObserved=observedRate*payout-ask;
-    if(evObserved<=0){
-      log(engineDefs[id].name+" · live quote rejected · observed accuracy "+percent(observedRate)+" vs break-even "+percent(breakEven),"warn");
-      engine.quoteKey="";
+  // Try the strongest eligible live candidate, then immediately fall through to the
+  // next ranked candidate if its live quote is not executable. This prevents one
+  // rejected quote from leaving an Auto card apparently "Running" with no trade.
+  for(const best of candidates){
+    if(choice!=="__auto__"&&best.market.symbol!==choice)continue;
+    if(choice==="__auto__"&&symbol&&best.market.symbol!==symbol)continue;
+    const engine=metricsFor(id,best.market.symbol);
+    if(engine.activeContract||engine.inFlight)continue;
+    const c=best.candidate,mt=best.metrics,observedRate=Number(mt.rate);
+    if(mt.n<MIN_VALIDATION_TESTS||!Number.isFinite(observedRate)||observedRate<=mt.baseline+minimumEntryEdge(id))continue;
+    const sig=candidateSignature(best.market,c);
+    if(engine.quoteKey===sig)continue;
+    engine.quoteKey=sig;
+    engine.inFlight=true;
+    engineBusy.add(id);
+    try{
+      const quote=await requestProposal(best.market,c,plannedStake,id);
+      const ask=Number(quote.ask_price),payout=Number(quote.payout);
+      if(!Number.isFinite(ask)||!Number.isFinite(payout)||payout<=0)throw new Error("Deriv quote omitted a usable price or payout.");
+      if(ask>riskLeft)throw new Error("Live quote exceeds the remaining loss limit.");
+      const breakEven=ask/payout;
+      const evObserved=observedRate*payout-ask;
+      if(evObserved<=0){
+        log(engineDefs[id].name+" · "+best.market.name+" quote rejected · accuracy "+percent(observedRate)+" below live break-even "+percent(breakEven)+" · trying next candidate","warn");
+        engine.quoteKey="";
+        continue;
+      }
+      await buyProposal({quote:quote,market:best.market,candidate:c,engineId:id,stake:ask,settings:settings,auto:true,evLower:evObserved,breakEven:breakEven});
       return;
+    }catch(e){
+      log(engineDefs[id].name+" · "+best.market.name+" quote/buy failed · "+(e.message||"Deriv request failed"),"warn");
+      engine.quoteKey="";
+      continue;
+    }finally{
+      engine.inFlight=false;
+      engineBusy.delete(id);
     }
-    await buyProposal({quote:quote,market:best.market,candidate:c,engineId:id,stake:ask,settings:settings,auto:true,evLower:evObserved,breakEven:breakEven});
-  }catch(e){
-    log(engineDefs[id].name+" quote/buy failed · "+(e.message||"Deriv request failed"),"warn");
-    engine.quoteKey="";
-  }finally{
-    engine.inFlight=false;
-    engineBusy.delete(id);
   }
 }
 async function requestProposal(m,c,stake,engineId,durationTicks,durationUnit){await ensureAuthSocket();const duration=Number.isInteger(durationTicks)?durationTicks:1;const req={proposal:1,amount:stake,basis:"stake",contract_type:c.contractType,currency:currency,duration:duration,duration_unit:durationUnit||"t",underlying_symbol:m.symbol,req_id:nextReq++};if(c.barrier!==null)req.barrier=String(c.barrier);const response=await sendAuthRequest(req,"proposal");if(response&&response.error)throw new Error(response.error.message||"Deriv rejected the quote request.");if(!response||!response.proposal)throw new Error("Deriv returned no proposal.");return response.proposal}

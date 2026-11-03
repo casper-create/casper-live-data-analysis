@@ -23,3 +23,11 @@
 - Auto-market ranking uses observed accuracy edge with confidence weighting.
 - Reduced fallback scan retry to 100 ms; normal entry remains tick-driven and settlement-driven.
 - Added automated tests for entry eligibility and live quote EV.
+
+
+## 0.5.5 — execution supervisor fix
+- Ranked execution now tries the strongest eligible candidate and immediately falls through to the next qualifying candidate when a live quote is not executable.
+- Auto-switching cards no longer get stuck on one rejected quote while displaying Running.
+- Selected-market cards retain their market binding.
+- Preserved live proposal/buy, settlement, recovery and risk gates.
+- Preserved V4-compatible authentication.

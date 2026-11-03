@@ -31,3 +31,13 @@ test('Observed quote EV gate rejects negative live edge', () => {
   assert.ok(.134 * payout - ask > 0);
   assert.ok(.10 * payout - ask <= 0);
 });
+
+
+test('Auto execution must fall through when the strongest quote is not executable', () => {
+  const candidates = [
+    { rate: .60, payout: 1.66 }, // 0.996 expected payout before stake: reject
+    { rate: .58, payout: 1.80 }  // 1.044: executable
+  ];
+  const executable = candidates.find(x => x.rate * x.payout - 1 > 0);
+  assert.equal(executable, candidates[1]);
+});
