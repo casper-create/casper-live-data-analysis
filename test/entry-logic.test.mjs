@@ -41,3 +41,17 @@ test('Auto execution must fall through when the strongest quote is not executabl
   const executable = candidates.find(x => x.rate * x.payout - 1 > 0);
   assert.equal(executable, candidates[1]);
 });
+
+
+test('Auto Switcher direction uses live displacement plus directional consistency', () => {
+  function direction(prices, windowSize = 8) {
+    const from = Math.max(1, prices.length - windowSize);
+    let up=0, down=0, abs=0;
+    for (let i=from;i<prices.length;i++){ const d=prices[i]-prices[i-1]; abs+=Math.abs(d); if(d>0)up++; else if(d<0)down++; }
+    const displacement=(prices.at(-1)-prices[from-1])/(abs||1);
+    const consistency=(up-down)/Math.max(1,up+down);
+    return .62*displacement+.38*consistency;
+  }
+  assert.ok(direction([100,101,102,103,104,105,106,107,108]) > 0);
+  assert.ok(direction([108,107,106,105,104,103,102,101,100]) < 0);
+});

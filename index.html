@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#06171d">
 <meta name="description" content="CASPER Live Deriv Data Analysis">
-<title>CASPER Live Deriv Data Analysis · v0.5.4</title>
+<title>CASPER Live Deriv Data Analysis · v0.5.7</title>
 <style>
 :root{color-scheme:dark;--bg:#06171d;--panel:#0a2028;--panel2:#0d2730;--line:#173b46;--cyan:#18d5ea;--blue:#0999b6;--muted:#86a4bb;--text:#f1f5fb;--gold:#ffc629;--green:#22d5a0;--red:#ff6681;--purple:#a45cff;--radius:18px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 *{box-sizing:border-box}body{margin:0;min-width:320px;background:var(--bg);color:var(--text)}button,input,select{font:inherit}button{cursor:pointer;color:inherit}button:disabled{cursor:not-allowed;opacity:.45}
@@ -286,9 +286,9 @@
 "use strict";
 const $=function(s){return document.querySelector(s)};
 const $$=function(s){return Array.from(document.querySelectorAll(s))};
-const APP_VERSION="0.5.5";
+const APP_VERSION="0.5.7";
 const MIN_VALIDATION_TESTS=12; // Keep the live-entry screen fast; accuracy remains based only on observed Deriv ticks.
-const FALLBACK_SCAN_MS=100; // Only a fallback retry; normal execution is tick-driven and settlement-driven.
+const FALLBACK_SCAN_MS=25; // Safety fallback only; primary execution is triggered directly by each live tick/settlement.
 function minimumEntryEdge(id){
   // Digit strategies have a 10% baseline, so a six-point universal gate was too strict.
   if(id==="matches"||id==="over8")return 0.02;
@@ -334,10 +334,32 @@ function digitOf(m,q){const s=priceText(m,q);const digits=s.replace(/\D/g,"");re
 function metricsFor(id,symbol){let s=engineState[id].get(symbol);if(!s){s={results:[],metrics:{n:0,hits:0,rate:null,lower:null,upper:null,baseline:engineDefs[id].baseline},latest:null,pending:null,quoteKey:"",inFlight:false,activeContract:null,pnl:0};engineState[id].set(symbol,s)}return s}
 function wilson(h,n,z){if(!n)return {lower:0,upper:1};const p=h/n,z2=z*z,den=1+z2/n,mid=p+z2/(2*n),margin=z*Math.sqrt((p*(1-p)+z2/(4*n))/n);return {lower:(mid-margin)/den,upper:(mid+margin)/den}}
 function updateMetrics(id,symbol,result){const s=metricsFor(id,symbol);s.results.push(Boolean(result));if(s.results.length>2000)s.results.shift();const n=s.results.length,h=s.results.reduce(function(a,x){return a+(x?1:0)},0),w=wilson(h,n,1.96);s.metrics={n:n,hits:h,rate:n?h/n:null,lower:w.lower,upper:w.upper,baseline:engineDefs[id].baseline};}
-function directionCandidate(prices,windowSize,minimum){if(prices.length<Math.max(24,windowSize+2))return null;let up=0,down=0;const from=Math.max(1,prices.length-windowSize);for(let i=from;i<prices.length;i++){if(prices[i]>prices[i-1])up++;else if(prices[i]<prices[i-1])down++}const n=up+down;if(!n||up===down)return null;const side=up>down?"up":"down",share=Math.max(up,down)/n;if(minimum&&share<minimum)return null;return {contractType:side==="up"?"CALL":"PUT",label:side==="up"?"Rise":"Fall",barrier:null,baseline:.5,strength:share,pHit:.5+(share-.5)*.6,samples:n,model:"direction"}}
-function parityCandidate(prices,m){if(prices.length<40)return null;let even=0,odd=0;const from=Math.max(0,prices.length-100);for(let i=from;i<prices.length;i++){if(digitOf(m,prices[i])%2===0)even++;else odd++}const n=even+odd;if(!n)return null;const side=even>=odd?"even":"odd",share=Math.max(even,odd)/n;return {contractType:side==="even"?"DIGITEVEN":"DIGITODD",label:side==="even"?"Even":"Odd",barrier:null,baseline:.5,strength:share,pHit:share,samples:n,model:"parity"}}
-function matchCandidate(prices,m){if(prices.length<100)return null;const counts=Array(10).fill(0),from=Math.max(0,prices.length-200);for(let i=from;i<prices.length;i++)counts[digitOf(m,prices[i])]++;let best=0;for(let d=1;d<10;d++)if(counts[d]>counts[best])best=d;const n=counts.reduce(function(a,x){return a+x},0),share=n?counts[best]/n:0;return {contractType:"DIGITMATCH",label:"Matches "+best,barrier:best,baseline:.1,strength:share,pHit:share,samples:n,model:"match"}}
-function over8Candidate(prices,m){if(prices.length<100)return null;let hits=0,n=0;for(let i=Math.max(0,prices.length-200);i<prices.length;i++){if(digitOf(m,prices[i])>8)hits++;n++}const p=n?hits/n:.1;return {contractType:"DIGITOVER",label:"Over 8",barrier:8,baseline:.1,strength:p,pHit:p,samples:n,model:"over8"}}
+function directionCandidate(prices,windowSize,minimum){
+  const w=Math.max(8,windowSize);
+  if(prices.length<Math.max(30,w+2))return null;
+  const from=Math.max(1,prices.length-w);
+  let up=0,down=0,absMove=0;
+  for(let i=from;i<prices.length;i++){
+    const d=prices[i]-prices[i-1];
+    absMove+=Math.abs(d);
+    if(d>0)up++; else if(d<0)down++;
+  }
+  const n=up+down;
+  if(!n||!absMove)return null;
+  const first=prices[from-1],last=prices[prices.length-1];
+  const displacement=Math.max(-1,Math.min(1,(last-first)/absMove));
+  const consistency=(up-down)/n;
+  const score=.62*displacement+.38*consistency;
+  const side=score>0?"up":"down";
+  const strength=.5+.5*Math.min(1,Math.abs(score));
+  const agreement=Math.abs(up-down)/n;
+  if(minimum&&strength<minimum)return null;
+  return {contractType:side==="up"?"CALL":"PUT",label:side==="up"?"Rise":"Fall",barrier:null,baseline:.5,strength:strength,pHit:.5+.5*Math.min(1,Math.abs(score)),samples:n,model:"direction",trendScore:score,trendAgreement:agreement,displacement:displacement,directionalTicks:{up:up,down:down}};
+}
+function liveTrend(prices,windowSize){if(prices.length<Math.max(10,windowSize+1))return {score:0,agreement:0,displacement:0,directionalTicks:{up:0,down:0}};const from=Math.max(1,prices.length-windowSize);let up=0,down=0,abs=0;for(let i=from;i<prices.length;i++){const d=prices[i]-prices[i-1];abs+=Math.abs(d);if(d>0)up++;else if(d<0)down++}const displacement=(prices[prices.length-1]-prices[from-1])/(abs||1);const consistency=(up-down)/Math.max(1,up+down);const score=.62*displacement+.38*consistency;return {score:score,agreement:Math.abs(up-down)/Math.max(1,up+down),displacement:displacement,directionalTicks:{up:up,down:down}}}
+function parityCandidate(prices,m){if(prices.length<40)return null;let even=0,odd=0;const from=Math.max(0,prices.length-100);for(let i=from;i<prices.length;i++){if(digitOf(m,prices[i])%2===0)even++;else odd++}const n=even+odd;if(!n)return null;const side=even>=odd?"even":"odd",share=Math.max(even,odd)/n,trend=liveTrend(prices,8);return {contractType:side==="even"?"DIGITEVEN":"DIGITODD",label:side==="even"?"Even":"Odd",barrier:null,baseline:.5,strength:share,pHit:share,samples:n,model:"parity",trendScore:trend.score,trendAgreement:trend.agreement,displacement:trend.displacement,directionalTicks:trend.directionalTicks}}
+function matchCandidate(prices,m){if(prices.length<100)return null;const counts=Array(10).fill(0),from=Math.max(0,prices.length-200);for(let i=from;i<prices.length;i++)counts[digitOf(m,prices[i])]++;let best=0;for(let d=1;d<10;d++)if(counts[d]>counts[best])best=d;const n=counts.reduce(function(a,x){return a+x},0),share=n?counts[best]/n:0,trend=liveTrend(prices,8);return {contractType:"DIGITMATCH",label:"Matches "+best,barrier:best,baseline:.1,strength:share,pHit:share,samples:n,model:"match",trendScore:trend.score,trendAgreement:trend.agreement,displacement:trend.displacement,directionalTicks:trend.directionalTicks}}
+function over8Candidate(prices,m){if(prices.length<100)return null;let hits=0,n=0;for(let i=Math.max(0,prices.length-200);i<prices.length;i++){if(digitOf(m,prices[i])>8)hits++;n++}const p=n?hits/n:.1,trend=liveTrend(prices,8);return {contractType:"DIGITOVER",label:"Over 8",barrier:8,baseline:.1,strength:p,pHit:p,samples:n,model:"over8",trendScore:trend.score,trendAgreement:trend.agreement,displacement:trend.displacement,directionalTicks:trend.directionalTicks}}
 function smartCompositeCandidate(prices,m,symbol){
   const sources=[
     {id:"rise",candidate:directionCandidate(prices,18,0)},
@@ -361,7 +383,7 @@ function smartCompositeCandidate(prices,m,symbol){
   c.smartScore=(function(){const met=metricsFor(winner.id,symbol).metrics;return met.n>=12&&met.lower!==null?(met.lower-winner.candidate.baseline)*Math.sqrt(met.n/(met.n+80)):(winner.candidate.pHit-winner.candidate.baseline)*0.25})();
   return c;
 }
-function rawCandidate(id,prices,m,symbol){if(id==="rise")return directionCandidate(prices,18,0);if(id==="parity")return parityCandidate(prices,m);if(id==="mix"){const candidates=[directionCandidate(prices,18,0),parityCandidate(prices,m)].filter(Boolean);if(!candidates.length)return null;candidates.sort(function(a,b){return Math.abs(b.strength-b.baseline)-Math.abs(a.strength-a.baseline)});const c=Object.assign({},candidates[0]);c.model=id;c.label="Mix · "+c.label;return c}if(id==="smart")return smartCompositeCandidate(prices,m,symbol);if(id==="matches")return matchCandidate(prices,m);if(id==="over8")return over8Candidate(prices,m);if(id==="tickstrike")return directionCandidate(prices,5,0);if(id==="autoswitch")return directionCandidate(prices,8,0);return null}
+function rawCandidate(id,prices,m,symbol){if(id==="rise"){const c=directionCandidate(prices,18,0);if(c)c.decisionWindow=18;return c}if(id==="parity")return parityCandidate(prices,m);if(id==="mix"){const candidates=[directionCandidate(prices,18,0),parityCandidate(prices,m)].filter(Boolean);if(!candidates.length)return null;candidates.sort(function(a,b){return Math.abs(b.strength-b.baseline)-Math.abs(a.strength-a.baseline)});const c=Object.assign({},candidates[0]);c.model=id;c.label="Mix · "+c.label;return c}if(id==="smart")return smartCompositeCandidate(prices,m,symbol);if(id==="matches")return matchCandidate(prices,m);if(id==="over8")return over8Candidate(prices,m);if(id==="tickstrike"){const c=directionCandidate(prices,5,0);if(c)c.decisionWindow=5;return c}if(id==="autoswitch"){const c=directionCandidate(prices,8,0);if(c)c.decisionWindow=8;return c}return null}
 function adjustedCandidate(id,prices,m,symbol){return rawCandidate(id,prices,m,symbol)}
 function hitFor(candidate,previous,next,m){if(!candidate)return null;if(candidate.contractType==="CALL")return next>previous;if(candidate.contractType==="PUT")return next<previous;const d=digitOf(m,next);if(candidate.contractType==="DIGITEVEN")return d%2===0;if(candidate.contractType==="DIGITODD")return d%2===1;if(candidate.contractType==="DIGITMATCH")return d===Number(candidate.barrier);if(candidate.contractType==="DIGITOVER")return d>Number(candidate.barrier);return null}
 function rebuildTests(m){const prices=m.ticks.map(function(t){return t.quote});for(const id of engineIds){const state=metricsFor(id,m.symbol);state.results=[];state.pending=null;state.latest=null}if(prices.length<150)return;const start=Math.max(100,Math.floor(prices.length*.8));for(let i=start;i<prices.length;i++){const prior=prices.slice(0,i);for(const id of engineIds){const c=rawCandidate(id,prior,m,m.symbol);if(!c)continue;const ok=hitFor(c,prices[i-1],prices[i],m);if(ok!==null)updateMetrics(id,m.symbol,ok)}}}
@@ -373,7 +395,13 @@ function connectPublic(){clearTimeout(publicRetry);status("Connecting to Deriv p
 function processTick(m,quote,epoch,pip){if(!Number.isFinite(quote))return;if(Number.isInteger(pip)&&pip>=0&&pip<=10)m.precision=pip;const previous=m.latest;if(previous!==null&&m.ticks.length){for(const id of engineIds){const s=metricsFor(id,m.symbol);if(s.pending){const result=hitFor(s.pending.candidate,s.pending.previous,quote,m);if(result!==null)updateMetrics(id,m.symbol,result)}}}m.latest=quote;m.epoch=epoch||Date.now()/1000;m.ticks.push({quote:quote,epoch:m.epoch});if(m.ticks.length>maxTicks)m.ticks.shift();for(const id of engineIds){const s=metricsFor(id,m.symbol);s.latest=adjustedCandidate(id,m.ticks.map(function(t){return t.quote}),m,m.symbol);s.pending=s.latest&&previous!==null?{candidate:s.latest,previous:previous}:null}const format=priceText(m,quote);if($("#tradeMarket").value===m.symbol)$("#manualPrice").textContent=format;renderChart();renderQueued=true;if(!window.requestAnimationFrame||!renderQueued){updateAll();renderQueued=false}else if(renderQueued){renderQueued=false;window.requestAnimationFrame(updateAll)}for(const id of running){const choice=engineMarketChoice.get(id);if(choice!=="")considerEntry(id,choice!=="__auto__"?choice:undefined)}}
 function renderMarketOptions(){const manual=$("#tradeMarket"),current=manual.value;manual.replaceChildren();for(const m of markets.values()){const o=document.createElement("option");o.value=m.symbol;o.textContent=m.name;manual.append(o)}if(markets.has(current))manual.value=current;else{const preferred=Array.from(markets.values()).find(function(m){return m.level===100&&m.oneSecond})||markets.values().next().value;if(preferred)manual.value=preferred.symbol}if(manual.value)$("#manualMarketName").textContent=markets.get(manual.value).name;["free","premium"].forEach(function(tier){const sel=$("#"+tier+"MarketSelect");if(!sel)return;const id=tier==="free"?activeFree:activePremium,choice=engineMarketChoice.get(id)||"__auto__";sel.replaceChildren();const auto=document.createElement("option");auto.value="__auto__";auto.textContent=id==="mix"||id==="smart"?"Automatic — strongest market":"Choose a Volatility market";sel.append(auto);for(const m of markets.values()){const o=document.createElement("option");o.value=m.symbol;o.textContent=m.name;sel.append(o)}sel.value=choice&&markets.has(choice)?choice:"__auto__";if(id!=="mix"&&id!=="smart"&&choice==="")sel.value="__auto__";$("#"+tier+"MarketHelp").textContent=(id==="mix"||id==="smart")?"Smart AI automatically selects the strongest qualifying market and mode from all 10 Volatility markets; you do not choose the market manually.":(choice?"This card will execute only on the Volatility market you choose.":"Choose a Volatility market before starting this card.")})}
 function renderMarkets(){const html=Array.from(markets.values()).map(function(m){const q=m.latest===null?"—":priceText(m,m.latest),digit=m.latest===null?"—":String(digitOf(m,m.latest));return '<div class="market-tile '+($("#tradeMarket").value===m.symbol?"selected":"")+'"><b>'+esc(m.name)+'</b><strong>'+esc(q)+'</strong><small>Last digit '+esc(digit)+' · '+(m.latest===null?"Connecting":m.historyReady?"Live":"History loading")+'</small></div>'}).join("");$("#marketTiles").innerHTML=html;$("#manualMarketTiles").innerHTML=html}
-function candidateScore(id,symbol,c){const met=metricsFor(id,symbol).metrics;if(met.n>=40&&met.rate!==null){const edge=met.rate-met.baseline;const confidence=Math.min(1,Math.sqrt(met.n/(met.n+80)));return edge*confidence}return (c.strength-c.baseline)*.25}
+function candidateScore(id,symbol,c){
+  const met=metricsFor(id,symbol).metrics;
+  const liveEdge=Math.max(0,Number(c.strength)-Number(c.baseline));
+  const observedEdge=met.n>=12&&met.rate!==null?Math.max(0,met.rate-met.baseline):0;
+  const confidence=met.n>=12?Math.min(1,Math.sqrt(met.n/(met.n+80))):0;
+  return .65*observedEdge*confidence+.35*liveEdge;
+}
 function bestFor(id){let arr=[];for(const m of markets.values()){const c=metricsFor(id,m.symbol).latest;if(c)arr.push({market:m,candidate:c,score:candidateScore(id,m.symbol,c),metrics:metricsFor(id,m.symbol).metrics})}arr.sort(function(a,b){return b.score-a.score});return arr[0]||null}
 function percent(x){return Number.isFinite(x)?(x*100).toFixed(1)+"%":"—"}
 function renderStats(id,prefix){const best=bestFor(id),state=best&&metricsFor(id,best.market.symbol);const pnl=trades.filter(function(t){return t.engineId===id&&t.settled}).reduce(function(a,t){return a+Number(t.profit||0)},0);$("#"+prefix+"Accuracy").textContent=best?percent(best.metrics.rate):"—";$("#"+prefix+"Tests").textContent=best?String(best.metrics.n):"0";$("#"+prefix+"Lower").textContent=best?percent(best.metrics.lower):"—";$("#"+prefix+"Pnl").textContent=money(pnl)}
@@ -462,6 +490,13 @@ async function considerEntry(id,symbol){
 
   const candidates=rankedSignals(id);
   if(!candidates.length)return;
+  // A user-selected market is a hard execution boundary. The decision engine
+  // may choose direction, but it must never silently switch the selected market.
+  if(choice!=="__auto__"){
+    const selected=candidates.find(function(x){return x.market.symbol===choice});
+    if(!selected)return;
+    candidates.splice(0,candidates.length,selected);
+  }
   const plannedStake=stakeForNext(id,settings),riskLeft=remainingRisk(id,settings);
   if(plannedStake<0.35||(balance!==null&&plannedStake>balance)){
     log(engineDefs[id].name+" waiting · next stake cannot be supported by remaining risk or account balance","warn");
@@ -476,8 +511,14 @@ async function considerEntry(id,symbol){
     if(choice==="__auto__"&&symbol&&best.market.symbol!==symbol)continue;
     const engine=metricsFor(id,best.market.symbol);
     if(engine.activeContract||engine.inFlight)continue;
-    const c=best.candidate,mt=best.metrics,observedRate=Number(mt.rate);
-    if(mt.n<MIN_VALIDATION_TESTS||!Number.isFinite(observedRate)||observedRate<=mt.baseline+minimumEntryEdge(id))continue;
+    const c=best.candidate,mt=best.metrics,observedRate=Number(mt.rate),edge=minimumEntryEdge(id);
+    // Every automated card now follows the same live-decision discipline as Auto Switcher:
+    // enough observed history + a current live edge + a current market-state decision.
+    if(mt.n<MIN_VALIDATION_TESTS||!Number.isFinite(observedRate)||observedRate<=mt.baseline+edge)continue;
+    if(!Number.isFinite(Number(c.pHit))||Number(c.pHit)<=Number(c.baseline)+edge)continue;
+    const trend=Math.abs(Number(c.trendScore||0));
+    if((c.contractType==="CALL"||c.contractType==="PUT") && (!Number.isFinite(trend)||trend<0.08))continue;
+    if((id==="matches"||id==="over8"||id==="parity") && (!Number.isFinite(trend)||trend<0.04) && Number(c.strength)<Number(c.baseline)+edge+0.02)continue;
     const sig=candidateSignature(best.market,c);
     if(engine.quoteKey===sig)continue;
     engine.quoteKey=sig;
@@ -495,6 +536,8 @@ async function considerEntry(id,symbol){
         engine.quoteKey="";
         continue;
       }
+      const trendState=Number(c.trendScore)>0.02?"RISING":Number(c.trendScore)<-0.02?"FALLING":"FLAT";
+      log(engineDefs[id].name+" · decision "+best.market.name+" · "+c.label+" · market "+trendState+" · live signal "+percent(c.strength)+" · observed "+percent(observedRate));
       await buyProposal({quote:quote,market:best.market,candidate:c,engineId:id,stake:ask,settings:settings,auto:true,evLower:evObserved,breakEven:breakEven});
       return;
     }catch(e){
