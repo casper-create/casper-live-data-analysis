@@ -30,14 +30,14 @@ test('transaction panel has the live fields required by the video workflow', () 
   assert.match(html, /Deriv confirmed contract/);
 });
 
-test('V5.0.3 uses a fast accuracy screen and continuous retry loop', () => {
+test('V5.0.4 uses a fast accuracy screen and continuous retry loop', () => {
   assert.match(html, /MIN_VALIDATION_TESTS=12/);
-  assert.match(html, /MIN_ENTRY_EDGE=0\.06/);
+  assert.match(html, /minimumEntryEdge/);
   assert.match(html, /smartCompositeCandidate/);
   assert.match(html, /Rise\/Fall.*Even\/Odd.*Mix Both/);
   assert.match(html, /sourceStrategy/);
   assert.match(html, /engineBusy=new Set/);
-  assert.match(html, /scheduleEngineRetry\(id,900\)/);
+  assert.match(html, /FALLBACK_SCAN_MS=100/);
 });
 
 test('each strategy keeps its own state and active contract', () => {

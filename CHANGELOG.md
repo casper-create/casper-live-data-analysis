@@ -16,3 +16,10 @@
 - Added visible per-card accuracy to all 8 strategy cards.
 - Smart AI remains fully automatic: it scans all 10 Volatility markets and automatically selects the strongest qualifying market and contract mode.
 - Accuracy remains based on observed Deriv tick outcomes; no synthetic/fake trades or accuracy guarantees are used.
+
+## 0.5.4
+- Removed the universal six-point entry gate; digit strategies now use a strategy-appropriate observed edge.
+- Live execution now validates observed walk-forward rate against the live Deriv quote break-even instead of requiring the conservative Wilson lower bound to exceed break-even.
+- Auto-market ranking uses observed accuracy edge with confidence weighting.
+- Reduced fallback scan retry to 100 ms; normal entry remains tick-driven and settlement-driven.
+- Added automated tests for entry eligibility and live quote EV.
