@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.5.1';
+export const APP_VERSION = '0.5.3';
 // V4-compatible Deriv OAuth/session implementation. Keep this module as the single auth source.
 // Shared Deriv OAuth + session logic. Web-standard APIs only (Request, Response, crypto.subtle, fetch),
 // so the exact same code runs in Node 20+ (server.mjs) and in a Cloudflare Worker (_worker.js).

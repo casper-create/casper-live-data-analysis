@@ -1,4 +1,4 @@
-const APP_VERSION = '0.5.1';
+const APP_VERSION = '0.5.3';
 // V4-compatible Cloudflare auth copy. OAuth/session behavior is intentionally unchanged.
 const SESSION_COOKIE = '__Host-casper_sid';
 const STATE_COOKIE = '__Host-casper_oauth_state';

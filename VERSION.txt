@@ -1,3 +1,1 @@
-CASPER Live Deriv Data Analysis
-Version: 0.5.1
-Base auth: V4-compatible Deriv OAuth/session flow
+0.5.3
