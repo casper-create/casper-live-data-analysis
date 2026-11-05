@@ -24,3 +24,11 @@
 - Settled transactions display the actual Deriv payout and realized P/L.
 - Session total payout is reconciled from actual settlement payout, with a safe fallback only when Deriv omits the payout field.
 - Quote-time potential profit is kept separate from realized profit.
+
+
+## 0.5.12 — execution and accounting correction
+- Fixed automatic-market execution: Mix Both and Smart AI now evaluate all 10 current market candidates instead of being restricted to the market whose tick happened to trigger the decision timer.
+- Automatic-market signals are freshness-checked per candidate market; selected-market cards remain hard-locked to the chosen symbol.
+- Fixed settled payout accounting: Deriv `proposal_open_contract.profit` and actual buy price determine realized cash payout (`max(0, buy_price + profit)`). The contract's quoted/potential `payout` field is never counted as cash received after a losing settlement.
+- Added per-card Reset Session controls. Reset is blocked while that card has an open contract; prior rows are archived in page memory, while historical forecast/accuracy data is preserved.
+- Authentication and Manual Trading request flow unchanged.

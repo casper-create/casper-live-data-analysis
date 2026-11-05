@@ -63,3 +63,23 @@ test('V5.0.11 keeps quoted payout separate from realized settlement payout', () 
   assert.match(html, /actual payout/);
   assert.match(html, /quotedPayout/);
 });
+
+
+test('V5.0.12 automatic market decisions are not restricted to the triggering tick market', () => {
+  assert.match(html, /const target=choice!=="__auto__"\?choice:"__auto__"/);
+  assert.doesNotMatch(html, /choice==="__auto__"&&symbol&&best\.market\.symbol!==symbol/);
+  assert.match(html, /candidateAgeMs>MAX_SIGNAL_AGE_MS/);
+});
+
+test('V5.0.12 reset controls preserve forecast history and refuse open-contract resets', () => {
+  assert.match(html, /id="freeReset"/);
+  assert.match(html, /id="premiumReset"/);
+  assert.match(html, /Cannot reset .* while a Deriv contract is still open/);
+  assert.match(html, /archivedTrades\.push/);
+  assert.match(html, /Forecast history and accuracy were preserved/);
+});
+
+test('V5.0.12 settled cash payout is derived from actual buy price and realized profit', () => {
+  assert.match(html, /t\.realizedPayout=Math\.max\(0,Number\(t\.stake\)\+Number\(t\.profit\|\|0\)\)/);
+  assert.doesNotMatch(html, /if\(Number\.isFinite\(livePayout\)\) t\.realizedPayout=livePayout/);
+});

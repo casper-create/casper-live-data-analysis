@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#06171d">
 <meta name="description" content="CASPER Live Deriv Data Analysis">
-<title>CASPER Live Deriv Data Analysis · v0.5.10</title>
+<title>CASPER Live Deriv Data Analysis · v0.5.12</title>
 <style>
 :root{color-scheme:dark;--bg:#06171d;--panel:#0a2028;--panel2:#0d2730;--line:#173b46;--cyan:#18d5ea;--blue:#0999b6;--muted:#86a4bb;--text:#f1f5fb;--gold:#ffc629;--green:#22d5a0;--red:#ff6681;--purple:#a45cff;--radius:18px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 *{box-sizing:border-box}body{margin:0;min-width:320px;background:var(--bg);color:var(--text)}button,input,select{font:inherit}button{cursor:pointer;color:inherit}button:disabled{cursor:not-allowed;opacity:.45}
@@ -223,7 +223,7 @@
       <div class="field"><label for="freeTarget">Profit target</label><div class="money"><input id="freeTarget" type="number" min="0.35" step="0.01" value="10"><span class="currency">USD</span></div></div>
       <div class="field"><label for="freeMaxLoss">Max loss</label><div class="money"><input id="freeMaxLoss" type="number" min="0.35" step="0.01" value="10"><span class="currency">USD</span></div></div>
     </div>
-    <div class="runrow"><button class="btn gold" id="freeRun">▷ &nbsp;Run selected scanner</button><button class="btn hide" id="freeStop">Stop scanner</button></div>
+    <div class="runrow"><button class="btn gold" id="freeRun">▷ &nbsp;Run selected scanner</button><button class="btn hide" id="freeStop">Stop scanner</button><button class="btn" id="freeReset" type="button">Reset session</button></div>
     <div id="freeRiskNote" class="callout">Choose Flat, Tims 1.6, or Tims 2. Flat never increases the stake. Tims 1.6 uses 1.00× → 1.60× → 2.56×; Tims 2 uses 1.00× → 2.00× → 4.00×. Both recovery modes are capped at two recovery steps and reset to base after a win. A card stops when its session target or max-loss limit is reached; the next stake is capped by the remaining loss limit.</div>
     <div class="board-grid"><div><h2 class="section-title">Ten-market scan</h2><p class="foot">Each card keeps its own forecast and validation results.</p></div><div class="status"><span class="dot live"></span><span>All free scanners read the same live feed through separate strategy state.</span></div></div>
     <div class="table-wrap"><table><thead><tr><th>Market</th><th>Mode / signal</th><th class="num">Accuracy</th><th class="num">Tests</th><th class="num">Signal strength</th><th>Execution</th></tr></thead><tbody id="freeBoard"></tbody></table></div>
@@ -251,7 +251,7 @@
       <div class="field"><label for="premiumTarget">Profit target</label><div class="money"><input id="premiumTarget" type="number" min="0.35" step="0.01" value="20"><span class="currency">USD</span></div></div>
       <div class="field"><label for="premiumMaxLoss">Max loss</label><div class="money"><input id="premiumMaxLoss" type="number" min="0.35" step="0.01" value="20"><span class="currency">USD</span></div></div>
     </div>
-    <div class="runrow"><button class="btn gold" id="premiumRun">♛ &nbsp;Run selected Premium scanner</button><button class="btn hide" id="premiumStop">Stop scanner</button></div>
+    <div class="runrow"><button class="btn gold" id="premiumRun">♛ &nbsp;Run selected Premium scanner</button><button class="btn hide" id="premiumStop">Stop scanner</button><button class="btn" id="premiumReset" type="button">Reset session</button></div>
     <div id="premiumRiskNote" class="callout">Choose Flat, Tims 1.6, or Tims 2. Flat never increases the stake. Tims 1.6 uses 1.00× → 1.60× → 2.56×; Tims 2 uses 1.00× → 2.00× → 4.00×. Both recovery modes are capped at two recovery steps and reset to base after a win. A card stops when its session target or max-loss limit is reached; the next stake is capped by the remaining loss limit.</div>
     <div class="table-wrap"><table><thead><tr><th>Market</th><th>Mode / signal</th><th class="num">Accuracy</th><th class="num">Tests</th><th class="num">Signal strength</th><th>Execution</th></tr></thead><tbody id="premiumBoard"></tbody></table></div>
   </div>
@@ -286,7 +286,7 @@
 "use strict";
 const $=function(s){return document.querySelector(s)};
 const $$=function(s){return Array.from(document.querySelectorAll(s))};
-const APP_VERSION="0.5.11";
+const APP_VERSION="0.5.12";
 const MIN_VALIDATION_TESTS=12; // Fast warm-up; accuracy remains based only on observed Deriv ticks.
 const FALLBACK_SCAN_MS=120; // Recovery fallback only. Primary execution is tick-driven.
 const MAX_SIGNAL_AGE_MS=750; // Never execute a materially stale signal.
@@ -325,6 +325,7 @@ const engineRetryTimers=new Map();
 const recoverySteps=new Map(engineIds.map(function(id){return [id,0]}));
 const engineConfig=new Map(engineIds.map(function(id){return [id,{stake:20,target:200,maxLoss:50,stakeMode:"flat"}]}));
 const trades=[];
+const archivedTrades=[];
 const authPending=new Map();
 let publicWs=null,authWs=null,authConnecting=null,publicRetry=null;
 let nextReq=20,liveConnected=false,signedIn=false,premiumOwner=false,selectedAccount="",selectedType="",currency="USD",balance=null;
@@ -457,10 +458,6 @@ function remainingRisk(id,settings){return Math.max(0,settings.maxLoss+Math.min(
 function recoveryMultiplier(mode,step){if(mode==="tims16")return step===0?1:step===1?1.6:2.56;if(mode==="tims2")return step===0?1:step===1?2:4;return 1}
 function stakeForNext(id,settings){const step=Math.min(2,Math.max(0,recoverySteps.get(id)||0));return Math.min(settings.stake*recoveryMultiplier(settings.stakeMode,step),remainingRisk(id,settings))}
 function openTransactionPanel(scroll){const list=$("#transactionList");list.classList.remove("collapsed");$("#transactionToggle").setAttribute("aria-expanded","true");$("#transactionChevron").textContent="⌃";if(scroll)$("#transactions").scrollIntoView({behavior:"smooth",block:"start"})}
-$("#freeRun").addEventListener("click",function(){startEngine(activeFree)});
-$("#premiumRun").addEventListener("click",function(){startEngine(activePremium)});
-$("#freeStop").addEventListener("click",function(){stopEngine(activeFree,"Stopped by user")});
-$("#premiumStop").addEventListener("click",function(){stopEngine(activePremium,"Stopped by user")});
 ["freeStake","freeStakeMode","freeTarget","freeMaxLoss","premiumStake","premiumStakeMode","premiumTarget","premiumMaxLoss"].forEach(function(id){$("#"+id).addEventListener("change",function(){const engine=(id.startsWith("free")?activeFree:activePremium);saveSettingsFromUI(engine);updateAll()})});
 ["free","premium"].forEach(function(tier){$("#"+tier+"MarketSelect").addEventListener("change",function(){const id=tier==="free"?activeFree:activePremium;const raw=this.value;const choice=(id==="mix"||id==="smart")?(raw||"__auto__"):(raw==="__auto__"?"":raw);engineMarketChoice.set(id,choice);if(running.has(id)){stopEngine(id,"Market selection changed · restart the card to apply the new market");toast(engineDefs[id].name+" stopped so the new market selection can be applied. Run it again.")}renderMarketOptions();updateAll()})});
 
@@ -471,13 +468,13 @@ function scheduleLatestDecision(id,symbol,sourceSymbol,epoch){
   if(!running.has(id))return;
   const choice=engineMarketChoice.get(id);
   if(choice==="")return;
-  const target=choice!=="__auto__"?choice:(symbol||sourceSymbol);
+  const target=choice!=="__auto__"?choice:"__auto__";
   if(choice!=="__auto__" && sourceSymbol && sourceSymbol!==choice)return;
   const previous=enginePendingTick.get(id);
   if(previous && previous.epoch!==epoch){
     const skipped=(engineSkippedTicks.get(id)||0)+1;
     engineSkippedTicks.set(id,skipped);
-    const st=metricsFor(id,target);st.skippedTicks=skipped;
+    const st=target==="__auto__"?null:metricsFor(id,target);if(st)st.skippedTicks=skipped;
     if(skipped<=MAX_TICK_SKIP_LOG) log(engineDefs[id].name+" · skipped tick while executing · using newest tick "+String(epoch));
   }
   enginePendingTick.set(id,{symbol:target,epoch:Number(epoch||0)});
@@ -486,6 +483,7 @@ function scheduleLatestDecision(id,symbol,sourceSymbol,epoch){
     engineDecisionTimers.delete(id);
     if(!running.has(id))return;
     const pending=enginePendingTick.get(id);if(!pending)return;
+    if(pending.symbol==="__auto__"){considerEntry(id,null,pending.epoch);return;}
     const current=markets.get(pending.symbol);if(!current||current.epoch!==pending.epoch){
       const newest=current&&current.epoch?current.epoch:pending.epoch;
       enginePendingTick.set(id,{symbol:pending.symbol,epoch:newest});
@@ -505,7 +503,7 @@ function scheduleEngineRetry(id,delay){
     const choice=engineMarketChoice.get(id);
     if(choice!==""){
       if(choice!=="__auto__")scheduleLatestDecision(id,choice,choice,markets.get(choice)?.epoch||0);
-      else {const best=bestSignal(id);if(best)scheduleLatestDecision(id,best.market.symbol,best.market.symbol,best.market.epoch);}
+      else {const best=bestSignal(id);if(best)scheduleLatestDecision(id,null,best.market.symbol,best.market.epoch);}
     }
     scheduleEngineRetry(id,FALLBACK_SCAN_MS);
   },delay||FALLBACK_SCAN_MS);
@@ -540,13 +538,9 @@ async function considerEntry(id,symbol,decisionEpoch){
   const choice=engineMarketChoice.get(id);
   if(choice==="")return;
   if(choice!=="__auto__"&&symbol&&choice!==symbol)return;
-  const decisionMarket=markets.get(symbol || choice);
-  if(decisionMarket && Number.isFinite(decisionEpoch) && decisionEpoch>0 && Number.isFinite(decisionMarket.epoch)){
-    const ageMs=Math.max(0,(Date.now()/1000-decisionMarket.epoch)*1000);
-    if(ageMs>MAX_SIGNAL_AGE_MS){
-      enginePendingTick.delete(id);
-      return;
-    }
+  if(choice!=="__auto__"){
+    const selectedMarket=markets.get(choice);
+    if(!selectedMarket||!selectedMarket.epoch||((Date.now()/1000-selectedMarket.epoch)*1000)>MAX_SIGNAL_AGE_MS)return;
   }
   const settings=getSettings(id);
   const realized=realizedFor(id);
@@ -573,7 +567,8 @@ async function considerEntry(id,symbol,decisionEpoch){
   // rejected quote from leaving an Auto card apparently "Running" with no trade.
   for(const best of candidates){
     if(choice!=="__auto__"&&best.market.symbol!==choice)continue;
-    if(choice==="__auto__"&&symbol&&best.market.symbol!==symbol)continue;
+    const candidateAgeMs=best.market.epoch?Math.max(0,(Date.now()/1000-best.market.epoch)*1000):Infinity;
+    if(candidateAgeMs>MAX_SIGNAL_AGE_MS)continue;
     const engine=metricsFor(id,best.market.symbol);
     if(engine.activeContract||engine.inFlight)continue;
     const c=best.candidate,mt=best.metrics,observedRate=Number(mt.rate),edge=minimumEntryEdge(id);
@@ -656,9 +651,10 @@ function handleAuthMessage(d){
         t.settled=true;t.status="Settled";
         // Settlement values come from Deriv, never from our forecast math.
         // A win's realized payout is the contract payout; a loss returns zero.
-        if(Number.isFinite(livePayout)) t.realizedPayout=livePayout;
-        else if(Number(t.profit)>0) t.realizedPayout=Number(t.stake)+Number(t.profit);
-        else t.realizedPayout=0;
+        // Deriv's `payout` can remain the contract's potential payout after a loss.
+        // The settled cash amount is reconstructed from the authoritative realized
+        // profit and actual buy price; a full loss therefore records zero payout.
+        t.realizedPayout=Math.max(0,Number(t.stake)+Number(t.profit||0));
         if(t.engineId!=="manual"){
           const st=metricsFor(t.engineId,t.symbol);st.activeContract=null;st.quoteKey="";
           if(activeEngineContracts.get(t.engineId)===id)activeEngineContracts.delete(t.engineId);
@@ -679,7 +675,7 @@ function handleAuthMessage(d){
         updateAll();
         if(t.engineId!=="manual"&&running.has(t.engineId)){
           for(const mm of markets.values()){const ss=metricsFor(t.engineId,mm.symbol);ss.quoteKey="";ss.inFlight=false;ss.activeContract=null;}
-          const mm=engineMarketChoice.get(t.engineId);if(running.has(t.engineId)){const bm=mm!=="__auto__"?markets.get(mm):bestSignal(t.engineId)?.market;if(bm)scheduleLatestDecision(t.engineId,bm.symbol,bm.symbol,bm.epoch||0);}
+          const mm=engineMarketChoice.get(t.engineId);if(running.has(t.engineId)){const bm=mm!=="__auto__"?markets.get(mm):bestSignal(t.engineId)?.market;if(bm)scheduleLatestDecision(t.engineId,mm==="__auto__"?null:bm.symbol,bm.symbol,bm.epoch||0);}
         }
       }else{t.status="Open";updateAll();}
     }
@@ -714,6 +710,20 @@ $("#freeRun").addEventListener("click",function(){startEngine(activeFree)});
 $("#premiumRun").addEventListener("click",function(){startEngine(activePremium)});
 $("#freeStop").addEventListener("click",function(){stopEngine(activeFree,"Stopped by user")});
 $("#premiumStop").addEventListener("click",function(){stopEngine(activePremium,"Stopped by user")});
+function resetEngineSession(id){
+  if(running.has(id))stopEngine(id,"Session reset by user");
+  const open=trades.some(function(t){return t.engineId===id&&!t.settled;});
+  if(open){toast("Cannot reset "+engineDefs[id].name+" while a Deriv contract is still open. Wait for settlement first.");return}
+  const old=trades.filter(function(t){return t.engineId===id;});
+  if(!old.length){recoverySteps.set(id,0);updateAll();toast(engineDefs[id].name+" session counters are already clear.");return}
+  archivedTrades.push(...old.map(function(t){return Object.assign({archivedAt:Date.now()},t)}));
+  for(let i=trades.length-1;i>=0;i--)if(trades[i].engineId===id)trades.splice(i,1);
+  recoverySteps.set(id,0);
+  for(const m of markets.values()){const st=metricsFor(id,m.symbol);st.pnl=0;st.quoteKey="";st.inFlight=false;st.activeContract=null;}
+  updateAll();toast(engineDefs[id].name+" session reset. Forecast history and accuracy were preserved; previous trades were archived in this page session.");
+}
+$("#freeReset").addEventListener("click",function(){resetEngineSession(activeFree)});
+$("#premiumReset").addEventListener("click",function(){resetEngineSession(activePremium)});
 ["freeStake","freeStakeMode","freeTarget","freeMaxLoss","premiumStake","premiumStakeMode","premiumTarget","premiumMaxLoss"].forEach(function(id){$("#"+id).addEventListener("change",function(){const engine=(id.startsWith("free")?activeFree:activePremium);saveSettingsFromUI(engine);updateAll()})});
 
 function renderAll(){updateAll()}

@@ -107,3 +107,10 @@ When a new version is prepared, the assistant will provide the full project ZIP 
 
 ## V5.0.9 video-aligned math
 Automated cards use the actual Deriv proposal payout for break-even, expected-value and realized-profit calculations. No synthetic payout multiplier is used. The default automated test profile is 20 USD base stake, 200 USD profit target and 50 USD max loss; users can change these before starting. Video results are examples and are not guarantees.
+
+
+## V5.0.12 execution corrections
+- Mix Both and Smart AI use a global 10-market candidate ranking. The tick that wakes the scheduler no longer limits the eligible market list.
+- Candidate freshness is validated against each candidate's own market timestamp. Selected-market strategies remain restricted to the user's chosen market.
+- Settled cash payout is derived from the actual Deriv buy price plus realized contract profit, not the proposal's potential payout field.
+- Reset Session stops the selected card, refuses to reset while a contract is open, archives that card's session trades in the current page session, and preserves its historical forecast accuracy.
