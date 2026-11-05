@@ -83,3 +83,23 @@ test('V5.0.12 settled cash payout is derived from actual buy price and realized 
   assert.match(html, /t\.realizedPayout=Math\.max\(0,Number\(t\.stake\)\+Number\(t\.profit\|\|0\)\)/);
   assert.doesNotMatch(html, /if\(Number\.isFinite\(livePayout\)\) t\.realizedPayout=livePayout/);
 });
+
+test('V5.0.13 keeps retry intervals bounded', () => {
+  assert.match(html, /const FALLBACK_SCAN_MS=120/);
+  assert.match(html, /Number\.isFinite\(delay\)\?Math\.max\(50,delay\):FALLBACK_SCAN_MS/);
+});
+
+test('V5.0.13 ranks cached live candidates rather than recalculating every market on each decision', () => {
+  assert.match(html, /function currentCandidate\(id,symbol\).*?metricsFor\(id,symbol\)\.latest/);
+  assert.match(html, /Cache the current live candidate once/);
+});
+
+test('V5.0.13 batches visual updates to one animation frame', () => {
+  assert.match(html, /if\(!renderQueued\)\{renderQueued=true;if\(window\.requestAnimationFrame\)/);
+  assert.doesNotMatch(html, /renderChart\(\);renderQueued=true;renderQueued=false/);
+});
+
+test('V5.0.13 measures tick age, proposal latency and decision-to-buy latency', () => {
+  for (const field of ['tickAgeMs', 'quoteMs', 'decisionToBuyMs']) assert.match(html, new RegExp(field));
+  assert.match(html, /timing · tick age/);
+});

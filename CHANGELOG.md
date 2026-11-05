@@ -32,3 +32,10 @@
 - Fixed settled payout accounting: Deriv `proposal_open_contract.profit` and actual buy price determine realized cash payout (`max(0, buy_price + profit)`). The contract's quoted/potential `payout` field is never counted as cash received after a losing settlement.
 - Added per-card Reset Session controls. Reset is blocked while that card has an open contract; prior rows are archived in page memory, while historical forecast/accuracy data is preserved.
 - Authentication and Manual Trading request flow unchanged.
+
+## 0.5.13
+- Reduced avoidable main-thread work: cache each market/card's latest candidate and rank cached candidates instead of rebuilding price arrays for every decision.
+- Batch dashboard/chart rendering to one animation frame while keeping tick-driven decision scheduling immediate.
+- Kept the 120 ms recovery fallback bounded (minimum 50 ms for explicit retries); live ticks remain the primary trigger.
+- Record and log tick age, live proposal latency, and decision-to-buy latency so scan-to-execution speed is measurable.
+- Preserved the Deriv authentication files and existing V5.0.12 trading/risk behaviour.

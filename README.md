@@ -114,3 +114,6 @@ Automated cards use the actual Deriv proposal payout for break-even, expected-va
 - Candidate freshness is validated against each candidate's own market timestamp. Selected-market strategies remain restricted to the user's chosen market.
 - Settled cash payout is derived from the actual Deriv buy price plus realized contract profit, not the proposal's potential payout field.
 - Reset Session stops the selected card, refuses to reset while a contract is open, archives that card's session trades in the current page session, and preserves its historical forecast accuracy.
+
+## V5.0.13 execution timing and responsiveness
+V5.0.13 keeps live ticks as the primary scanner trigger. It caches each market/card's latest candidate, batches visual refreshes to one animation frame, and keeps a bounded 120 ms recovery check while live ticks remain the primary trigger. It records tick age, proposal latency, and decision-to-buy latency for each automated purchase. These measurements do not imply that every signal will be executable or profitable; Deriv quote availability, network latency, contract rules, and risk gates still apply.
