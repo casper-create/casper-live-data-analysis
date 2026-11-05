@@ -10,7 +10,7 @@ await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 await copyFile(join(root, 'index.html'), join(output, 'index.html'));
 
-const core = `// CASPER build v0.5.7\n` + (await readFile(join(root, 'auth-core.js'), 'utf8')).replace(/^export (async function|function|class|const)/gm, '$1');
+const core = `// CASPER build v0.5.11\n` + (await readFile(join(root, 'auth-core.js'), 'utf8')).replace(/^export (async function|function|class|const)/gm, '$1');
 const entry = `
 export default {
   async fetch(request, env) {
@@ -20,4 +20,4 @@ export default {
 };
 `;
 await writeFile(join(output, '_worker.js'), core + entry);
-console.log('Cloudflare Pages assets and Worker prepared in dist/ (CASPER v0.5.7).');
+console.log('Cloudflare Pages assets and Worker prepared in dist/ (CASPER v0.5.11).');

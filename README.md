@@ -1,4 +1,4 @@
-# CASPER Live Data Analysis — v0.5.7
+# CASPER Live Data Analysis — v0.5.11
 
 Dashboard with Deriv OAuth login. One shared auth module (`auth-core.js`) runs on both hosts, so Render and Cloudflare cannot drift apart again:
 
@@ -103,3 +103,7 @@ This bundle is intentionally delivered as a complete project, not a partial file
 ### Change-control rule
 
 When a new version is prepared, the assistant will provide the full project ZIP and the version marker. Do not mix individual files from different versions, especially `auth-core.js`, `server.mjs`, `build-pages.mjs`, and `index.html`.
+
+
+## V5.0.9 video-aligned math
+Automated cards use the actual Deriv proposal payout for break-even, expected-value and realized-profit calculations. No synthetic payout multiplier is used. The default automated test profile is 20 USD base stake, 200 USD profit target and 50 USD max loss; users can change these before starting. Video results are examples and are not guarantees.

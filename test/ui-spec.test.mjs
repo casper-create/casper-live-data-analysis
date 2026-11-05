@@ -37,11 +37,29 @@ test('V5.0.7 uses a fast live-decision screen and continuous retry loop', () => 
   assert.match(html, /Rise\/Fall.*Even\/Odd.*Mix Both/);
   assert.match(html, /sourceStrategy/);
   assert.match(html, /engineBusy=new Set/);
-  assert.match(html, /FALLBACK_SCAN_MS=25/);
+  assert.match(html, /FALLBACK_SCAN_MS=120/);
 });
 
 test('each strategy keeps its own state and active contract', () => {
   assert.match(html, /engineState=Object\.fromEntries/);
   assert.match(html, /activeEngineContracts=new Map/);
   assert.match(html, /recoverySteps=new Map/);
+});
+
+
+test('V5.0.10 coalesces live ticks and rejects stale signals', () => {
+  assert.match(html, /MAX_SIGNAL_AGE_MS=750/);
+  assert.match(html, /EXECUTION_COALESCE_MS=35/);
+  assert.match(html, /enginePendingTick/);
+  assert.match(html, /skipped tick while executing/);
+  assert.match(html, /using newest tick/);
+});
+
+
+test('V5.0.11 keeps quoted payout separate from realized settlement payout', () => {
+  assert.match(html, /realizedPayout/);
+  assert.match(html, /livePayout/);
+  assert.match(html, /Floating P\/L/);
+  assert.match(html, /actual payout/);
+  assert.match(html, /quotedPayout/);
 });
