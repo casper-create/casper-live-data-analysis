@@ -48,8 +48,8 @@ test('each strategy keeps its own state and active contract', () => {
 
 
 test('V5.0.10 coalesces live ticks and rejects stale signals', () => {
-  assert.match(html, /MAX_SIGNAL_AGE_MS=750/);
-  assert.match(html, /EXECUTION_COALESCE_MS=35/);
+  assert.match(html, /MAX_SIGNAL_AGE_MS=5000/);
+  assert.match(html, /EXECUTION_COALESCE_MS=15/);
   assert.match(html, /enginePendingTick/);
   assert.match(html, /skipped tick while executing/);
   assert.match(html, /using newest tick/);
@@ -102,4 +102,25 @@ test('V5.0.13 batches visual updates to one animation frame', () => {
 test('V5.0.13 measures tick age, proposal latency and decision-to-buy latency', () => {
   for (const field of ['tickAgeMs', 'quoteMs', 'decisionToBuyMs']) assert.match(html, new RegExp(field));
   assert.match(html, /timing · tick age/);
+});
+
+
+test('V0.5.16 exposes transaction-page stop-all, per-card stop and reset controls', () => {
+  assert.match(html, /id="stopAllEngines"/);
+  assert.match(html, /id="txEngineControls"/);
+  assert.match(html, /data-tx-stop=/);
+  assert.match(html, /id="txResetEngine"/);
+  assert.match(html, /id="txResetSelected"/);
+});
+
+test('V0.5.16 invalidates in-flight quote decisions after a scanner is stopped', () => {
+  assert.match(html, /engineRunTokens=new Map/);
+  assert.match(html, /bumpEngineRunToken\(id\);running\.delete\(id\)/);
+  assert.match(html, /engineRunTokens\.get\(id\)\|\|0\)!==runToken/);
+  assert.match(html, /payload\.runToken/);
+});
+
+test('V0.5.16 clearly distinguishes stopping scanners from closing already purchased contracts', () => {
+  assert.match(html, /Open Deriv contracts continue to settlement/);
+  assert.match(html, /contract already purchased will remain open until Deriv settles it/);
 });

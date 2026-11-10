@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.15 — Fast tick-to-decision loop and stale-tick correction
+- Fixed stale-signal checks to use the local monotonic tick receive timestamp instead of comparing rounded Deriv epoch seconds to wall-clock milliseconds. This removes false stale rejections on fresh ticks.
+- Reduced tick coalescing to 15 ms so each card evaluates the newest available tick promptly.
+- Kept the existing tick-driven loop and 120 ms fallback retry active for all eight cards.
+- Added a 2-second timeout for proposal and buy responses to bound normal scan-to-order waiting. A buy timeout stops that card and requires checking the Deriv portfolio before restart, preventing a blind duplicate buy.
+- Preserved each card's existing strategy-specific candidate logic and safety / payout checks; no accuracy threshold was bypassed.
+
+
 ## 0.5.9
 - Video-aligned automated test defaults: 20 USD base stake, 200 USD profit target, 50 USD max loss.
 - Live proposal payout is now explicitly used for break-even and expected-value validation.
@@ -48,3 +56,11 @@
 - Mix Both and Smart AI rank component strategies using independent walk-forward records.
 - Raised the live-entry validation minimum from 12 to 40 outcomes per card/market.
 - Preserved the existing interface, authentication, Deriv quote/settlement flow, and tick-driven execution timing.
+
+
+## 0.5.16 — Transaction quick controls and immediate stop
+- Added a Transactions-page control panel listing all eight scanners with per-card Stop buttons, Stop All, and a selected-card session reset.
+- Kept the existing scanner-page controls and all existing card layouts.
+- Added per-run tokens so a quote response arriving after Stop cannot trigger a new automated buy; stopping invalidates pending decisions and retry timers immediately.
+- Open Deriv contracts are not falsely cancelled: they remain monitored until settlement. A buy request already sent to Deriv may still be confirmed by Deriv.
+- Kept tick-driven scanning and the bounded market-data fallback loop; no artificial trade-entry sleep was added.
