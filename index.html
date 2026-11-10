@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#06171d">
 <meta name="description" content="CASPER Live Deriv Data Analysis">
-<title>CASPER Live Deriv Data Analysis · v0.5.13</title>
+<title>CASPER Live Deriv Data Analysis · v0.5.14</title>
 <style>
 :root{color-scheme:dark;--bg:#06171d;--panel:#0a2028;--panel2:#0d2730;--line:#173b46;--cyan:#18d5ea;--blue:#0999b6;--muted:#86a4bb;--text:#f1f5fb;--gold:#ffc629;--green:#22d5a0;--red:#ff6681;--purple:#a45cff;--radius:18px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 *{box-sizing:border-box}body{margin:0;min-width:320px;background:var(--bg);color:var(--text)}button,input,select{font:inherit}button{cursor:pointer;color:inherit}button:disabled{cursor:not-allowed;opacity:.45}
@@ -286,8 +286,8 @@
 "use strict";
 const $=function(s){return document.querySelector(s)};
 const $$=function(s){return Array.from(document.querySelectorAll(s))};
-const APP_VERSION="0.5.13";
-const MIN_VALIDATION_TESTS=12; // Fast warm-up; accuracy remains based only on observed Deriv ticks.
+const APP_VERSION="0.5.14";
+const MIN_VALIDATION_TESTS=40; // Require a meaningful card-specific walk-forward sample before live execution.
 const FALLBACK_SCAN_MS=120; // Recovery fallback only. Primary execution is tick-driven.
 const MAX_SIGNAL_AGE_MS=750; // Never execute a materially stale signal.
 const EXECUTION_COALESCE_MS=35; // Coalesce bursts of ticks into the newest decision; skipped ticks are counted, not replayed.
@@ -365,9 +365,51 @@ function directionCandidate(prices,windowSize,minimum){
   return {contractType:side==="up"?"CALL":"PUT",label:side==="up"?"Rise":"Fall",barrier:null,baseline:.5,strength:strength,pHit:.5+.5*Math.min(1,Math.abs(score)),samples:n,model:"direction",trendScore:score,trendAgreement:agreement,displacement:displacement,directionalTicks:{up:up,down:down}};
 }
 function liveTrend(prices,windowSize){if(prices.length<Math.max(10,windowSize+1))return {score:0,agreement:0,displacement:0,directionalTicks:{up:0,down:0}};const from=Math.max(1,prices.length-windowSize);let up=0,down=0,abs=0;for(let i=from;i<prices.length;i++){const d=prices[i]-prices[i-1];abs+=Math.abs(d);if(d>0)up++;else if(d<0)down++}const displacement=(prices[prices.length-1]-prices[from-1])/(abs||1);const consistency=(up-down)/Math.max(1,up+down);const score=.62*displacement+.38*consistency;return {score:score,agreement:Math.abs(up-down)/Math.max(1,up+down),displacement:displacement,directionalTicks:{up:up,down:down}}}
-function parityCandidate(prices,m){if(prices.length<40)return null;let even=0,odd=0;const from=Math.max(0,prices.length-100);for(let i=from;i<prices.length;i++){if(digitOf(m,prices[i])%2===0)even++;else odd++}const n=even+odd;if(!n)return null;const side=even>=odd?"even":"odd",share=Math.max(even,odd)/n,trend=liveTrend(prices,8);return {contractType:side==="even"?"DIGITEVEN":"DIGITODD",label:side==="even"?"Even":"Odd",barrier:null,baseline:.5,strength:share,pHit:share,samples:n,model:"parity",trendScore:trend.score,trendAgreement:trend.agreement,displacement:trend.displacement,directionalTicks:trend.directionalTicks}}
-function matchCandidate(prices,m){if(prices.length<100)return null;const counts=Array(10).fill(0),from=Math.max(0,prices.length-200);for(let i=from;i<prices.length;i++)counts[digitOf(m,prices[i])]++;let best=0;for(let d=1;d<10;d++)if(counts[d]>counts[best])best=d;const n=counts.reduce(function(a,x){return a+x},0),share=n?counts[best]/n:0,trend=liveTrend(prices,8);return {contractType:"DIGITMATCH",label:"Matches "+best,barrier:best,baseline:.1,strength:share,pHit:share,samples:n,model:"match",trendScore:trend.score,trendAgreement:trend.agreement,displacement:trend.displacement,directionalTicks:trend.directionalTicks}}
-function over8Candidate(prices,m){if(prices.length<100)return null;let hits=0,n=0;for(let i=Math.max(0,prices.length-200);i<prices.length;i++){if(digitOf(m,prices[i])>8)hits++;n++}const p=n?hits/n:.1,trend=liveTrend(prices,8);return {contractType:"DIGITOVER",label:"Over 8",barrier:8,baseline:.1,strength:p,pHit:p,samples:n,model:"over8",trendScore:trend.score,trendAgreement:trend.agreement,displacement:trend.displacement,directionalTicks:trend.directionalTicks}}
+function conditionalDigits(prices,m,lookback){
+  const counts=Array(10).fill(1), current=digitOf(m,prices[prices.length-1]);
+  const from=Math.max(1,prices.length-(lookback||500));let n=0;
+  for(let i=from;i<prices.length;i++)if(digitOf(m,prices[i-1])===current){counts[digitOf(m,prices[i])]++;n++}
+  const total=counts.reduce(function(a,x){return a+x},0);
+  return {counts:counts,n:n,total:total,current:current,probabilities:counts.map(function(x){return x/total})};
+}
+function parityCandidate(prices,m){
+  if(prices.length<80)return null;
+  const d=conditionalDigits(prices,m,500),even=d.counts.reduce(function(a,x,i){return a+(i%2===0?x:0)},0),odd=d.total-even;
+  const side=even>=odd?"even":"odd",p=Math.max(even,odd)/d.total,trend=liveTrend(prices,12);
+  return {contractType:side==="even"?"DIGITEVEN":"DIGITODD",label:side==="even"?"Even":"Odd",barrier:null,baseline:.5,strength:p,pHit:p,samples:d.n,model:"parity-transition",trendScore:trend.score,trendAgreement:trend.agreement,displacement:trend.displacement,directionalTicks:trend.directionalTicks,conditionalSamples:d.n};
+}
+function matchCandidate(prices,m){
+  if(prices.length<100)return null;
+  const d=conditionalDigits(prices,m,700);let best=0;for(let i=1;i<10;i++)if(d.probabilities[i]>d.probabilities[best])best=i;
+  const trend=liveTrend(prices,12),p=d.probabilities[best];
+  return {contractType:"DIGITMATCH",label:"Matches "+best,barrier:best,baseline:.1,strength:p,pHit:p,samples:d.n,model:"match-transition",trendScore:trend.score,trendAgreement:trend.agreement,displacement:trend.displacement,directionalTicks:trend.directionalTicks,conditionalSamples:d.n};
+}
+function over8Candidate(prices,m){
+  if(prices.length<100)return null;
+  const d=conditionalDigits(prices,m,700),p=d.probabilities[9],trend=liveTrend(prices,12);
+  return {contractType:"DIGITOVER",label:"Over 8",barrier:8,baseline:.1,strength:p,pHit:p,samples:d.n,model:"over8-transition",trendScore:trend.score,trendAgreement:trend.agreement,displacement:trend.displacement,directionalTicks:trend.directionalTicks,conditionalSamples:d.n};
+}
+function consensusDirection(prices,windows,model){
+  const cs=windows.map(function(w){return directionCandidate(prices,w,0)}).filter(Boolean);if(cs.length!==windows.length)return null;
+  const signs=cs.map(function(c){return c.contractType}),same=signs.every(function(x){return x===signs[0]});
+  if(!same)return null;
+  const strength=cs.reduce(function(a,c){return a+c.strength},0)/cs.length;
+  const trend=cs.reduce(function(a,c){return a+c.trendScore},0)/cs.length;
+  const c=Object.assign({},cs[0]);c.strength=strength;c.pHit=strength;c.trendScore=trend;c.model=model;c.decisionWindows=windows.slice();c.windowAgreement=1;return c;
+}
+function riseFallCandidate(prices){return consensusDirection(prices,[12,24,48],"rise-consensus")}
+function tickStrikeCandidate(prices){
+  const c=consensusDirection(prices,[4,7,12],"tickstrike-momentum");if(!c)return null;
+  const recent=prices.slice(-5),prior=prices.slice(-10,-5);if(recent.length<5||prior.length<5)return null;
+  const recentMove=recent[4]-recent[0],priorMove=prior[4]-prior[0];
+  if(Math.sign(recentMove)!==Math.sign(priorMove)||Math.abs(recentMove)<Math.abs(priorMove)*.35)return null;
+  c.acceleration=Math.abs(recentMove)/(Math.abs(priorMove)||1);c.strength=Math.min(.99,c.strength+.025);c.pHit=c.strength;c.decisionWindow=4;return c;
+}
+function autoSwitcherCandidate(prices){
+  const c=consensusDirection(prices,[8,18,36],"autoswitch-multiframe");if(!c)return null;
+  if(c.trendAgreement<.58||Math.abs(c.displacement)<.12)return null;
+  c.decisionWindow=8;return c;
+}
 function smartCompositeCandidate(prices,m,symbol){
   const sources=[
     {id:"rise",candidate:directionCandidate(prices,18,0)},
@@ -391,7 +433,21 @@ function smartCompositeCandidate(prices,m,symbol){
   c.smartScore=(function(){const met=metricsFor(winner.id,symbol).metrics;return met.n>=12&&met.lower!==null?(met.lower-winner.candidate.baseline)*Math.sqrt(met.n/(met.n+80)):(winner.candidate.pHit-winner.candidate.baseline)*0.25})();
   return c;
 }
-function rawCandidate(id,prices,m,symbol){if(id==="rise"){const c=directionCandidate(prices,18,0);if(c)c.decisionWindow=18;return c}if(id==="parity")return parityCandidate(prices,m);if(id==="mix"){const candidates=[directionCandidate(prices,18,0),parityCandidate(prices,m)].filter(Boolean);if(!candidates.length)return null;candidates.sort(function(a,b){return Math.abs(b.strength-b.baseline)-Math.abs(a.strength-a.baseline)});const c=Object.assign({},candidates[0]);c.model=id;c.label="Mix · "+c.label;return c}if(id==="smart")return smartCompositeCandidate(prices,m,symbol);if(id==="matches")return matchCandidate(prices,m);if(id==="over8")return over8Candidate(prices,m);if(id==="tickstrike"){const c=directionCandidate(prices,5,0);if(c)c.decisionWindow=5;return c}if(id==="autoswitch"){const c=directionCandidate(prices,8,0);if(c)c.decisionWindow=8;return c}return null}
+function rawCandidate(id,prices,m,symbol){
+  if(id==="rise")return riseFallCandidate(prices);
+  if(id==="parity")return parityCandidate(prices,m);
+  if(id==="mix"){
+    const candidates=[riseFallCandidate(prices),parityCandidate(prices,m)].filter(Boolean);if(!candidates.length)return null;
+    candidates.sort(function(a,b){const ma=metricsFor(a.model==="parity-transition"?"parity":"rise",symbol).metrics,mb=metricsFor(b.model==="parity-transition"?"parity":"rise",symbol).metrics;const sa=ma.n>=40?ma.lower-ma.baseline:a.pHit-a.baseline,sb=mb.n>=40?mb.lower-mb.baseline:b.pHit-b.baseline;return sb-sa});
+    const c=Object.assign({},candidates[0]);c.model="mix";c.sourceStrategy=candidates[0].model==="parity-transition"?"parity":"rise";c.label="Mix · "+c.label;return c;
+  }
+  if(id==="smart")return smartCompositeCandidate(prices,m,symbol);
+  if(id==="matches")return matchCandidate(prices,m);
+  if(id==="over8")return over8Candidate(prices,m);
+  if(id==="tickstrike")return tickStrikeCandidate(prices);
+  if(id==="autoswitch")return autoSwitcherCandidate(prices);
+  return null;
+}
 function adjustedCandidate(id,prices,m,symbol){return rawCandidate(id,prices,m,symbol)}
 function hitFor(candidate,previous,next,m){if(!candidate)return null;if(candidate.contractType==="CALL")return next>previous;if(candidate.contractType==="PUT")return next<previous;const d=digitOf(m,next);if(candidate.contractType==="DIGITEVEN")return d%2===0;if(candidate.contractType==="DIGITODD")return d%2===1;if(candidate.contractType==="DIGITMATCH")return d===Number(candidate.barrier);if(candidate.contractType==="DIGITOVER")return d>Number(candidate.barrier);return null}
 function rebuildTests(m){
@@ -592,6 +648,15 @@ async function considerEntry(id,symbol,decisionEpoch){
     // enough observed history + a current live edge + a current market-state decision.
     if(mt.n<MIN_VALIDATION_TESTS||!Number.isFinite(observedRate)||observedRate<=mt.baseline+edge)continue;
     if(!Number.isFinite(Number(c.pHit))||Number(c.pHit)<=Number(c.baseline)+edge)continue;
+    // Card-specific decision contracts: each card must satisfy the evidence its own model needs.
+    if(id==="rise"&&(!c.decisionWindows||c.windowAgreement!==1||Math.abs(Number(c.trendScore))<0.10))continue;
+    if(id==="parity"&&(!Number.isFinite(c.conditionalSamples)||c.conditionalSamples<25))continue;
+    if(id==="mix"&&(!c.sourceStrategy||!Number.isFinite(c.pHit)))continue;
+    if(id==="smart"&&(!c.sourceStrategy||!Number.isFinite(c.smartScore)))continue;
+    if(id==="matches"&&(!Number.isFinite(c.conditionalSamples)||c.conditionalSamples<25))continue;
+    if(id==="over8"&&(!Number.isFinite(c.conditionalSamples)||c.conditionalSamples<25))continue;
+    if(id==="tickstrike"&&(!Number.isFinite(c.acceleration)||c.acceleration<0.35||c.windowAgreement!==1))continue;
+    if(id==="autoswitch"&&(!c.decisionWindows||c.windowAgreement!==1||c.trendAgreement<0.58))continue;
     const trend=Math.abs(Number(c.trendScore||0));
     if((c.contractType==="CALL"||c.contractType==="PUT") && (!Number.isFinite(trend)||trend<0.08))continue;
     if((id==="matches"||id==="over8"||id==="parity") && (!Number.isFinite(trend)||trend<0.04) && Number(c.strength)<Number(c.baseline)+edge+0.02)continue;

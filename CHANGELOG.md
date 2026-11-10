@@ -39,3 +39,12 @@
 - Kept the 120 ms recovery fallback bounded (minimum 50 ms for explicit retries); live ticks remain the primary trigger.
 - Record and log tick age, live proposal latency, and decision-to-buy latency so scan-to-execution speed is measurable.
 - Preserved the Deriv authentication files and existing V5.0.12 trading/risk behaviour.
+
+
+## 0.5.14 — card-specific accuracy logic
+- Implemented distinct decision logic for all eight cards while retaining isolated per-card state and validation.
+- Directional cards use multi-window agreement; TickStrike adds an impulse check; Auto Switcher uses its own multi-timeframe filter.
+- Digit cards use conditional next-digit transition probabilities, not just recent unconditional digit counts.
+- Mix Both and Smart AI rank component strategies using independent walk-forward records.
+- Raised the live-entry validation minimum from 12 to 40 outcomes per card/market.
+- Preserved the existing interface, authentication, Deriv quote/settlement flow, and tick-driven execution timing.

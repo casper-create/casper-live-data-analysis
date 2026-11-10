@@ -31,7 +31,7 @@ test('transaction panel has the live fields required by the video workflow', () 
 });
 
 test('V5.0.7 uses a fast live-decision screen and continuous retry loop', () => {
-  assert.match(html, /MIN_VALIDATION_TESTS=12/);
+  assert.match(html, /MIN_VALIDATION_TESTS=40/);
   assert.match(html, /minimumEntryEdge/);
   assert.match(html, /smartCompositeCandidate/);
   assert.match(html, /Rise\/Fall.*Even\/Odd.*Mix Both/);
