@@ -32,3 +32,12 @@ test('demo warm-up is enabled while real-account validation remains strict', () 
   assert.match(html, /selectedType!=="demo" && \(mt\.n<REAL_ACCOUNT_VALIDATION_TESTS/);
   assert.match(html, /selectedType==="demo"/);
 });
+test('V0.5.18 defaults all cards to all-market scanning except single-market Auto Switcher', () => {
+  assert.match(html, /id==="autoswitch"\?"":"__auto__"/);
+  assert.match(html, /id==="autoswitch"\?\(raw==="__auto__"\?"":raw\):\(raw\|\|"__auto__"\)/);
+  assert.match(html, /Automatic — scan all 10 markets/);
+});
+test('V0.5.18 fallback retry continues even when no candidate is cached', () => {
+  assert.match(html, /const latest=best\?best\.market:Array\.from\(markets\.values\(\)\)/);
+  assert.match(html, /scheduleLatestDecision\(id,null,latest\?latest\.symbol:null,latest\?latest\.epoch\|\|0:0\)/);
+});

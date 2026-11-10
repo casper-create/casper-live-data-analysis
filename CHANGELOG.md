@@ -1,3 +1,11 @@
+## 0.5.18 — Independent all-market scanning defaults
+
+- Free and Premium cards now default to independently scanning all 10 supported Volatility markets; users can still pin a card to one market.
+- Auto Switcher remains intentionally restricted to one user-selected market.
+- Retry scheduling now continues to invoke the decision loop even when no candidate is currently cached, preventing an apparently running card from silently losing its retry path.
+- No fixed execution sleep was added; live ticks remain the primary trigger and the bounded fallback remains active.
+- Existing risk, quote, expected-value, account validation and stop safeguards are preserved.
+
 # Changelog
 
 ## 0.5.15 — Fast tick-to-decision loop and stale-tick correction
