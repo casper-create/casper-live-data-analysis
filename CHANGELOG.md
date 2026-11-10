@@ -64,3 +64,10 @@
 - Added per-run tokens so a quote response arriving after Stop cannot trigger a new automated buy; stopping invalidates pending decisions and retry timers immediately.
 - Open Deriv contracts are not falsely cancelled: they remain monitored until settlement. A buy request already sent to Deriv may still be confirmed by Deriv.
 - Kept tick-driven scanning and the bounded market-data fallback loop; no artificial trade-entry sleep was added.
+
+## 0.5.17 — trade-entry warm-up and tick scheduling correction
+- Fixed the live tick callback argument mapping so each card's decision timer receives the actual market symbol and tick epoch.
+- Removed the 40-observation hard block from demo-account testing: demo scanners can begin qualifying entries after 12 card/market walk-forward outcomes, provided the card-specific live signal and quote economics pass.
+- Kept real-account automation behind the full 40-outcome card/market validation gate and positive observed edge.
+- Preserved each card's strategy-specific filters, live Deriv proposal/payout checks, balance/loss limits, stop controls, and duplicate-buy protections.
+- This is an execution-path correction, not a claim of 80–85% accuracy; demo results must be measured before enabling real-account automation.

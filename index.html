@@ -291,8 +291,9 @@
 "use strict";
 const $=function(s){return document.querySelector(s)};
 const $$=function(s){return Array.from(document.querySelectorAll(s))};
-const APP_VERSION="0.5.16";
-const MIN_VALIDATION_TESTS=40; // Require a meaningful card-specific walk-forward sample before live execution.
+const APP_VERSION="0.5.17";
+const MIN_VALIDATION_TESTS=12; // Demo warm-up sample; real-account automation retains the 40-outcome evidence gate.
+const REAL_ACCOUNT_VALIDATION_TESTS=40;
 const FALLBACK_SCAN_MS=120; // Market-dependent fallback; live ticks remain the primary trigger.
 const MAX_SIGNAL_AGE_MS=5000; // Use local receive time; Deriv tick epochs may be rounded to whole seconds.
 const EXECUTION_COALESCE_MS=15; // Minimal coalescing; always decide from the newest tick.
@@ -480,7 +481,7 @@ function sendPublic(msg){if(publicWs&&publicWs.readyState===WebSocket.OPEN)publi
 function connectPublic(){clearTimeout(publicRetry);status("Connecting to Deriv public feed…",false);try{publicWs=new WebSocket(publicUrl)}catch(e){status("Could not create market-data connection",false);return}publicWs.onopen=function(){liveConnected=true;publicWs.send(JSON.stringify({active_symbols:"brief",req_id:1}));status("Connected · loading Deriv volatility markets",true);$("#scanOverlay").classList.add("show");$("#scanOverlayText").textContent="Requesting live symbols and recent tick history…";log("Public Deriv WebSocket connected")};publicWs.onmessage=function(ev){let d;try{d=JSON.parse(ev.data)}catch(e){return}if(d.error){const msg=d.error.message||"Deriv data request failed";log("Deriv feed: "+msg,"warn");$("#scanOverlay").classList.remove("show");if(d.req_id===1)status(msg,false);return}if(d.req_id===1&&Array.isArray(d.active_symbols)){setMarkets(d.active_symbols);return}if(d.msg_type==="history"&&d.history){const sym=d.echo_req&&d.echo_req.ticks_history;const m=markets.get(sym);if(!m)return;const prices=(d.history.prices||[]).map(Number).filter(Number.isFinite),times=d.history.times||[];const old=m.ticks;const combined=prices.map(function(q,i){return {quote:q,epoch:Number(times[i]||0)}}).concat(old.filter(function(t){return t.epoch>0}));combined.sort(function(a,b){return a.epoch-b.epoch});const dedup=[];for(const t of combined){if(!dedup.length||dedup[dedup.length-1].epoch!==t.epoch)dedup.push(t)}m.ticks=dedup.slice(-maxTicks);m.latest=m.ticks.length?m.ticks[m.ticks.length-1].quote:null;m.epoch=m.ticks.length?m.ticks[m.ticks.length-1].epoch:null;m.receivedAt=performance.now();m.historyReady=true;rebuildTests(m);for(const id of engineIds)metricsFor(id,m.symbol).pending=null;log("Loaded "+m.ticks.length+" Deriv history ticks for "+m.name);updateAll();if(Array.from(markets.values()).every(function(x){return x.historyReady})){status("Live · scanning all markets on every incoming tick",true);$("#scanOverlay").classList.remove("show");$("#scanOverlayText").textContent="Live scanner ready"}};if(d.msg_type==="tick"&&d.tick){const m=markets.get(d.tick.symbol);if(!m)return;processTick(m,Number(d.tick.quote),Number(d.tick.epoch||Date.now()/1000),Number(d.tick.pip_size));}};publicWs.onerror=function(){liveConnected=false;$("#scanOverlay").classList.remove("show");status("Deriv market feed connection error",false)};publicWs.onclose=function(){liveConnected=false;status("Market feed disconnected · reconnecting",false);$("#scanOverlay").classList.remove("show");publicRetry=setTimeout(connectPublic,2200)}}
 function processTick(m,quote,epoch,pip){if(!Number.isFinite(quote))return;if(Number.isInteger(pip)&&pip>=0&&pip<=10)m.precision=pip;const previous=m.latest;if(previous!==null&&m.ticks.length){for(const id of engineIds){const s=metricsFor(id,m.symbol);if(s.pending){const result=hitFor(s.pending.candidate,s.pending.previous,quote,m);if(result!==null)updateMetrics(id,m.symbol,result)}}}m.latest=quote;m.epoch=epoch||Date.now()/1000;m.receivedAt=performance.now();m.ticks.push({quote:quote,epoch:m.epoch});if(m.ticks.length>maxTicks)m.ticks.shift();const prices=m.ticks.map(function(t){return t.quote});for(const id of engineIds){const s=metricsFor(id,m.symbol);s.latest=adjustedCandidate(id,prices,m,m.symbol);s.pending=s.latest&&previous!==null?{candidate:s.latest,previous:previous}:null}if($("#tradeMarket").value===m.symbol)$("#manualPrice").textContent=priceText(m,quote);if(!renderQueued){renderQueued=true;if(window.requestAnimationFrame){window.requestAnimationFrame(function(){renderQueued=false;renderChart();updateAll()})}else{renderQueued=false;renderChart();updateAll()}}for(const id of running){
   const choice=engineMarketChoice.get(id);
-  if(choice!=="") scheduleLatestDecision(id, choice!=="__auto__"?choice:undefined, m.symbol, m.epoch);
+  if(choice!=="") scheduleLatestDecision(id,choice!=="__auto__"?choice:null,m.symbol,m.epoch);
 }}
 function renderMarketOptions(){const manual=$("#tradeMarket"),current=manual.value;manual.replaceChildren();for(const m of markets.values()){const o=document.createElement("option");o.value=m.symbol;o.textContent=m.name;manual.append(o)}if(markets.has(current))manual.value=current;else{const preferred=Array.from(markets.values()).find(function(m){return m.level===100&&m.oneSecond})||markets.values().next().value;if(preferred)manual.value=preferred.symbol}if(manual.value)$("#manualMarketName").textContent=markets.get(manual.value).name;["free","premium"].forEach(function(tier){const sel=$("#"+tier+"MarketSelect");if(!sel)return;const id=tier==="free"?activeFree:activePremium,choice=engineMarketChoice.get(id)||"__auto__";sel.replaceChildren();const auto=document.createElement("option");auto.value="__auto__";auto.textContent=id==="mix"||id==="smart"?"Automatic — strongest market":"Choose a Volatility market";sel.append(auto);for(const m of markets.values()){const o=document.createElement("option");o.value=m.symbol;o.textContent=m.name;sel.append(o)}sel.value=choice&&markets.has(choice)?choice:"__auto__";if(id!=="mix"&&id!=="smart"&&choice==="")sel.value="__auto__";$("#"+tier+"MarketHelp").textContent=(id==="mix"||id==="smart")?"Smart AI automatically selects the strongest qualifying market and mode from all 10 Volatility markets; you do not choose the market manually.":(choice?"This card will execute only on the Volatility market you choose.":"Choose a Volatility market before starting this card.")})}
 function renderMarkets(){const html=Array.from(markets.values()).map(function(m){const q=m.latest===null?"—":priceText(m,m.latest),digit=m.latest===null?"—":String(digitOf(m,m.latest));return '<div class="market-tile '+($("#tradeMarket").value===m.symbol?"selected":"")+'"><b>'+esc(m.name)+'</b><strong>'+esc(q)+'</strong><small>Last digit '+esc(digit)+' · '+(m.latest===null?"Connecting":m.historyReady?"Live":"History loading")+'</small></div>'}).join("");$("#marketTiles").innerHTML=html;$("#manualMarketTiles").innerHTML=html}
@@ -657,7 +658,12 @@ async function considerEntry(id,symbol,decisionEpoch){
     const c=best.candidate,mt=best.metrics,observedRate=Number(mt.rate),edge=minimumEntryEdge(id);
     // Every automated card now follows the same live-decision discipline as Auto Switcher:
     // enough observed history + a current live edge + a current market-state decision.
-    if(mt.n<MIN_VALIDATION_TESTS||!Number.isFinite(observedRate)||observedRate<=mt.baseline+edge)continue;
+    // Demo accounts may trade after a short warm-up so the user can verify the
+    // complete quote→buy→settlement loop. Real accounts retain the full 40-outcome
+    // walk-forward gate and must show a positive observed edge before entry.
+    if(mt.n<MIN_VALIDATION_TESTS)continue;
+    if(selectedType!=="demo" && (mt.n<REAL_ACCOUNT_VALIDATION_TESTS || !Number.isFinite(observedRate) || observedRate<=mt.baseline+edge))continue;
+    if(selectedType==="demo" && Number.isFinite(observedRate) && observedRate<mt.baseline-0.08)continue;
     if(!Number.isFinite(Number(c.pHit))||Number(c.pHit)<=Number(c.baseline)+edge)continue;
     // Card-specific decision contracts: each card must satisfy the evidence its own model needs.
     if(id==="rise"&&(!c.decisionWindows||c.windowAgreement!==1||Math.abs(Number(c.trendScore))<0.10))continue;
@@ -689,12 +695,13 @@ async function considerEntry(id,symbol,decisionEpoch){
       if(ask>riskLeft)throw new Error("Live quote exceeds the remaining loss limit.");
       const breakEven=ask/payout;
       const grossProfit=payout-ask;
-      const evObserved=observedRate*payout-ask;
+      const probabilityForEV=(selectedType==="demo"&&mt.n<REAL_ACCOUNT_VALIDATION_TESTS)?Number(c.pHit):observedRate;
+      const evObserved=probabilityForEV*payout-ask;
       // The video-style high profits come from the actual Deriv payout for the
       // selected contract type (especially digit contracts), not a hard-coded
       // multiplier. Never assume a payout: use the live proposal.
       if(breakEven>=1 || grossProfit<=0 || evObserved<=0){
-        log(engineDefs[id].name+" · "+best.market.name+" quote rejected · live payout "+money(payout)+" · potential profit "+money(grossProfit)+" · break-even "+percent(breakEven)+" · observed "+percent(observedRate),"warn");
+        log(engineDefs[id].name+" · "+best.market.name+" quote rejected · live payout "+money(payout)+" · potential profit "+money(grossProfit)+" · break-even "+percent(breakEven)+" · observed "+percent(observedRate)+" · EV estimate "+percent(probabilityForEV),"warn");
         engine.quoteKey="";
         continue;
       }

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 test('V0.5.15 defines distinct decision logic for all eight cards', () => {
   for (const fn of ['riseFallCandidate','parityCandidate','mix','smartCompositeCandidate','matchCandidate','over8Candidate','tickStrikeCandidate','autoSwitcherCandidate']) assert.ok(html.includes(fn), `missing ${fn}`);
-  assert.match(html, /MIN_VALIDATION_TESTS=40/);
+  assert.match(html, /MIN_VALIDATION_TESTS=12/);
 });
 test('digit prediction uses conditional next-digit transitions', () => {
   assert.match(html, /function conditionalDigits\(/);
@@ -25,4 +25,10 @@ test('freshness uses local tick receive time and bounded proposal/buy waits', ()
   assert.match(html, /sendAuthRequest\(req,"proposal",2000\)/);
   assert.match(html, /sendAuthRequest\(req,"buy",2000\)/);
   assert.match(html, /BUY_RESPONSE_TIMEOUT/);
+});
+
+test('demo warm-up is enabled while real-account validation remains strict', () => {
+  assert.match(html, /REAL_ACCOUNT_VALIDATION_TESTS=40/);
+  assert.match(html, /selectedType!=="demo" && \(mt\.n<REAL_ACCOUNT_VALIDATION_TESTS/);
+  assert.match(html, /selectedType==="demo"/);
 });
