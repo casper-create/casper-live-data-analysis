@@ -1,3 +1,10 @@
+## 0.5.19 — Premium prediction calibration upgrade
+
+- Improved Matches Printer, Over 8 Killer and parity digit-transition estimates with recency weighting and Bayesian shrinkage toward each market’s unconditional digit distribution.
+- Reduced overreaction to small conditional samples; model probabilities are normalized after blending.
+- Kept the existing Premium card interfaces, market selection, scan scheduling, quote/buy flow, execution timeouts, and stop controls unchanged.
+- No accuracy guarantee: continue to evaluate genuinely out-of-sample forecasts and settled Deriv outcomes.
+
 ## 0.5.18 — Independent all-market scanning defaults
 
 - Free and Premium cards now default to independently scanning all 10 supported Volatility markets; users can still pin a card to one market.

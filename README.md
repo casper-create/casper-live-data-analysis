@@ -1,4 +1,4 @@
-# CASPER Live Data Analysis — v0.5.18
+# CASPER Live Data Analysis — v0.5.19
 
 Dashboard with Deriv OAuth login. One shared auth module (`auth-core.js`) runs on both hosts, so Render and Cloudflare cannot drift apart again:
 

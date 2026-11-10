@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#06171d">
 <meta name="description" content="CASPER Live Deriv Data Analysis">
-<title>CASPER Live Deriv Data Analysis · v0.5.16</title>
+<title>CASPER Live Deriv Data Analysis · v0.5.19</title>
 <style>
 :root{color-scheme:dark;--bg:#06171d;--panel:#0a2028;--panel2:#0d2730;--line:#173b46;--cyan:#18d5ea;--blue:#0999b6;--muted:#86a4bb;--text:#f1f5fb;--gold:#ffc629;--green:#22d5a0;--red:#ff6681;--purple:#a45cff;--radius:18px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 *{box-sizing:border-box}body{margin:0;min-width:320px;background:var(--bg);color:var(--text)}button,input,select{font:inherit}button{cursor:pointer;color:inherit}button:disabled{cursor:not-allowed;opacity:.45}
@@ -375,11 +375,23 @@ function directionCandidate(prices,windowSize,minimum){
 }
 function liveTrend(prices,windowSize){if(prices.length<Math.max(10,windowSize+1))return {score:0,agreement:0,displacement:0,directionalTicks:{up:0,down:0}};const from=Math.max(1,prices.length-windowSize);let up=0,down=0,abs=0;for(let i=from;i<prices.length;i++){const d=prices[i]-prices[i-1];abs+=Math.abs(d);if(d>0)up++;else if(d<0)down++}const displacement=(prices[prices.length-1]-prices[from-1])/(abs||1);const consistency=(up-down)/Math.max(1,up+down);const score=.62*displacement+.38*consistency;return {score:score,agreement:Math.abs(up-down)/Math.max(1,up+down),displacement:displacement,directionalTicks:{up:up,down:down}}}
 function conditionalDigits(prices,m,lookback){
-  const counts=Array(10).fill(1), current=digitOf(m,prices[prices.length-1]);
-  const from=Math.max(1,prices.length-(lookback||500));let n=0;
-  for(let i=from;i<prices.length;i++)if(digitOf(m,prices[i-1])===current){counts[digitOf(m,prices[i])]++;n++}
-  const total=counts.reduce(function(a,x){return a+x},0);
-  return {counts:counts,n:n,total:total,current:current,probabilities:counts.map(function(x){return x/total})};
+  // Recency-weighted transition estimates shrunk toward the market-wide digit mix.
+  // This reduces overconfidence from sparse conditional samples; it cannot guarantee edge.
+  const current=digitOf(m,prices[prices.length-1]);
+  const from=Math.max(1,prices.length-(lookback||700));
+  const global=Array(10).fill(0),conditional=Array(10).fill(0);
+  let globalWeight=0,conditionalWeight=0,rawN=0;
+  const halfLife=Math.max(80,Math.min(220,Math.floor((prices.length-from)*0.45)));
+  for(let i=from;i<prices.length;i++){
+    const weight=Math.pow(0.5,(prices.length-1-i)/halfLife);
+    const next=digitOf(m,prices[i]);global[next]+=weight;globalWeight+=weight;
+    if(digitOf(m,prices[i-1])===current){conditional[next]+=weight;conditionalWeight+=weight;rawN++;}
+  }
+  const globalP=global.map(function(x){return (x+0.5)/(globalWeight+5)});
+  const reliability=conditionalWeight/(conditionalWeight+90);
+  const probs=conditional.map(function(x,i){const cp=(x+globalP[i]*12)/(conditionalWeight+12);return reliability*cp+(1-reliability)*globalP[i]});
+  const norm=probs.reduce(function(a,x){return a+x},0),probabilities=probs.map(function(x){return x/norm});
+  return {counts:conditional,n:rawN,total:conditionalWeight,current:current,probabilities:probabilities,globalProbabilities:globalP,conditionalWeight:conditionalWeight,reliability:reliability};
 }
 function parityCandidate(prices,m){
   if(prices.length<80)return null;
@@ -391,12 +403,12 @@ function matchCandidate(prices,m){
   if(prices.length<100)return null;
   const d=conditionalDigits(prices,m,700);let best=0;for(let i=1;i<10;i++)if(d.probabilities[i]>d.probabilities[best])best=i;
   const trend=liveTrend(prices,12),p=d.probabilities[best];
-  return {contractType:"DIGITMATCH",label:"Matches "+best,barrier:best,baseline:.1,strength:p,pHit:p,samples:d.n,model:"match-transition",trendScore:trend.score,trendAgreement:trend.agreement,displacement:trend.displacement,directionalTicks:trend.directionalTicks,conditionalSamples:d.n};
+  return {contractType:"DIGITMATCH",label:"Matches "+best,barrier:best,baseline:.1,strength:p,pHit:p,samples:d.n,model:"match-transition-shrunk",trendScore:trend.score,trendAgreement:trend.agreement,displacement:trend.displacement,directionalTicks:trend.directionalTicks,conditionalSamples:d.n};
 }
 function over8Candidate(prices,m){
   if(prices.length<100)return null;
   const d=conditionalDigits(prices,m,700),p=d.probabilities[9],trend=liveTrend(prices,12);
-  return {contractType:"DIGITOVER",label:"Over 8",barrier:8,baseline:.1,strength:p,pHit:p,samples:d.n,model:"over8-transition",trendScore:trend.score,trendAgreement:trend.agreement,displacement:trend.displacement,directionalTicks:trend.directionalTicks,conditionalSamples:d.n};
+  return {contractType:"DIGITOVER",label:"Over 8",barrier:8,baseline:.1,strength:p,pHit:p,samples:d.n,model:"over8-transition-shrunk",trendScore:trend.score,trendAgreement:trend.agreement,displacement:trend.displacement,directionalTicks:trend.directionalTicks,conditionalSamples:d.n};
 }
 function consensusDirection(prices,windows,model){
   const cs=windows.map(function(w){return directionCandidate(prices,w,0)}).filter(Boolean);if(cs.length!==windows.length)return null;

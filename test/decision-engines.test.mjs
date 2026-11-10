@@ -8,8 +8,8 @@ test('V0.5.15 defines distinct decision logic for all eight cards', () => {
 });
 test('digit prediction uses conditional next-digit transitions', () => {
   assert.match(html, /function conditionalDigits\(/);
-  assert.match(html, /model:"match-transition"/);
-  assert.match(html, /model:"over8-transition"/);
+  assert.match(html, /model:"match-transition-shrunk"/);
+  assert.match(html, /model:"over8-transition-shrunk"/);
   assert.match(html, /model:"parity-transition"/);
 });
 test('fast cards retain tick-driven scheduling without adding a fixed execution sleep', () => {
@@ -40,4 +40,19 @@ test('V0.5.18 defaults all cards to all-market scanning except single-market Aut
 test('V0.5.18 fallback retry continues even when no candidate is cached', () => {
   assert.match(html, /const latest=best\?best\.market:Array\.from\(markets\.values\(\)\)/);
   assert.match(html, /scheduleLatestDecision\(id,null,latest\?latest\.symbol:null,latest\?latest\.epoch\|\|0:0\)/);
+});
+
+test('V0.5.19 digit models use recency weighting and shrinkage instead of raw tiny-sample rates', () => {
+  assert.match(html, /const halfLife=/);
+  assert.match(html, /const reliability=conditionalWeight\/\(conditionalWeight\+90\)/);
+  assert.match(html, /globalProbabilities:globalP/);
+  assert.match(html, /model:"match-transition-shrunk"/);
+  assert.match(html, /model:"over8-transition-shrunk"/);
+});
+
+test('V0.5.19 preserves execution scheduling and bounded Deriv request waits', () => {
+  assert.match(html, /EXECUTION_COALESCE_MS=15/);
+  assert.match(html, /FALLBACK_SCAN_MS=120/);
+  assert.match(html, /sendAuthRequest\(req,"proposal",2000\)/);
+  assert.match(html, /sendAuthRequest\(req,"buy",2000\)/);
 });
