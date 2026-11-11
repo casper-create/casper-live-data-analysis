@@ -1,3 +1,15 @@
+## 0.5.20 — NEXORA MACHINE central intelligence
+
+- Introduced a central decision broker supervising all eight specialist cards with explicit ENTER / WAIT / REJECT directives.
+- Added live per-market memory for recent tick movement, directional balance, volatility and broad regime classification.
+- Added central outcome-learning counters fed by walk-forward forecast results and settled trade feedback.
+- Machine authorisation requires a formed specialist signal, minimum validation evidence, a fresh tick and positive expected value from the live Deriv quote; existing card-specific and risk safeguards remain in force.
+- Added a NEXORA MACHINE status panel showing live intelligence state, markets observed, cards running and outcomes learned.
+- Preserved Auto Switcher's single selected market and Rise/Fall-only behaviour.
+- Preserved tick-driven execution: no fixed sleep; 15 ms coalescing, 120 ms recovery retry and 2-second proposal/buy response timeouts remain unchanged. The timeout bounds a stalled request; it is not an intentional delay.
+- Each card retains one open contract at a time and resumes immediately after settlement when a fresh qualifying opportunity exists.
+- No future-knowledge, accuracy or profit guarantees are claimed.
+
 ## 0.5.19 — Premium prediction calibration upgrade
 
 - Improved Matches Printer, Over 8 Killer and parity digit-transition estimates with recency weighting and Bayesian shrinkage toward each market’s unconditional digit distribution.

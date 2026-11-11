@@ -1,4 +1,4 @@
-# CASPER Live Data Analysis — v0.5.19
+# CASPER Live Data Analysis — v0.5.20
 
 Dashboard with Deriv OAuth login. One shared auth module (`auth-core.js`) runs on both hosts, so Render and Cloudflare cannot drift apart again:
 
@@ -42,6 +42,15 @@ GitHub Pages cannot run the login routes; use Render or Cloudflare.
 Node 20.6+. Copy `env.example` to `.env`, fill it in, register `http://127.0.0.1:8080/auth/callback`, then `npm start`.
 
 `npm test` runs the smoke tests (routes exist, PKCE redirect, origin checks, cookie encryption).
+
+## NEXORA MACHINE — central intelligence layer (v0.5.20)
+
+- Observes incoming Deriv ticks across the supported Volatility markets and maintains bounded per-market memory (recent movement, directional balance, volatility and broad regime label).
+- Supervises all eight specialist cards through a shared ENTER / WAIT / REJECT decision broker. Specialist strategy definitions remain independent; Auto Switcher stays pinned to one selected market and only chooses Rise or Fall.
+- Uses the specialist forecast, walk-forward evidence, current tick freshness and the live Deriv quote's payout-adjusted expected value before authorising an entry. Existing card-specific validation, account checks, stop limits and duplicate-order protections remain authoritative.
+- Learns from walk-forward forecast outcomes and keeps a compact per-card/per-market outcome history in this browser (no Deriv tokens or account credentials are stored in this memory). Market tick telemetry is maintained live; the machine does not claim to know future ticks or guarantee profits.
+- No artificial two-second execution delay is added. The existing 15 ms tick coalescing, 120 ms recovery retry and bounded 2-second Deriv proposal/buy response timeouts remain. The two-second timeout is a failure bound, not a wait before buying.
+- One open contract per card is retained; after settlement, the card immediately resumes from the newest available signal, subject to fresh quote and risk validation.
 
 ## Behaviour notes
 

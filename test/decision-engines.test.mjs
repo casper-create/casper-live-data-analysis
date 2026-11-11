@@ -56,3 +56,29 @@ test('V0.5.19 preserves execution scheduling and bounded Deriv request waits', (
   assert.match(html, /sendAuthRequest\(req,"proposal",2000\)/);
   assert.match(html, /sendAuthRequest\(req,"buy",2000\)/);
 });
+
+
+test('V0.5.20 installs the central NEXORA MACHINE decision broker and live memory', () => {
+  assert.match(html, /NEXORA MACHINE/);
+  assert.match(html, /function machineObserveTick\(/);
+  assert.match(html, /function machineAuthorise\(/);
+  assert.match(html, /function machineLearnOutcome\(/);
+  assert.match(html, /machineAuthorise\(id,best\.market,c,mt,observedRate,evObserved\)/);
+  assert.match(html, /outcomeMemory:loadMachineOutcomeMemory\(\)/);
+  assert.match(html, /machineRecord\("WAIT"/);
+});
+
+test('V0.5.20 keeps immediate tick-driven execution and does not add a two-second sleep', () => {
+  assert.match(html, /EXECUTION_COALESCE_MS=15/);
+  assert.match(html, /FALLBACK_SCAN_MS=120/);
+  assert.match(html, /sendAuthRequest\(req,"proposal",2000\)/);
+  assert.match(html, /sendAuthRequest\(req,"buy",2000\)/);
+  assert.doesNotMatch(html, /setTimeout\([^;]{0,100},\s*2000\s*\)/);
+});
+
+test('Auto Switcher remains Rise/Fall-only and market-pinned', () => {
+  assert.match(html, /function autoSwitcherCandidate\(/);
+  assert.match(html, /engineMarketChoice\.get\(id\)/);
+  assert.match(html, /if\(choice!=="__auto__"&&symbol&&choice!==symbol\)return/);
+  assert.match(html, /contractType:side==="up"\?"CALL":"PUT"/);
+});
