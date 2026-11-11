@@ -1,3 +1,10 @@
+## 0.5.21 — NEXORA MACHINE fast start
+
+- Seeds each market's NEXORA live-behaviour memory from the historical Deriv ticks already loaded for walk-forward evaluation, removing the unnecessary 30-live-tick warm-up after the dashboard is ready.
+- A single Run Bot click starts the selected card immediately after existing account, balance, stake, target and max-loss checks; removed the extra confirmation-screen click.
+- Preserves the 15 ms newest-tick coalescing, 120 ms recovery scan, live Deriv proposal/buy flow, per-card one-open-contract guard, and immediate next-signal evaluation after settlement.
+- Does not force trades or bypass specialist evidence, live quote, payout-adjusted expected-value, freshness, or risk checks. No profit guarantee.
+
 ## 0.5.20 — NEXORA MACHINE central intelligence
 
 - Introduced a central decision broker supervising all eight specialist cards with explicit ENTER / WAIT / REJECT directives.

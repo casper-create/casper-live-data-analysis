@@ -82,3 +82,17 @@ test('Auto Switcher remains Rise/Fall-only and market-pinned', () => {
   assert.match(html, /if\(choice!=="__auto__"&&symbol&&choice!==symbol\)return/);
   assert.match(html, /contractType:side==="up"\?"CALL":"PUT"/);
 });
+
+test('V0.5.21 seeds NEXORA market memory from already-loaded Deriv history', () => {
+  assert.match(html, /function seedMachineFromHistory\(m\)/);
+  assert.match(html, /m\.historyReady=true;seedMachineFromHistory\(m\);rebuildTests\(m\)/);
+  assert.match(html, /machineObserveTick\(m,m\.ticks\[i\]\.quote,i\?m\.ticks\[i-1\]\.quote:null\)/);
+});
+
+test('V0.5.21 Run Bot starts in one click after account and risk checks', () => {
+  const start = html.slice(html.indexOf('async function startEngine(id)'), html.indexOf('function scheduleLatestDecision'));
+  assert.match(start, /if\(!signedIn\|\|!selectedAccount\)/);
+  assert.match(start, /settings\.maxLoss/);
+  assert.match(start, /await activateEngine\(id\)/);
+  assert.doesNotMatch(start, /confirmOverlay/);
+});
