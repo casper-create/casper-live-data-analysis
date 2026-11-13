@@ -15,8 +15,8 @@ test('digit prediction uses conditional next-digit transitions', () => {
 test('fast cards retain tick-driven scheduling without adding a fixed execution sleep', () => {
   assert.match(html, /function processTick\(/);
   assert.match(html, /scheduleLatestDecision\(id/);
-  assert.match(html, /EXECUTION_COALESCE_MS=15/);
-  assert.match(html, /FALLBACK_SCAN_MS=120/);
+  assert.match(html, /EXECUTION_COALESCE_MS=0/);
+  assert.match(html, /FALLBACK_SCAN_MS=250/);
 });
 
 test('freshness uses local tick receive time and bounded proposal/buy waits', () => {
@@ -38,8 +38,7 @@ test('V0.5.18 defaults all cards to all-market scanning except single-market Aut
   assert.match(html, /Automatic — scan all 10 markets/);
 });
 test('V0.5.18 fallback retry continues even when no candidate is cached', () => {
-  assert.match(html, /const latest=best\?best\.market:Array\.from\(markets\.values\(\)\)/);
-  assert.match(html, /scheduleLatestDecision\(id,null,latest\?latest\.symbol:null,latest\?latest\.epoch\|\|0:0\)/);
+  assert.match(html, /else for\(const market of markets\.values\(\)\)if\(market\.latest!==null\)scheduleLatestDecision/);
 });
 
 test('V0.5.19 digit models use recency weighting and shrinkage instead of raw tiny-sample rates', () => {
@@ -51,8 +50,8 @@ test('V0.5.19 digit models use recency weighting and shrinkage instead of raw ti
 });
 
 test('V0.5.19 preserves execution scheduling and bounded Deriv request waits', () => {
-  assert.match(html, /EXECUTION_COALESCE_MS=15/);
-  assert.match(html, /FALLBACK_SCAN_MS=120/);
+  assert.match(html, /EXECUTION_COALESCE_MS=0/);
+  assert.match(html, /FALLBACK_SCAN_MS=250/);
   assert.match(html, /sendAuthRequest\(req,"proposal",2000\)/);
   assert.match(html, /sendAuthRequest\(req,"buy",2000\)/);
 });
@@ -69,8 +68,8 @@ test('V0.5.20 installs the central NEXORA MACHINE decision broker and live memor
 });
 
 test('V0.5.20 keeps immediate tick-driven execution and does not add a two-second sleep', () => {
-  assert.match(html, /EXECUTION_COALESCE_MS=15/);
-  assert.match(html, /FALLBACK_SCAN_MS=120/);
+  assert.match(html, /EXECUTION_COALESCE_MS=0/);
+  assert.match(html, /FALLBACK_SCAN_MS=250/);
   assert.match(html, /sendAuthRequest\(req,"proposal",2000\)/);
   assert.match(html, /sendAuthRequest\(req,"buy",2000\)/);
   assert.doesNotMatch(html, /setTimeout\([^;]{0,100},\s*2000\s*\)/);
@@ -95,4 +94,70 @@ test('V0.5.21 Run Bot starts in one click after account and risk checks', () => 
   assert.match(start, /settings\.maxLoss/);
   assert.match(start, /await activateEngine\(id\)/);
   assert.doesNotMatch(start, /confirmOverlay/);
+});
+
+
+test('v0.6.0 uses immediate microtask decisions instead of timer coalescing', () => {
+  assert.match(html, /queueMicrotask\(function\(\)/);
+  assert.match(html, /EXECUTION_COALESCE_MS=0/);
+  assert.doesNotMatch(html, /},\s*EXECUTION_COALESCE_MS\)/);
+});
+
+test('v0.6.0 has independent per-card/per-market execution pipelines', () => {
+  assert.match(html, /const activeEngineContracts=new Map\(\); \/\/ key: engineId\|symbol -> Set of open contract IDs/);
+  assert.match(html, /const engineBusyMarkets=new Set\(\)/);
+  assert.match(html, /function contractKey\(id,symbol\)/);
+  assert.match(html, /scheduleLatestDecision\(id,m\.symbol,m\.symbol,m\.epoch\|\|0\)/);
+  assert.match(html, /MAX_PARALLEL_MARKET_ORDERS=10/);
+  assert.match(html, /MAX_OPEN_CONTRACTS_PER_CARD=10/);
+});
+
+test('v0.6.0 records actual settled P/L into persistent card/market memory', () => {
+  assert.match(html, /function machineLearnTradeOutcome\(/);
+  assert.match(html, /machineLearnTradeOutcome\(t\.engineId,t\.symbol,Number\(t\.profit\|\|0\)\)/);
+  assert.match(html, /MACHINE_TRADE_MEMORY_KEY/);
+});
+
+test('v0.6.0 preserves full Flat stake or skips instead of silently reducing it', () => {
+  assert.match(html, /settings\.stakeMode==="flat"\?desired/);
+  assert.match(html, /settings\.stakeMode==="flat"&&plannedStake>riskLeft/);
+});
+
+test('v0.6.0 reserves stake while proposals are in flight and counts open exposure', () => {
+  assert.match(html, /pendingStakeReservations\.set\(activePipelineKey,plannedStake\)/);
+  assert.match(html, /reservedStakeTotal\(\)\+plannedStake>balance/);
+  assert.match(html, /MAX_OPEN_CONTRACTS_TOTAL=20/);
+});
+
+test('v0.6.0 Auto Switcher stays on the selected market and chooses Rise or Fall', () => {
+  assert.match(html, /id==="autoswitch"\?"":"__auto__"/);
+  assert.match(html, /function autoSwitcherCandidate\(/);
+  assert.match(html, /contractType:side==="up"\?"CALL":"PUT"/);
+});
+
+
+test('v0.6.0 payout EV uses walk-forward evidence with conservative settled-outcome calibration', () => {
+  assert.match(html, /const probabilityForEV=machineAdjustedProbability\(id,best\.market\.symbol,observedRate\)/);
+  assert.match(html, /const settledWinRate=stats\.wins\/stats\.n,weight=Math\.min\(\.35,stats\.n\/\(stats\.n\+25\)\)/);
+});
+
+
+test('v0.6.0 feeds market memory and settled card/market outcomes into each live specialist candidate', () => {
+  assert.match(html, /function machineEnrichCandidate\(/);
+  assert.match(html, /candidate\.machine=\{/);
+  assert.match(html, /digitCounts:mem\?mem\.digitCounts\.slice\(\)/);
+  assert.match(html, /function machineAdjustedProbability\(/);
+  assert.match(html, /const probabilityForEV=machineAdjustedProbability\(id,best\.market\.symbol,observedRate\)/);
+  assert.match(html, /function machineTradeStats\(/);
+});
+
+
+test('v0.6.1 allows a new same-card/same-market entry while earlier contracts remain open, within caps', () => {
+  assert.match(html, /function activeCountForEngine\(id\)\{let n=0;for\(const \[key,ids\] of activeEngineContracts\.entries\(\)\)if\(key\.startsWith\(id\+"\|"\)\)n\+=ids instanceof Set\?ids\.size:ids\?1:0;return n\}/);
+  assert.match(html, /const activeIds=activeEngineContracts\.get\(activeKey\);/);
+  assert.match(html, /activeIds\.add\(t\.id\)/);
+  assert.match(html, /if\(activeIds\.size\)\{st\.activeContract=Array\.from\(activeIds\)\.at\(-1\)\}/);
+  assert.doesNotMatch(html, /if\(hasActiveContract\(id,symbol\)\|\|marketPipelineBusy/);
+  assert.match(html, /MAX_OPEN_CONTRACTS_PER_CARD=10/);
+  assert.match(html, /MAX_OPEN_CONTRACTS_TOTAL=20/);
 });

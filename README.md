@@ -1,9 +1,9 @@
-# CASPER Live Data Analysis — v0.5.21
+# CASPER Live Data Analysis — v0.6.1
 
 Dashboard with Deriv OAuth login. One shared auth module (`auth-core.js`) runs on both hosts, so Render and Cloudflare cannot drift apart again:
 
 - `server.mjs`: Node server (Render, or local development)
-- `VERSION.txt`: explicit build marker so every V5 bundle is easy to identify
+- `VERSION.txt`: explicit build marker so every release bundle is easy to identify
 - `build-pages.mjs`: builds `dist/` for Cloudflare Pages, assembling `_worker.js` from `auth-core.js`
 
 Sessions are stateless: an AES-GCM encrypted HttpOnly cookie. Nothing is kept on the server, so restarts, sleeping instances and redeploys do not log anyone out. The Deriv access token never reaches page JavaScript.
@@ -43,14 +43,17 @@ Node 20.6+. Copy `env.example` to `.env`, fill it in, register `http://127.0.0.1
 
 `npm test` runs the smoke tests (routes exist, PKCE redirect, origin checks, cookie encryption).
 
-## NEXORA MACHINE — central intelligence layer (v0.5.20)
+## NEXORA MACHINE — central intelligence layer (v0.6.0)
 
-- Observes incoming Deriv ticks across the supported Volatility markets and maintains bounded per-market memory (recent movement, directional balance, volatility and broad regime label).
+- Observes incoming Deriv ticks across the ten target Volatility markets and maintains bounded per-market memory: recent movement, directional balance, volatility regime, last-digit distribution and live tick intervals. The initial 1,000-tick history seeds market memory before the first live decision.
 - Supervises all eight specialist cards through a shared ENTER / WAIT / REJECT decision broker. Specialist strategy definitions remain independent; Auto Switcher stays pinned to one selected market and only chooses Rise or Fall.
 - Uses the specialist forecast, walk-forward evidence, current tick freshness and the live Deriv quote's payout-adjusted expected value before authorising an entry. Existing card-specific validation, account checks, stop limits and duplicate-order protections remain authoritative.
-- Learns from walk-forward forecast outcomes and keeps a compact per-card/per-market outcome history in this browser (no Deriv tokens or account credentials are stored in this memory). Market tick telemetry is maintained live; the machine does not claim to know future ticks or guarantee profits.
-- No artificial two-second execution delay is added. The existing 15 ms tick coalescing, 120 ms recovery retry and bounded 2-second Deriv proposal/buy response timeouts remain. The two-second timeout is a failure bound, not a wait before buying.
-- One open contract per card is retained; after settlement, the card immediately resumes from the newest available signal, subject to fresh quote and risk validation.
+- Learns from walk-forward forecast outcomes and actual settled card/market P/L. After five settled trades for a card/market, its measured win rate is blended conservatively into that card/market's payout-EV estimate; raw signal strength is never treated as a calibrated probability. Compact histories are stored locally in the browser; no Deriv tokens or account credentials are stored in this memory.
+- No timer-based execution coalescing is used: each incoming tick queues a microtask decision. The 250 ms recovery scan is only a fallback when no new tick arrives; it is not a mandatory wait before buying.
+- Automated cards have independent per-market quote/buy pipelines. All-market cards can analyse all ten markets without one market's quote request blocking another market's decision.
+- Bounded concurrency: up to ten simultaneous quote/buy pipelines, up to ten open contracts per card (one per card/market), and twenty tracked open contracts total. Deriv/network response time and API-side limits still determine actual purchase throughput.
+- Pending stake reservations account for in-flight proposals. Flat mode always uses the configured base stake and skips if the full amount cannot fit the remaining loss budget; it is never silently reduced.
+- Same-tick duplicate re-entry is blocked. After settlement, the card resumes on a fresh tick, subject to the live quote, payout, risk and account checks.
 
 ## Behaviour notes
 
@@ -58,7 +61,7 @@ Node 20.6+. Copy `env.example` to `.env`, fill it in, register `http://127.0.0.1
 - A Deriv outage does not end your session. Only an expired or rejected token does.
 - If login fails, the dashboard shows why (cancelled, expired, rejected by Deriv, network).
 - Automated cards are enabled only after explicit user confirmation, live Deriv quote validation, and the configured target/max-loss checks. Orders are real Deriv purchases only; there are no simulated transaction rows.
-- The current testing warm-up requires 40 observed validation results before a card can qualify a trade. This is a testing threshold, not an accuracy guarantee.
+- Demo automation requires at least 12 walk-forward forecast results; real-account automation requires at least 40 and a measured edge. These are evidence gates, not accuracy guarantees.
 - V4-compatible Deriv OAuth/session behavior is intentionally preserved in `auth-core.js`. Do not replace it with a different login implementation.
 
 
@@ -101,8 +104,8 @@ This bundle is intentionally delivered as a complete project, not a partial file
 
 ### Automated card behavior
 
-- Rise / Fall and Even / Odd use the selected Volatility market.
-- Mix Both and Smart AI can choose automatically from all 10 target Volatility markets.
+- Rise / Fall and Even / Odd can be configured for a selected market or all-market scanning.
+- Mix Both and Smart AI evaluate their own specialist signals independently across all 10 target Volatility markets.
 - Premium cards are available to a signed-in account for testing; owner-ID gating only controls the owner label.
 - Each card owns its own recovery counter, P/L, active contract, validation state and stop limits.
 - A completed losing trade advances Flat/Tims 1.6/Tims 2 recovery as configured, capped at two recovery steps; a win resets to base.
@@ -126,3 +129,17 @@ Automated cards use the actual Deriv proposal payout for break-even, expected-va
 
 ## V5.0.13 execution timing and responsiveness
 V5.0.13 keeps live ticks as the primary scanner trigger. It caches each market/card's latest candidate, batches visual refreshes to one animation frame, and keeps a bounded 120 ms recovery check while live ticks remain the primary trigger. It records tick age, proposal latency, and decision-to-buy latency for each automated purchase. These measurements do not imply that every signal will be executable or profitable; Deriv quote availability, network latency, contract rules, and risk gates still apply.
+
+## v0.6.0 execution and learning notes
+
+- Manual Trading retains its manual quote → review → buy flow.
+- Free cards retain their own Rise/Fall, Even/Odd, Mix Both and Smart AI specialist models.
+- Premium cards retain their own Matches, Over 8, TickStrike and Auto Switcher models. Auto Switcher remains pinned to the one market selected by the user and chooses either Rise or Fall; it never changes market or contract family.
+- The Machine maintains per-market return, volatility, directional, tick-interval and digit-frequency memory. It records walk-forward forecast outcomes and actual settled card/market trade P/L separately.
+- Execution is event-driven and parallel across independent market pipelines. Ten internal pipelines are not the same as ten confirmed purchases per second: Deriv's tick frequency, proposal and buy confirmations, network latency and account/API limits remain outside the browser's control.
+- The system does not guarantee profitable trades. Use a Deriv Demo account first and verify actual transaction settlements and risk limits before considering real funds.
+
+
+## v0.6.1 continuous contract tracking
+
+A card may now open another qualifying contract on a new live tick while earlier contracts from the same card and market remain open. Open contracts are tracked as a set per card/market; each settlement removes only its own contract. Limits remain 10 open contracts per card, 20 account-wide, and 10 concurrent quote/buy pipelines. These limits protect account exposure and Deriv request load. Actual throughput depends on market ticks and Deriv response latency; no fixed trades-per-second or profit level is promised.

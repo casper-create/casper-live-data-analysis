@@ -1,3 +1,25 @@
+## 0.6.1 — Continuous same-market contract pipeline
+
+- Allows a running card to request a fresh qualifying contract on a new tick even while earlier contracts from that same card/market remain open.
+- Tracks multiple open contract IDs per card/market and removes only the contract that actually settles.
+- Keeps the per-card (10), account-wide (20), and concurrent proposal/buy (10) caps, fixed-stake risk reservation, fresh-tick de-duplication, and stop-token checks.
+- This increases potential transaction continuity; it does not guarantee a fixed number of Deriv purchases per second or profitability.
+
+## 0.6.0 — NEXORA MACHINE parallel market pipelines
+
+- Promoted NEXORA to the central Deriv-only intelligence layer supervising all eight existing specialist cards.
+- Added rolling per-market memory for tick returns, directional balance, volatility regime, last-digit distribution and observed tick intervals; history seeds this memory before live operation.
+- Replaced the 15 ms timer coalescing with a microtask decision queue. The live tick stream remains the primary trigger; a 250 ms recovery scan is only a fallback.
+- Reworked automated execution into independent card/market pipelines. All-market cards can evaluate ten markets independently instead of one slow proposal blocking every market for that card.
+- Added bounded concurrency: up to ten simultaneous quote/buy pipelines, up to ten open contracts per card (one per card/market), and twenty open contracts total across tracked manual and automated positions.
+- Added pending-stake reservations so simultaneous proposals cannot over-allocate the same card's loss budget or exceed the account's available balance estimate.
+- Preserved Auto Switcher as a manually selected single market with Rise/Fall decisions only; it can choose either direction.
+- Added persistent per-card/per-market learning records for actual settled trade P/L, separate from walk-forward forecast outcomes; after five settled trades, a conservative blend of the observed contract win rate informs payout-EV estimates.
+- Corrected Flat staking so it always requests the configured base stake; if the full stake exceeds remaining loss budget, the card skips rather than silently reducing it.
+- Prevented same-tick immediate re-entry after settlement; the next trade requires a fresh tick.
+- Removed redundant trend gates while retaining core signal validity, minimum walk-forward evidence, live payout/EV, freshness, account, balance, duplicate-order and exposure safeguards.
+- No promise of ten confirmed purchases per second: actual throughput remains bounded by Deriv's tick cadence, proposal/buy round trips, account limits and network conditions.
+
 ## 0.5.21 — NEXORA MACHINE fast start
 
 - Seeds each market's NEXORA live-behaviour memory from the historical Deriv ticks already loaded for walk-forward evaluation, removing the unnecessary 30-live-tick warm-up after the dashboard is ready.

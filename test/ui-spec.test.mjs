@@ -36,8 +36,8 @@ test('V5.0.7 uses a fast live-decision screen and continuous retry loop', () => 
   assert.match(html, /smartCompositeCandidate/);
   assert.match(html, /Rise\/Fall.*Even\/Odd.*Mix Both/);
   assert.match(html, /sourceStrategy/);
-  assert.match(html, /engineBusy=new Set/);
-  assert.match(html, /FALLBACK_SCAN_MS=120/);
+  assert.match(html, /engineBusyMarkets=new Set/);
+  assert.match(html, /FALLBACK_SCAN_MS=250/);
 });
 
 test('each strategy keeps its own state and active contract', () => {
@@ -49,10 +49,10 @@ test('each strategy keeps its own state and active contract', () => {
 
 test('V5.0.10 coalesces live ticks and rejects stale signals', () => {
   assert.match(html, /MAX_SIGNAL_AGE_MS=5000/);
-  assert.match(html, /EXECUTION_COALESCE_MS=15/);
+  assert.match(html, /EXECUTION_COALESCE_MS=0/);
   assert.match(html, /enginePendingTick/);
-  assert.match(html, /skipped tick while executing/);
-  assert.match(html, /using newest tick/);
+  assert.match(html, /coalesced superseded tick/);
+  assert.match(html, /using newest/);
 });
 
 
@@ -66,8 +66,8 @@ test('V5.0.11 keeps quoted payout separate from realized settlement payout', () 
 
 
 test('V5.0.12 automatic market decisions are not restricted to the triggering tick market', () => {
-  assert.match(html, /const target=choice!=="__auto__"\?choice:"__auto__"/);
-  assert.doesNotMatch(html, /choice==="__auto__"&&symbol&&best\.market\.symbol!==symbol/);
+  assert.match(html, /Each market has its own pipeline/);
+  assert.match(html, /const candidates=\[\{market:currentMarket,candidate:localCandidate/);
   assert.match(html, /candidateAgeMs>MAX_SIGNAL_AGE_MS/);
 });
 
@@ -85,7 +85,7 @@ test('V5.0.12 settled cash payout is derived from actual buy price and realized 
 });
 
 test('V5.0.13 keeps retry intervals bounded', () => {
-  assert.match(html, /const FALLBACK_SCAN_MS=120/);
+  assert.match(html, /const FALLBACK_SCAN_MS=250/);
   assert.match(html, /Number\.isFinite\(delay\)\?Math\.max\(50,delay\):FALLBACK_SCAN_MS/);
 });
 
