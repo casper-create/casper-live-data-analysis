@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#06171d">
 <meta name="description" content="CASPER NEXORA MACHINE — Deriv market intelligence and trading">
-<title>CASPER Live Deriv Data Analysis · v0.6.1</title>
+<title>CASPER Live Deriv Data Analysis · v0.6.0</title>
 <style>
 :root{color-scheme:dark;--bg:#06171d;--panel:#0a2028;--panel2:#0d2730;--line:#173b46;--cyan:#18d5ea;--blue:#0999b6;--muted:#86a4bb;--text:#f1f5fb;--gold:#ffc629;--green:#22d5a0;--red:#ff6681;--purple:#a45cff;--radius:18px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 *{box-sizing:border-box}body{margin:0;min-width:320px;background:var(--bg);color:var(--text)}button,input,select{font:inherit}button{cursor:pointer;color:inherit}button:disabled{cursor:not-allowed;opacity:.45}
@@ -296,14 +296,14 @@
 "use strict";
 const $=function(s){return document.querySelector(s)};
 const $$=function(s){return Array.from(document.querySelectorAll(s))};
-const APP_VERSION="0.6.1";
+const APP_VERSION="0.6.2";
 const MIN_VALIDATION_TESTS=12; // Demo warm-up sample; real-account automation retains the 40-outcome evidence gate.
 const REAL_ACCOUNT_VALIDATION_TESTS=40;
 const FALLBACK_SCAN_MS=250; // Recovery only; live ticks remain the primary trigger.
 const MAX_SIGNAL_AGE_MS=5000; // Use local receive time; Deriv tick epochs may be rounded to whole seconds.
 const EXECUTION_COALESCE_MS=0; // Decisions are queued as microtasks; no timer-based execution coalescing.
 const MAX_TICK_SKIP_LOG=8;
-const MAX_OPEN_CONTRACTS_PER_CARD=10; // Multiple contracts per card are allowed, within this cap.
+const MAX_OPEN_CONTRACTS_PER_CARD=10; // Multiple settled-later contracts may remain open per card.
 const MAX_OPEN_CONTRACTS_TOTAL=20; // Account-wide safety ceiling across automated cards.
 const MAX_PARALLEL_MARKET_ORDERS=10;
 function minimumEntryEdge(id){
@@ -328,7 +328,7 @@ const levelOrder=[100,75,50,25,10];
 const markets=new Map();
 const engineState=Object.fromEntries(engineIds.map(function(id){return [id,new Map()]}));
 const running=new Set();
-const activeEngineContracts=new Map(); // key: engineId|symbol -> Set of open contract IDs
+const activeEngineContracts=new Map(); // key: engineId|symbol -> Set<contractId>
 const engineBusyMarkets=new Set(); // independent in-flight pipeline per engine/market
 const pendingStakeReservations=new Map();
 const enginePendingTick=new Map();
@@ -349,6 +349,16 @@ let publicWs=null,authWs=null,authConnecting=null,publicRetry=null;
 let nextReq=20,liveConnected=false,signedIn=false,premiumOwner=false,selectedAccount="",selectedType="",currency="USD",balance=null;
 let activeFree="rise",activePremium="matches",manualQuote=null,startingEngine=null,renderQueued=false,tradeCounter=0;
 const maxTicks=1500;
+const matchGateLogAt=new Map();
+function matchesGate(id,market,reason){
+  if(id!=="matches"||!market)return;
+  const key=market.symbol+"|"+reason,now=Date.now(),last=matchGateLogAt.get(key)||0;
+  if(now-last<3000)return;
+  matchGateLogAt.set(key,now);
+  log("Matches Printer · "+market.name+" · "+reason,"warn");
+  machineRecord("WAIT",id,market,reason);
+}
+
 // NEXORA MACHINE: a central, lightweight intelligence and decision-broker layer.
 // It observes every Deriv tick, maintains bounded market memory, supervises each
 // strategy's existing specialist model, and records real walk-forward outcomes.
@@ -366,7 +376,7 @@ function loadMachineOutcomeMemory(){
 function persistMachineOutcomeMemory(){
   clearTimeout(machineMemorySaveTimer);machineMemorySaveTimer=setTimeout(function(){try{const compact=Array.from(nexoraMachine.outcomeMemory.entries()).map(([key,items])=>[key,items.slice(-500).map(x=>!!x.hit)]);localStorage.setItem(MACHINE_MEMORY_KEY,JSON.stringify(compact));}catch(e){log("NEXORA memory could not be saved in this browser session","warn");}},350);
 }
-const nexoraMachine={version:"0.6.1",status:"INITIALISING",marketMemory:new Map(),outcomeMemory:loadMachineOutcomeMemory(),learned:0,decisions:0,entries:0,rejections:0,waits:0,last:{command:"WAIT",detail:"Building live Deriv market memory…",card:"—",market:"—",at:0},cardMemory:new Map(engineIds.map(id=>[id,{learned:0,entries:0,rejections:0,settledTrades:0,realizedPnl:0,lastCommand:"WAIT"}])),tradeMemory:loadMachineTradeMemory()};
+const nexoraMachine={version:"0.6.0",status:"INITIALISING",marketMemory:new Map(),outcomeMemory:loadMachineOutcomeMemory(),learned:0,decisions:0,entries:0,rejections:0,waits:0,last:{command:"WAIT",detail:"Building live Deriv market memory…",card:"—",market:"—",at:0},cardMemory:new Map(engineIds.map(id=>[id,{learned:0,entries:0,rejections:0,settledTrades:0,realizedPnl:0,lastCommand:"WAIT"}])),tradeMemory:loadMachineTradeMemory()};
 function refreshMachineLearnedCount(){const forecasts=Array.from(nexoraMachine.outcomeMemory.values()).reduce((sum,items)=>sum+items.length,0),settlements=Array.from(nexoraMachine.tradeMemory.values()).reduce((sum,items)=>sum+items.length,0);nexoraMachine.learned=forecasts+settlements;}
 refreshMachineLearnedCount();
 for(const [key,items] of nexoraMachine.tradeMemory.entries()){const id=key.split("|")[0],card=nexoraMachine.cardMemory.get(id);if(card){card.settledTrades+=items.length;card.realizedPnl+=items.reduce((sum,item)=>sum+Number(item.profit||0),0);}}
@@ -671,7 +681,7 @@ function contractKey(id,symbol){return id+"|"+symbol}
 function activeCountForEngine(id){let n=0;for(const [key,ids] of activeEngineContracts.entries())if(key.startsWith(id+"|"))n+=ids instanceof Set?ids.size:ids?1:0;return n}
 function activeCountTotal(){return trades.filter(function(t){return !t.settled}).length}
 function pendingCountForEngine(id){let n=0;for(const key of engineBusyMarkets)if(key.startsWith(id+"|"))n++;return n}
-function hasActiveContract(id,symbol){const ids=activeEngineContracts.get(contractKey(id,symbol));return ids instanceof Set?ids.size>0:!!ids}
+function hasActiveContract(id,symbol){return activeEngineContracts.has(contractKey(id,symbol))}
 function marketPipelineBusy(id,symbol){return engineBusyMarkets.has(contractKey(id,symbol))}
 function openTransactionPanel(scroll){const list=$("#transactionList");list.classList.remove("collapsed");$("#transactionToggle").setAttribute("aria-expanded","true");$("#transactionChevron").textContent="⌃";if(scroll)$("#transactions").scrollIntoView({behavior:"smooth",block:"start"})}
 ["freeStake","freeStakeMode","freeTarget","freeMaxLoss","premiumStake","premiumStakeMode","premiumTarget","premiumMaxLoss"].forEach(function(id){$("#"+id).addEventListener("change",function(){const engine=(id.startsWith("free")?activeFree:activePremium);saveSettingsFromUI(engine);updateAll()})});
@@ -782,7 +792,7 @@ async function considerEntry(id,symbol,decisionEpoch){
   const currentMarket=markets.get(symbol);
   if(!currentMarket||currentMarket.latest===null)return;
   const localCandidate=currentCandidate(id,symbol);
-  if(!localCandidate){machineRecord("WAIT",id,currentMarket,"This card is still forming its market-specific signal.");return;}
+  if(!localCandidate){machineRecord("WAIT",id,currentMarket,"This card is still forming its market-specific signal.");matchesGate(id,currentMarket,"Waiting for sufficient live tick history to form a digit candidate.");return;}
   // Each market has its own pipeline. Automatic cards therefore evaluate all ten
   // markets independently instead of allowing one busy market to block the others.
   // Auto Switcher remains pinned to its one manually selected market.
@@ -809,16 +819,16 @@ async function considerEntry(id,symbol,decisionEpoch){
     // Demo accounts may trade after a short warm-up so the user can verify the
     // complete quote→buy→settlement loop. Real accounts retain the full 40-outcome
     // walk-forward gate and must show a positive observed edge before entry.
-    if(mt.n<MIN_VALIDATION_TESTS)continue;
-    if(selectedType!=="demo" && (mt.n<REAL_ACCOUNT_VALIDATION_TESTS || !Number.isFinite(observedRate) || observedRate<=mt.baseline+edge))continue;
-    if(selectedType==="demo" && Number.isFinite(observedRate) && observedRate<mt.baseline-0.08)continue;
-    if(!Number.isFinite(Number(c.pHit))||Number(c.pHit)<=Number(c.baseline)+edge)continue;
+    if(mt.n<MIN_VALIDATION_TESTS){matchesGate(id,best.market,"Waiting for "+MIN_VALIDATION_TESTS+" walk-forward forecasts; currently "+mt.n+".");continue;}
+    if(selectedType!=="demo" && (mt.n<REAL_ACCOUNT_VALIDATION_TESTS || !Number.isFinite(observedRate) || observedRate<=mt.baseline+edge)){matchesGate(id,best.market,"Real-account evidence gate: "+mt.n+"/"+REAL_ACCOUNT_VALIDATION_TESTS+" forecasts; observed "+percent(observedRate)+" versus required above "+percent(mt.baseline+edge)+".");continue;}
+    if(selectedType==="demo" && Number.isFinite(observedRate) && observedRate<mt.baseline-0.08){matchesGate(id,best.market,"Demo validation floor rejected observed forecast rate "+percent(observedRate)+".");continue;}
+    if(!Number.isFinite(Number(c.pHit))||Number(c.pHit)<=Number(c.baseline)+edge){matchesGate(id,best.market,"Candidate edge gate: "+percent(Number(c.pHit))+" estimated versus required above "+percent(Number(c.baseline)+edge)+".");continue;}
     // Card-specific decision contracts: each card must satisfy the evidence its own model needs.
     if(id==="rise"&&(!c.decisionWindows||c.windowAgreement!==1||Math.abs(Number(c.trendScore))<0.10))continue;
     if(id==="parity"&&(!Number.isFinite(c.conditionalSamples)||c.conditionalSamples<25))continue;
     if(id==="mix"&&(!c.sourceStrategy||!Number.isFinite(c.pHit)))continue;
     if(id==="smart"&&(!c.sourceStrategy||!Number.isFinite(c.smartScore)))continue;
-    if(id==="matches"&&(!Number.isFinite(c.conditionalSamples)||c.conditionalSamples<25))continue;
+    if(id==="matches"&&(!Number.isFinite(c.conditionalSamples)||c.conditionalSamples<25)){matchesGate(id,best.market,"Conditional digit sample gate: "+Number(c.conditionalSamples||0)+"/25 observations.");continue;}
     if(id==="over8"&&(!Number.isFinite(c.conditionalSamples)||c.conditionalSamples<25))continue;
     if(id==="tickstrike"&&(!Number.isFinite(c.acceleration)||c.acceleration<0.35||c.windowAgreement!==1))continue;
     if(id==="autoswitch"&&(!c.decisionWindows||c.windowAgreement!==1||c.trendAgreement<0.58))continue;
@@ -852,6 +862,7 @@ async function considerEntry(id,symbol,decisionEpoch){
       if(breakEven>=1 || grossProfit<=0 || evObserved<=0){
         log(engineDefs[id].name+" · "+best.market.name+" quote rejected · live payout "+money(payout)+" · potential profit "+money(grossProfit)+" · break-even "+percent(breakEven)+" · observed "+percent(observedRate)+" · EV estimate "+percent(probabilityForEV),"warn");
         machineRecord("REJECT",id,best.market,"Live Deriv quote failed the payout-adjusted expected-value gate.");
+        matchesGate(id,best.market,"Live Deriv quote rejected: observed win probability "+percent(probabilityForEV)+" does not cover break-even "+percent(breakEven)+".");
         continue;
       }
       if(!machineAuthorise(id,best.market,c,mt,observedRate,evObserved))continue;
@@ -884,7 +895,11 @@ function showManualQuote(){if(!manualQuote)return;const p=manualQuote.quote,ask=
 $("#manualBuy").addEventListener("click",async function(){if(!manualQuote)return;const q=manualQuote;try{if(selectedType!=="demo"&&!window.confirm("Buy one "+q.candidate.contractType+" contract for "+money(Number(q.quote.ask_price))+" from your REAL Deriv account? The stake can be lost."))return;await buyProposal({quote:q.quote,market:q.market,candidate:q.candidate,engineId:"manual",stake:Number(q.quote.ask_price),settings:{target:0,maxLoss:0},auto:false,evLower:null,breakEven:Number(q.quote.ask_price)/Number(q.quote.payout)});manualQuote=null;$("#manualQuoteBox").classList.add("hide");$("#manualBuy").classList.add("hide")}catch(e){toast(e.message||"Could not buy contract.")}});
 async function buyProposal(payload){const p=payload.quote,ask=Number(p.ask_price);if(!p.id||!Number.isFinite(ask)||ask<=0)throw new Error("Deriv returned an invalid proposal.");if(payload.auto&&(!running.has(payload.engineId)||payload.auto!==true||(engineRunTokens.get(payload.engineId)||0)!==payload.runToken))return;const req={buy:p.id,price:ask,req_id:nextReq++};const d=await sendAuthRequest(req,"buy",2000);const b=d.buy;if(!b||!b.contract_id)throw new Error("Deriv did not confirm a purchase.");const actualBuyPrice=Number(b.buy_price||ask);
   const quotedPayout=Number(p.payout||0);
-  const t={id:String(b.contract_id),signalEpoch:payload.signalEpoch||null,engineId:payload.engineId,engineName:payload.engineId==="manual"?"Manual Trading":engineDefs[payload.engineId].name,market:payload.market.name,symbol:payload.market.symbol,contract:payload.candidate.label||payload.candidate.contractType,contractType:payload.candidate.contractType,stake:actualBuyPrice,status:"Open",profit:null,settled:false,time:Number(b.purchase_time||Date.now()/1000),currency:currency,auto:payload.auto,evLower:payload.evLower,breakEven:payload.breakEven,payout:quotedPayout,potentialProfit:quotedPayout-actualBuyPrice,realizedPayout:null,signalAt:payload.signalAt||null,tickAgeMs:payload.tickAgeMs??null,quoteMs:payload.quoteMs??null,decisionToBuyMs:payload.signalAt?performance.now()-payload.signalAt:null,executionMs:payload.signalAt?performance.now()-payload.signalAt:null};trades.unshift(t);if(payload.engineId!=="manual"&&t.executionMs!==null){const st=metricsFor(payload.engineId,payload.market.symbol);st.lastDecisionEpoch=t.signalEpoch||st.lastDecisionEpoch;if(!Array.isArray(st.executionSamples))st.executionSamples=[];st.executionSamples.push(t.executionMs);if(st.executionSamples.length>100)st.executionSamples.shift();st.lastExecutionMs=t.executionMs;}if(payload.engineId!=="manual"){const activeKey=contractKey(payload.engineId,payload.market.symbol);let activeIds=activeEngineContracts.get(activeKey);if(!(activeIds instanceof Set)){activeIds=new Set(activeIds?[String(activeIds)]:[]);activeEngineContracts.set(activeKey,activeIds)}activeIds.add(t.id);metricsFor(payload.engineId,payload.market.symbol).activeContract=t.id}openTransactionPanel(true);sendAuth({proposal_open_contract:1,contract_id:Number(t.id),subscribe:1,req_id:nextReq++});log(t.engineName+" · Deriv confirmed contract "+t.id+" on "+t.market);updateAll()}
+  const t={id:String(b.contract_id),signalEpoch:payload.signalEpoch||null,engineId:payload.engineId,engineName:payload.engineId==="manual"?"Manual Trading":engineDefs[payload.engineId].name,market:payload.market.name,symbol:payload.market.symbol,contract:payload.candidate.label||payload.candidate.contractType,contractType:payload.candidate.contractType,stake:actualBuyPrice,status:"Open",profit:null,settled:false,time:Number(b.purchase_time||Date.now()/1000),currency:currency,auto:payload.auto,evLower:payload.evLower,breakEven:payload.breakEven,payout:quotedPayout,potentialProfit:quotedPayout-actualBuyPrice,realizedPayout:null,signalAt:payload.signalAt||null,tickAgeMs:payload.tickAgeMs??null,quoteMs:payload.quoteMs??null,decisionToBuyMs:payload.signalAt?performance.now()-payload.signalAt:null,executionMs:payload.signalAt?performance.now()-payload.signalAt:null};trades.unshift(t);if(payload.engineId!=="manual"&&t.executionMs!==null){const st=metricsFor(payload.engineId,payload.market.symbol);st.lastDecisionEpoch=t.signalEpoch||st.lastDecisionEpoch;if(!Array.isArray(st.executionSamples))st.executionSamples=[];st.executionSamples.push(t.executionMs);if(st.executionSamples.length>100)st.executionSamples.shift();st.lastExecutionMs=t.executionMs;}if(payload.engineId!=="manual"){metricsFor(payload.engineId,payload.market.symbol).activeContract=t.id;
+    const activeKey=contractKey(payload.engineId,payload.market.symbol);
+    let activeSet=activeEngineContracts.get(activeKey);
+    if(!(activeSet instanceof Set)){activeSet=new Set(activeSet?[activeSet]:[]);activeEngineContracts.set(activeKey,activeSet)}
+    activeSet.add(t.id)}openTransactionPanel(true);sendAuth({proposal_open_contract:1,contract_id:Number(t.id),subscribe:1,req_id:nextReq++});log(t.engineName+" · Deriv confirmed contract "+t.id+" on "+t.market);updateAll()}
 function renderTransactions(){const body=$("#transactionsBody");if(!trades.length){body.innerHTML='<tr><td colspan="7" class="muted">No contracts have been placed in this session.</td></tr>'}else{body.innerHTML=trades.slice(0,100).map(function(t){const pnl=t.profit===null?"—":money(t.profit,t.currency),n=Number(t.profit),status=t.settled?(n>0?"Won":n<0?"Lost":"Settled"):"Open",statusClass=status.toLowerCase(),rowClass=t.settled?(n>0?"transaction-row-win":n<0?"transaction-row-loss":""):"transaction-row-open",recovery=t.engineId!=="manual"?'<span class="recovery-chip">'+esc(recoveryLabel(t.engineId))+'</span>':'';const liveLabel=!t.settled&&t.profit!==null?'<span class="tx-meta">Floating P/L · '+esc(money(t.profit,t.currency))+'</span>':'';const payoutLabel=t.settled&&Number.isFinite(Number(t.realizedPayout))?'<span class="tx-meta">Payout · '+esc(money(t.realizedPayout,t.currency))+'</span>':'';return '<tr class="'+rowClass+'"><td>'+esc(new Date(t.time*1000).toLocaleTimeString())+'</td><td><span class="tx-card">'+esc(t.engineName)+'</span>'+recovery+'</td><td><strong>'+esc(t.market)+'</strong><span class="tx-meta">'+esc(t.symbol)+' · '+esc(t.contract)+'</span></td><td>'+esc(t.contract)+'</td><td>'+esc(money(t.stake,t.currency))+'</td><td><span class="status-pill '+statusClass+'">'+esc(status)+'</span>'+liveLabel+payoutLabel+'</td><td class="num '+(t.profit===null?'':n>=0?'good-text':'bad-text')+'">'+esc(pnl)+'</td></tr>'}).join("")}const closed=trades.filter(function(t){return t.settled}),total=closed.reduce(function(a,t){return a+Number(t.profit||0)},0),wins=closed.filter(function(t){return Number(t.profit)>0}).length,losses=closed.filter(function(t){return Number(t.profit)<0}).length,open=trades.filter(function(t){return !t.settled}).length,totalStake=trades.reduce(function(a,t){return a+Number(t.stake||0)},0),totalPayout=closed.reduce(function(a,t){return a+(Number.isFinite(Number(t.realizedPayout))?Number(t.realizedPayout):Math.max(0,Number(t.stake||0)+Number(t.profit||0)))},0);$("#totalPnl").textContent=money(total);$("#totalPnl").className=total>=0?"good-text":"bad-text";$("#winCount").textContent=String(wins);$("#lossCount").textContent=String(losses);$("#openCount").textContent=String(open);$("#txTotalStake").textContent=money(totalStake);$("#txTotalPayout").textContent=money(totalPayout);$("#txRuns").textContent=String(trades.length);$("#txLost").textContent=String(losses);$("#txWon").textContent=String(wins);$("#txTotalProfit").textContent=money(total)}
 function handleAuthMessage(d){
   if(d.error){
@@ -919,9 +934,11 @@ function handleAuthMessage(d){
         if(t.engineId!=="manual"){
           const st=metricsFor(t.engineId,t.symbol);
           const activeKey=contractKey(t.engineId,t.symbol);
-          const activeIds=activeEngineContracts.get(activeKey);
-          if(activeIds instanceof Set){activeIds.delete(id);if(activeIds.size){st.activeContract=Array.from(activeIds).at(-1)}else{activeEngineContracts.delete(activeKey);st.activeContract=null}}
-          else if(activeIds===id){activeEngineContracts.delete(activeKey);st.activeContract=null}
+          const activeSet=activeEngineContracts.get(activeKey);
+          if(activeSet instanceof Set){activeSet.delete(id);if(!activeSet.size)activeEngineContracts.delete(activeKey)}
+          else if(activeSet===id)activeEngineContracts.delete(activeKey);
+          const remaining=activeEngineContracts.get(activeKey);
+          st.activeContract=remaining instanceof Set?(Array.from(remaining).at(-1)||null):(remaining||null);
           if(Number(t.profit)<0){
             const nextStep=Math.min(2,(recoverySteps.get(t.engineId)||0)+1);
             if(getSettings(t.engineId).stakeMode==="flat"||nextStep>=2){

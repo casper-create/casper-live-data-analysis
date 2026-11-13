@@ -1,10 +1,3 @@
-## 0.6.1 — Continuous same-market contract pipeline
-
-- Allows a running card to request a fresh qualifying contract on a new tick even while earlier contracts from that same card/market remain open.
-- Tracks multiple open contract IDs per card/market and removes only the contract that actually settles.
-- Keeps the per-card (10), account-wide (20), and concurrent proposal/buy (10) caps, fixed-stake risk reservation, fresh-tick de-duplication, and stop-token checks.
-- This increases potential transaction continuity; it does not guarantee a fixed number of Deriv purchases per second or profitability.
-
 ## 0.6.0 — NEXORA MACHINE parallel market pipelines
 
 - Promoted NEXORA to the central Deriv-only intelligence layer supervising all eight existing specialist cards.

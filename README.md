@@ -1,4 +1,4 @@
-# CASPER Live Data Analysis — v0.6.1
+# CASPER Live Data Analysis — v0.6.0
 
 Dashboard with Deriv OAuth login. One shared auth module (`auth-core.js`) runs on both hosts, so Render and Cloudflare cannot drift apart again:
 
@@ -138,8 +138,3 @@ V5.0.13 keeps live ticks as the primary scanner trigger. It caches each market/c
 - The Machine maintains per-market return, volatility, directional, tick-interval and digit-frequency memory. It records walk-forward forecast outcomes and actual settled card/market trade P/L separately.
 - Execution is event-driven and parallel across independent market pipelines. Ten internal pipelines are not the same as ten confirmed purchases per second: Deriv's tick frequency, proposal and buy confirmations, network latency and account/API limits remain outside the browser's control.
 - The system does not guarantee profitable trades. Use a Deriv Demo account first and verify actual transaction settlements and risk limits before considering real funds.
-
-
-## v0.6.1 continuous contract tracking
-
-A card may now open another qualifying contract on a new live tick while earlier contracts from the same card and market remain open. Open contracts are tracked as a set per card/market; each settlement removes only its own contract. Limits remain 10 open contracts per card, 20 account-wide, and 10 concurrent quote/buy pipelines. These limits protect account exposure and Deriv request load. Actual throughput depends on market ticks and Deriv response latency; no fixed trades-per-second or profit level is promised.

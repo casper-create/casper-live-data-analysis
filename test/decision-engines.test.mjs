@@ -104,7 +104,7 @@ test('v0.6.0 uses immediate microtask decisions instead of timer coalescing', ()
 });
 
 test('v0.6.0 has independent per-card/per-market execution pipelines', () => {
-  assert.match(html, /const activeEngineContracts=new Map\(\); \/\/ key: engineId\|symbol -> Set of open contract IDs/);
+  assert.match(html, /const activeEngineContracts=new Map\(\); \/\/ key: engineId\|symbol -> Set<contractId>/);
   assert.match(html, /const engineBusyMarkets=new Set\(\)/);
   assert.match(html, /function contractKey\(id,symbol\)/);
   assert.match(html, /scheduleLatestDecision\(id,m\.symbol,m\.symbol,m\.epoch\|\|0\)/);
@@ -149,15 +149,4 @@ test('v0.6.0 feeds market memory and settled card/market outcomes into each live
   assert.match(html, /function machineAdjustedProbability\(/);
   assert.match(html, /const probabilityForEV=machineAdjustedProbability\(id,best\.market\.symbol,observedRate\)/);
   assert.match(html, /function machineTradeStats\(/);
-});
-
-
-test('v0.6.1 allows a new same-card/same-market entry while earlier contracts remain open, within caps', () => {
-  assert.match(html, /function activeCountForEngine\(id\)\{let n=0;for\(const \[key,ids\] of activeEngineContracts\.entries\(\)\)if\(key\.startsWith\(id\+"\|"\)\)n\+=ids instanceof Set\?ids\.size:ids\?1:0;return n\}/);
-  assert.match(html, /const activeIds=activeEngineContracts\.get\(activeKey\);/);
-  assert.match(html, /activeIds\.add\(t\.id\)/);
-  assert.match(html, /if\(activeIds\.size\)\{st\.activeContract=Array\.from\(activeIds\)\.at\(-1\)\}/);
-  assert.doesNotMatch(html, /if\(hasActiveContract\(id,symbol\)\|\|marketPipelineBusy/);
-  assert.match(html, /MAX_OPEN_CONTRACTS_PER_CARD=10/);
-  assert.match(html, /MAX_OPEN_CONTRACTS_TOTAL=20/);
 });
