@@ -6,7 +6,7 @@ const env = { DERIV_CLIENT_ID: 'abc123', SESSION_ENCRYPTION_KEY: 'x'.repeat(40),
 const call = (path, init = {}, e = env) => handleRequest(new Request('https://example.test' + path, init), e);
 
 test('healthz reports login configuration', async () => {
-  assert.deepEqual(await (await call('/healthz')).json(), { ok: true, loginConfigured: true, version: '0.6.0' });
+  assert.deepEqual(await (await call('/healthz')).json(), { ok: true, loginConfigured: true, version: '0.6.3' });
   assert.equal((await (await call('/healthz', {}, {})).json()).loginConfigured, false);
 });
 
@@ -71,4 +71,9 @@ test('login uses the exact configured redirect URI', async () => {
   const res = await call('/auth/login', {}, customEnv);
   const loc = new URL(res.headers.get('Location'));
   assert.equal(loc.searchParams.get('redirect_uri'), 'https://trader.example/callback');
+});
+
+test('Cloudflare Worker CSP permits the public Deriv market feed websocket host', async () => {
+  const worker = await (await import('node:fs/promises')).readFile(new URL('../worker.js', import.meta.url), 'utf8');
+  assert.match(worker, /connect-src[^\"]*wss:\/\/api\.derivws\.com/);
 });

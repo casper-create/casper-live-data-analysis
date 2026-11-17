@@ -22,8 +22,8 @@ test('fast cards retain tick-driven scheduling without adding a fixed execution 
 test('freshness uses local tick receive time and bounded proposal/buy waits', () => {
   assert.match(html, /function liveTickAgeMs\(/);
   assert.match(html, /MAX_SIGNAL_AGE_MS=5000/);
-  assert.match(html, /sendAuthRequest\(req,"proposal",2000\)/);
-  assert.match(html, /sendAuthRequest\(req,"buy",2000\)/);
+  assert.match(html, /sendAuthRequest\(req,"proposal",8000\)/);
+  assert.match(html, /sendAuthRequest\(req,"buy",8000\)/);
   assert.match(html, /BUY_RESPONSE_TIMEOUT/);
 });
 
@@ -52,8 +52,8 @@ test('V0.5.19 digit models use recency weighting and shrinkage instead of raw ti
 test('V0.5.19 preserves execution scheduling and bounded Deriv request waits', () => {
   assert.match(html, /EXECUTION_COALESCE_MS=0/);
   assert.match(html, /FALLBACK_SCAN_MS=250/);
-  assert.match(html, /sendAuthRequest\(req,"proposal",2000\)/);
-  assert.match(html, /sendAuthRequest\(req,"buy",2000\)/);
+  assert.match(html, /sendAuthRequest\(req,"proposal",8000\)/);
+  assert.match(html, /sendAuthRequest\(req,"buy",8000\)/);
 });
 
 
@@ -70,8 +70,8 @@ test('V0.5.20 installs the central NEXORA MACHINE decision broker and live memor
 test('V0.5.20 keeps immediate tick-driven execution and does not add a two-second sleep', () => {
   assert.match(html, /EXECUTION_COALESCE_MS=0/);
   assert.match(html, /FALLBACK_SCAN_MS=250/);
-  assert.match(html, /sendAuthRequest\(req,"proposal",2000\)/);
-  assert.match(html, /sendAuthRequest\(req,"buy",2000\)/);
+  assert.match(html, /sendAuthRequest\(req,"proposal",8000\)/);
+  assert.match(html, /sendAuthRequest\(req,"buy",8000\)/);
   assert.doesNotMatch(html, /setTimeout\([^;]{0,100},\s*2000\s*\)/);
 });
 

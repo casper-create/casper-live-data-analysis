@@ -1,4 +1,4 @@
-const APP_VERSION = '0.6.0';
+const APP_VERSION = '0.6.3';
 // V4-compatible Cloudflare auth copy. OAuth/session behavior is intentionally unchanged.
 const SESSION_COOKIE = '__Host-casper_sid';
 const STATE_COOKIE = '__Host-casper_oauth_state';
@@ -234,7 +234,7 @@ function secureHeaders(response) {
   headers.set('X-Frame-Options', 'DENY');
   headers.set('Referrer-Policy', 'no-referrer');
   headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  headers.set('Content-Security-Policy', "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://auth.deriv.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.derivws.com wss://ws.derivws.com");
+  headers.set('Content-Security-Policy', "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://auth.deriv.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.derivws.com wss://api.derivws.com wss://ws.derivws.com");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 

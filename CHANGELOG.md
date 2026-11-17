@@ -1,3 +1,13 @@
+## 0.6.3 — resilient live execution and socket recovery
+
+- Public Deriv WebSocket now has an explicit 10-second opening-handshake timeout. Hung handshakes are closed and retried with exponential backoff plus jitter.
+- Added a 25-second heartbeat and 25-second stale-message watchdog to detect a silent public feed.
+- Added heartbeat pings to the authenticated account socket and diagnostics when it closes while scanners are active.
+- Increased proposal response timeout from 2 to 8 seconds and buy response timeout from 2 to 8 seconds. Buy timeout remains a hard stop to avoid duplicate orders when purchase confirmation is uncertain.
+- Run requests now display account-connection progress before the scanner is marked RUNNING. After account connection, the card immediately evaluates cached market candidates and then continues on every fresh tick.
+- Preserved all eight specialist strategies, independent per-card/per-market pipelines, multiple-open-contract tracking, live quote EV checks, account balance limits, and stop controls.
+- No first-five-trades profit guarantee: no software can know future random market outcomes. No synthetic wins or forced entries were introduced.
+
 ## 0.6.0 — NEXORA MACHINE parallel market pipelines
 
 - Promoted NEXORA to the central Deriv-only intelligence layer supervising all eight existing specialist cards.
@@ -120,3 +130,8 @@
 - Kept real-account automation behind the full 40-outcome card/market validation gate and positive observed edge.
 - Preserved each card's strategy-specific filters, live Deriv proposal/payout checks, balance/loss limits, stop controls, and duplicate-buy protections.
 - This is an execution-path correction, not a claim of 80–85% accuracy; demo results must be measured before enabling real-account automation.
+
+## v0.6.2 WebSocket hotfix
+- Updated the standalone Worker Content Security Policy to permit the public Deriv market-data WebSocket host `wss://api.derivws.com`, matching the public feed URL used by the dashboard.
+- Kept `wss://ws.derivws.com` allowed for compatibility with Deriv WebSocket endpoints.
+- Added a regression test for the standalone Worker CSP.
