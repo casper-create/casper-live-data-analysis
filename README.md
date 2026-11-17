@@ -1,4 +1,4 @@
-# CASPER Live Data Analysis — v0.6.3
+# CASPER Live Data Analysis — v0.6.6
 
 Dashboard with Deriv OAuth login. One shared auth module (`auth-core.js`) runs on both hosts, so Render and Cloudflare cannot drift apart again:
 
@@ -140,7 +140,7 @@ V5.0.13 keeps live ticks as the primary scanner trigger. It caches each market/c
 - The system does not guarantee profitable trades. Use a Deriv Demo account first and verify actual transaction settlements and risk limits before considering real funds.
 
 
-## v0.6.3 — resilient live execution and socket recovery
+## v0.6.6 — resilient live execution and socket recovery
 
 - Added a 10-second public WebSocket opening-handshake timeout so a hung Deriv connection is detected rather than left indefinitely in a connecting state.
 - Added exponential reconnect backoff with jitter, connection heartbeat pings, and a stale-feed watchdog for the public market-data socket.

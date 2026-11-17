@@ -25,7 +25,7 @@ test('automated cards expose Flat, Tims 1.6 and Tims 2 modes', () => {
 });
 
 test('transaction panel has the live fields required by the video workflow', () => {
-  for (const heading of ['Time', 'Card', 'Market', 'Contract', 'Stake', 'Status', 'Profit / loss']) assert.match(html, new RegExp(heading));
+  for (const heading of ['Time', 'Type', 'Entry / Exit spot', 'Buy price / Payout', 'Card / Market', 'Status', 'Profit / loss']) assert.match(html, new RegExp(heading));
   assert.match(html, /proposal_open_contract/);
   assert.match(html, /Deriv confirmed contract/);
 });
@@ -59,7 +59,7 @@ test('V5.0.10 coalesces live ticks and rejects stale signals', () => {
 test('V5.0.11 keeps quoted payout separate from realized settlement payout', () => {
   assert.match(html, /realizedPayout/);
   assert.match(html, /livePayout/);
-  assert.match(html, /Floating P\/L/);
+  assert.match(html, /Live P\/L/);
   assert.match(html, /actual payout/);
   assert.match(html, /quotedPayout/);
 });
@@ -105,12 +105,16 @@ test('V5.0.13 measures tick age, proposal latency and decision-to-buy latency', 
 });
 
 
-test('V0.5.16 exposes transaction-page stop-all, per-card stop and reset controls', () => {
-  assert.match(html, /id="stopAllEngines"/);
+test('v0.6.6 scanner controls match the reference: live scan state and isolated per-card controls', () => {
+  assert.match(html, /id="txScanTitle"/);
+  assert.match(html, /Scanning the market/);
   assert.match(html, /id="txEngineControls"/);
   assert.match(html, /data-tx-stop=/);
-  assert.match(html, /id="txResetEngine"/);
-  assert.match(html, /id="txResetSelected"/);
+  assert.match(html, /data-tx-reset=/);
+  assert.doesNotMatch(html, /id="stopAllEngines"/);
+  assert.doesNotMatch(html, /id="txResetSelected"/);
+  assert.doesNotMatch(html, /id="txResetEngine"/);
+  assert.match(html, /Each card is controlled independently/);
 });
 
 test('V0.5.16 invalidates in-flight quote decisions after a scanner is stopped', () => {
@@ -120,7 +124,48 @@ test('V0.5.16 invalidates in-flight quote decisions after a scanner is stopped',
   assert.match(html, /payload\.runToken/);
 });
 
-test('V0.5.16 clearly distinguishes stopping scanners from closing already purchased contracts', () => {
-  assert.match(html, /Open Deriv contracts continue to settlement/);
-  assert.match(html, /contract already purchased will remain open until Deriv settles it/);
+test('v0.6.6 per-card reset never silently stops an active scanner', () => {
+  assert.match(html, /Stop .* individually before resetting its session/);
+  assert.match(html, /open Deriv contracts continue to settlement/i);
+  assert.doesNotMatch(html, /function stopAllEngines/);
+});
+
+
+test('v0.6.5 transaction drawer follows the supplied reference interaction', () => {
+  assert.match(html, /<section class="card collapsed" id="transactions">/);
+  assert.match(html, /aria-expanded="false"/);
+  assert.match(html, /#transactions\.collapsed \.transaction-kpis/);
+  assert.match(html, /#transactions\.collapsed \.transaction-list/);
+  assert.match(html, /position:fixed/);
+  assert.match(html, /newest first/);
+  assert.match(html, /entry_tick_display_value/);
+  assert.match(html, /exit_tick_display_value/);
+  assert.match(html, /trades\.unshift\(t\)/);
+  assert.match(html, /function renderTransactions\(\)/);
+  assert.doesNotMatch(html, /openTransactionPanel\(true\);sendAuth\(\{proposal_open_contract/);
+});
+
+test('v0.6.5 transaction totals use confirmed buys and settled Deriv payout only', () => {
+  assert.match(html, /const totalStake=trades\.reduce/);
+  assert.match(html, /const totalPayout=closed\.reduce/);
+  assert.match(html, /Number\.isFinite\(Number\(t\.realizedPayout\)\)\?Number\(t\.realizedPayout\):0/);
+  assert.match(html, /t\.realizedPayout=Math\.max\(0,Number\(t\.stake\)\+Number\(t\.profit\|\|0\)\)/);
+});
+
+
+test('v0.6.5 can start the four Premium cards together through separate strategy pipelines', () => {
+  assert.match(html, /id="premiumRunAll"/);
+  assert.match(html, /function beginEngineNow\(id\)/);
+  assert.match(html, /async function activateEngines\(ids\)/);
+  assert.match(html, /const ids=\["matches","over8","tickstrike","autoswitch"\]/);
+  assert.match(html, /Each keeps its own model, market pipelines and risk limits/);
+  assert.match(html, /combined base stakes exceed available unreserved balance/);
+});
+
+
+test('v0.6.6 scanner reference includes a live green terminal fed by real application log events', () => {
+  assert.match(html, /id="txTerminalLines"/);
+  assert.match(html, /NEXORA LIVE SCAN FEED/);
+  assert.match(html, /terminal\.prepend\(line\)/);
+  assert.match(html, /LIVE SCANNING/);
 });

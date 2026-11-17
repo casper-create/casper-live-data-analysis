@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#06171d">
 <meta name="description" content="CASPER NEXORA MACHINE — Deriv market intelligence and trading">
-<title>CASPER Live Deriv Data Analysis · v0.6.0</title>
+<title>CASPER Live Deriv Data Analysis · v0.6.6</title>
 <style>
 :root{color-scheme:dark;--bg:#06171d;--panel:#0a2028;--panel2:#0d2730;--line:#173b46;--cyan:#18d5ea;--blue:#0999b6;--muted:#86a4bb;--text:#f1f5fb;--gold:#ffc629;--green:#22d5a0;--red:#ff6681;--purple:#a45cff;--radius:18px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 *{box-sizing:border-box}body{margin:0;min-width:320px;background:var(--bg);color:var(--text)}button,input,select{font:inherit}button{cursor:pointer;color:inherit}button:disabled{cursor:not-allowed;opacity:.45}
@@ -15,7 +15,8 @@
 .mainnav{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;padding:12px 20px;background:#071b22;border-bottom:1px solid var(--line)}.navbtn{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:13px 10px;font-weight:780;color:#d5dfeb}.navbtn.active{background:#0a91ac;border-color:var(--cyan);box-shadow:0 0 18px #00d9ec50;color:white}
 .wrap{max-width:1500px;margin:20px auto;padding:0 20px 48px}.page{display:none}.page.active{display:block}.card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:24px;box-shadow:0 18px 60px #0002;margin-bottom:16px}.heading{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}.heading h1,.heading h2{margin:0}.heading h1{font-size:26px}.heading h2{font-size:21px}.subtitle{color:var(--muted);margin-top:5px}.tag{border:1px solid #624ba3;color:#c6aaff;background:#17152a;border-radius:99px;font-size:11px;padding:4px 9px;font-weight:800;display:inline-block}.tag.green{border-color:#087e69;background:#092b29;color:#37ddb2}.tag.gold{border-color:#806318;color:#ffdc6d;background:#282518}
 .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;padding:34px 4px 24px;align-items:center}.hero h1{font-size:clamp(42px,6vw,82px);line-height:.98;letter-spacing:-.045em;margin:0 0 18px}.hero-copy{font-size:19px;line-height:1.55;color:#9db3c5;max-width:670px}.hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}.hero-card{border:1px solid #0e839b;border-radius:26px;background:linear-gradient(145deg,#0b222b,#081820);padding:24px;box-shadow:0 0 30px #00cee329}.hero-card-head{display:flex;align-items:center;gap:14px}.hero-card-head h2{margin:0;background:linear-gradient(90deg,#23c9ef,#b064f5);color:transparent;background-clip:text}.hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:20px 0}.machine-panel{margin-top:15px;padding:14px;border:1px solid #176477;border-radius:15px;background:#06171d}.machine-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.machine-head strong{font-size:14px;letter-spacing:.08em;color:#6deafa}.machine-mode{font-size:10px;color:#8de8d1;border:1px solid #176d5c;border-radius:99px;padding:4px 8px}.machine-command{display:flex;align-items:center;gap:9px;margin:12px 0 8px}.machine-command b{font-size:20px;color:var(--green)}.machine-command.wait b{color:var(--gold)}.machine-command.reject b{color:var(--red)}.machine-detail{font-size:12px;color:var(--muted);line-height:1.45}.machine-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}.machine-metric{padding:8px;border:1px solid var(--line);border-radius:9px;background:#091f28}.machine-metric b{display:block;font-size:14px;color:var(--cyan)}.machine-metric small{color:var(--muted);font-size:10px}.hero-stat{border:1px solid var(--line);border-radius:14px;text-align:center;padding:13px 6px;background:#07171d}.hero-stat b{display:block;color:var(--cyan);font-size:20px}.hero-stat small{color:var(--muted)}
-.section-title{font-size:18px;margin:0 0 12px}.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.strategy{position:relative;text-align:left;min-height:100px;background:#091d25;border:1px solid var(--line);border-radius:15px;padding:15px;transition:.15s}.strategy:hover{border-color:#1a8699;background:#0b2933}.strategy.selected{border-color:var(--cyan);background:#0d3039;box-shadow:0 0 16px #00cee329}.strategy:disabled{opacity:.45}.strategy .icon{font-size:22px;color:#96adc0;display:block;margin-bottom:5px}.strategy b{font-size:16px}.strategy p{margin:5px 0 0;color:#8399aa;font-size:13px;line-height:1.4}.strategy .badge{position:absolute;right:10px;top:9px;border:1px solid #4b6370;border-radius:99px;padding:2px 7px;color:#92a7b3;font-size:10px;font-weight:800}.strategy .recommended{background:#00b98d;color:#fff;border-radius:6px;padding:3px 7px;font-size:10px;font-weight:850;position:absolute;right:8px;top:-8px}.strategy .card-status{display:flex;gap:7px;align-items:center;margin-top:9px;color:#7794a5;font-size:11px}.strategy .card-status strong{color:#dbe8ef;font-weight:750}.strategy .card-status strong.scanning{color:var(--green);text-shadow:0 0 9px #22d5a055}.strategy .card-status .mini-dot{width:7px;height:7px;border-radius:50%;background:#64788a}.strategy .card-status .mini-dot.live{background:var(--green);box-shadow:0 0 8px #22d5a0}.strategy .card-status .mini-dot.busy{background:var(--gold);box-shadow:0 0 8px #ffc629}.strategy .card-markets{position:absolute;left:15px;bottom:11px;color:#5f8191;font-size:10px}.transaction-list table{min-width:860px}.card-market-control{margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#091d25}.card-market-control label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}.card-market-control select{width:100%;padding:11px;border:1px solid #1a5361;border-radius:10px;background:#07151d;color:var(--text);font-weight:700}.transaction-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:14px 0}.transaction-kpi{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#091d25}.transaction-kpi small{display:block;color:var(--muted);font-size:10px}.transaction-kpi strong{display:block;margin-top:3px;font-size:15px}.@media(max-width:1100px){.stat-grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:900px){.transaction-kpis{grid-template-columns:repeat(3,1fr)}}@media(max-width:600px){.transaction-kpis{grid-template-columns:repeat(2,1fr)}}.tx-control-panel{margin:12px 0 16px;padding:13px;border:1px solid #185262;border-radius:13px;background:#071a21}.tx-control-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.tx-control-heading strong{display:block}.tx-control-heading small{display:block;color:var(--muted);font-size:11px;margin-top:3px}.tx-engine-controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}.tx-engine-control{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#091f28;font-size:12px}.tx-engine-control .state{color:var(--muted)}.tx-engine-control .state.running{color:var(--green)}.tx-engine-control button{padding:6px 9px;font-size:11px}.tx-reset-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}.tx-reset-row label{color:var(--muted);font-size:12px}.tx-reset-row select{min-width:170px;padding:9px;border:1px solid #1a5361;border-radius:9px;background:#07151d;color:var(--text)}.danger-btn{border-color:#a13b52!important;background:#451b27!important;color:#ffb4c1!important}@media(max-width:800px){.tx-engine-controls{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:460px){.tx-engine-controls{grid-template-columns:1fr}.tx-control-heading .btn{width:100%}}.transaction-row-open{background:#081f27}.transaction-row-win{background:#08251f}.transaction-row-loss{background:#29171e}.tx-card{font-weight:800}.tx-meta{display:block;color:var(--muted);font-size:10px;margin-top:2px}.status-pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:850;border:1px solid var(--line)}.status-pill.open{color:#8fefff;border-color:#126f82;background:#092630}.status-pill.won{color:#52e2b5;border-color:#087e69;background:#092b29}.status-pill.lost{color:#ff9aad;border-color:#80364b;background:#2b1720}.recovery-chip{display:inline-block;margin-top:4px;color:#ffd86a;font-size:10px}
+.section-title{font-size:18px;margin:0 0 12px}.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.strategy{position:relative;text-align:left;min-height:100px;background:#091d25;border:1px solid var(--line);border-radius:15px;padding:15px;transition:.15s}.strategy:hover{border-color:#1a8699;background:#0b2933}.strategy.selected{border-color:var(--cyan);background:#0d3039;box-shadow:0 0 16px #00cee329}.strategy:disabled{opacity:.45}.strategy .icon{font-size:22px;color:#96adc0;display:block;margin-bottom:5px}.strategy b{font-size:16px}.strategy p{margin:5px 0 0;color:#8399aa;font-size:13px;line-height:1.4}.strategy .badge{position:absolute;right:10px;top:9px;border:1px solid #4b6370;border-radius:99px;padding:2px 7px;color:#92a7b3;font-size:10px;font-weight:800}.strategy .recommended{background:#00b98d;color:#fff;border-radius:6px;padding:3px 7px;font-size:10px;font-weight:850;position:absolute;right:8px;top:-8px}.strategy .card-status{display:flex;gap:7px;align-items:center;margin-top:9px;color:#7794a5;font-size:11px}.strategy .card-status strong{color:#dbe8ef;font-weight:750}.strategy .card-status strong.scanning{color:var(--green);text-shadow:0 0 9px #22d5a055}.strategy .card-status .mini-dot{width:7px;height:7px;border-radius:50%;background:#64788a}.strategy .card-status .mini-dot.live{background:var(--green);box-shadow:0 0 8px #22d5a0}.strategy .card-status .mini-dot.busy{background:var(--gold);box-shadow:0 0 8px #ffc629}.strategy .card-markets{position:absolute;left:15px;bottom:11px;color:#5f8191;font-size:10px}.transaction-list table{min-width:860px}.card-market-control{margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#091d25}.card-market-control label{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}.card-market-control select{width:100%;padding:11px;border:1px solid #1a5361;border-radius:10px;background:#07151d;color:var(--text);font-weight:700}.transaction-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:14px 0}.transaction-kpi{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#091d25}.transaction-kpi small{display:block;color:var(--muted);font-size:10px}.transaction-kpi strong{display:block;margin-top:3px;font-size:15px}.@media(max-width:1100px){.stat-grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:900px){.transaction-kpis{grid-template-columns:repeat(3,1fr)}}@media(max-width:600px){.transaction-kpis{grid-template-columns:repeat(2,1fr)}}.tx-control-panel{margin:12px 0 16px;padding:13px;border:1px solid #185262;border-radius:13px;background:#071a21}.tx-scan-status{display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid #126b72;border-radius:11px;background:linear-gradient(100deg,#06252a,#081b25);margin-bottom:12px}.tx-scan-status strong{display:block;font-size:14px;color:#b9fff0}.tx-scan-status small{display:block;color:var(--muted);font-size:11px;margin-top:3px}.tx-scan-pulse{width:11px;height:11px;flex:0 0 11px;border-radius:50%;background:#627786;box-shadow:0 0 0 0 #25d6a044}.tx-scan-status.active .tx-scan-pulse{background:#25d6a0;animation:scannerPulse 1.4s infinite;box-shadow:0 0 12px #25d6a0}.tx-scan-count{margin-left:auto;font-size:10px;font-weight:900;letter-spacing:.08em;color:#8fefff;white-space:nowrap}.tx-terminal{margin:10px 0 12px;padding:9px 11px;border:1px solid #14543e;border-radius:9px;background:#020d0b;color:#56d995;font:10px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;box-shadow:inset 0 0 22px #00a85a12}.tx-terminal-head{display:flex;align-items:center;gap:7px;padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid #12432f;color:#9af7bd;font-weight:900;letter-spacing:.1em}.tx-terminal-head span:last-child{margin-left:auto;color:#72c99c}.tx-terminal-lamp{width:7px;height:7px;border-radius:50%;background:#52db91;box-shadow:0 0 8px #52db91}.tx-terminal-lines{max-height:112px;overflow:auto;display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}.tx-terminal-lines div{color:#59c98e}.tx-terminal-lines div:first-child{color:#a4ffc4}@keyframes scannerPulse{0%{box-shadow:0 0 0 0 #25d6a088}70%{box-shadow:0 0 0 10px #25d6a000}100%{box-shadow:0 0 0 0 #25d6a000}}.tx-control-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.tx-control-heading strong{display:block}.tx-control-heading small{display:block;color:var(--muted);font-size:11px;margin-top:3px}.tx-engine-controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}.tx-engine-control{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#091f28;font-size:12px}.tx-engine-control .state{color:var(--muted)}.tx-engine-control .state.running{color:var(--green)}.tx-engine-control .tx-card-actions{display:flex;gap:5px}.tx-engine-control button{padding:6px 9px;font-size:11px}.tx-engine-control button:disabled{opacity:.4}.danger-btn{border-color:#a13b52!important;background:#451b27!important;color:#ffb4c1!important}@media(max-width:800px){.tx-engine-controls{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:460px){.tx-engine-controls{grid-template-columns:1fr}}
+.transaction-row-open{background:#081f27}.transaction-row-win{background:#08251f}.transaction-row-loss{background:#29171e}.tx-card{font-weight:800}.tx-meta{display:block;color:var(--muted);font-size:10px;margin-top:2px}.status-pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:850;border:1px solid var(--line)}.status-pill.open{color:#8fefff;border-color:#126f82;background:#092630}.status-pill.won{color:#52e2b5;border-color:#087e69;background:#092b29}.status-pill.lost{color:#ff9aad;border-color:#80364b;background:#2b1720}.recovery-chip{display:inline-block;margin-top:4px;color:#ffd86a;font-size:10px}
 .controls{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}.control-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}.field label{display:block;color:var(--muted);margin-bottom:7px;font-size:14px}.field input,.field select{width:100%;padding:13px 14px;min-height:50px;outline:none}.field input:focus,.field select:focus{border-color:var(--cyan)}.money{position:relative}.money span{position:absolute;right:14px;top:15px;color:var(--muted)}.money input{padding-right:56px}
 .status{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px}.dot{width:9px;height:9px;background:#718396;border-radius:50%;display:inline-block}.dot.live{background:var(--green);box-shadow:0 0 12px var(--green)}.dot.warn{background:var(--gold)}
 .runrow{display:flex;gap:10px;margin-top:18px}.runrow .btn{flex:1;padding:15px;font-size:17px;border-radius:999px}
@@ -69,6 +70,52 @@
 @media(max-width:700px){.topbar{padding:9px 12px;height:auto;min-height:66px}.brand{font-size:16px}.brandmark{width:42px;height:42px;font-size:20px}.brand small{font-size:10px}.topactions{gap:5px}.account{padding:7px;font-size:12px}.account select{max-width:105px}.topactions .login-btn{padding:8px}.mainnav{padding:8px;gap:6px}.navbtn{font-size:12px;padding:10px 4px}.wrap{padding:0 10px 30px;margin:12px auto}.card{padding:16px}.heading{align-items:flex-start;flex-direction:column}.hero{padding:18px 3px}.hero h1{font-size:45px}.hero-copy{font-size:16px}.hero-card{padding:17px}.grid2{grid-template-columns:1fr 1fr}.grid3{grid-template-columns:1fr 1fr}.controls,.control-row{grid-template-columns:1fr}.market-grid{grid-template-columns:repeat(2,1fr)}.stat-grid{grid-template-columns:repeat(2,1fr)}.quote-grid{grid-template-columns:repeat(2,1fr)}.runrow{flex-direction:column}.transaction-summary{gap:8px 14px}.chart-box canvas{height:200px}}
 @media(max-width:420px){.mainnav{grid-template-columns:repeat(2,1fr)}.grid2,.grid3{grid-template-columns:1fr}.hero-stats{gap:6px}.hero-stat b{font-size:17px}.brand{gap:7px}.topactions{gap:4px}.login-btn{font-size:12px;padding:8px 9px!important}}
 .manual-chart-box canvas{height:500px}@media(max-width:700px){.manual-product-tabs{padding:8px}.manual-product-tab{font-size:12px;padding:9px 11px}.chart-market-select{min-width:0;max-width:calc(100% - 28px);left:14px;right:14px}.manual-chart-box canvas{height:360px}.manual-market-strip{grid-template-columns:repeat(2,1fr)}}
+
+/* v0.6.6 reference-matched transaction drawer */
+body{padding-bottom:76px}
+#transactions{position:fixed;z-index:45;left:max(10px,calc((100vw - 1240px)/2));right:max(10px,calc((100vw - 1240px)/2));bottom:0;margin:0;max-height:min(78vh,720px);display:flex;flex-direction:column;overflow:hidden;border:1px solid #245766;border-bottom:0;border-radius:16px 16px 0 0;background:#071820;box-shadow:0 -12px 38px #0009;padding:0}
+#transactions.collapsed{max-height:62px}
+#transactions .transaction-head{flex:0 0 auto;min-height:60px;padding:10px 14px;background:#0a222b;border-bottom:1px solid #1b4855;gap:10px}
+#transactions .transaction-head h2{font-size:16px}
+#transactions .transaction-head .subtitle{font-size:10px}
+#transactions .transaction-summary{gap:8px 14px;font-size:11px}
+#transactions .transaction-kpis{flex:0 0 auto;margin:8px 12px;grid-template-columns:repeat(6,minmax(0,1fr))}
+#transactions .transaction-kpi{padding:8px 10px}
+#transactions .transaction-kpi small{font-size:9px}
+#transactions .transaction-kpi strong{font-size:13px}
+#transactions .tx-control-panel{flex:0 0 auto;margin:4px 12px 8px;padding:9px}
+#transactions .tx-engine-controls{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:8px}
+#transactions .tx-engine-control{padding:6px 8px}
+#transactions .transaction-list{min-height:0;overflow:auto;margin:0 12px 12px}
+#transactions .transaction-list .table-wrap{margin:0;max-height:32vh;overflow:auto}
+#transactions .transaction-list table{min-width:720px}
+#transactions .transaction-list th{position:sticky;top:0;z-index:1}
+#transactions .transaction-list td{padding:8px 10px;font-size:11px}
+#transactions.collapsed .transaction-kpis,#transactions.collapsed .tx-control-panel,#transactions.collapsed .transaction-list{display:none}
+#transactions.collapsed .transaction-head{border-bottom:0}
+#transactions.collapsed #transactionChevron{transform:rotate(180deg)}
+.tx-spot{display:block;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tx-spot small{color:var(--muted);font-size:9px}
+.tx-buy{display:block;font-weight:800;white-space:nowrap}
+.tx-payout{display:block;color:var(--muted);font-size:10px;white-space:nowrap}
+.tx-contract-type{font-weight:800;white-space:nowrap}
+@media(max-width:700px){
+ body{padding-bottom:68px}
+ #transactions{left:0;right:0;max-height:78vh;border-radius:14px 14px 0 0}
+ #transactions.collapsed{max-height:58px}
+ #transactions .transaction-head{padding:8px 10px;min-height:56px}
+ #transactions .transaction-head h2{font-size:14px}
+ #transactions .transaction-summary{gap:4px 8px;font-size:9px}
+ #transactions .transaction-summary span:nth-child(1){display:none}
+ #transactions .transaction-kpis{grid-template-columns:repeat(3,minmax(0,1fr));margin:6px 8px}
+ #transactions .transaction-kpi{padding:6px}
+ #transactions .transaction-kpi strong{font-size:11px}
+ #transactions .tx-control-panel{margin:4px 8px 6px;padding:7px}
+ #transactions .tx-engine-controls{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #transactions .transaction-list{margin:0 8px 8px}
+ #transactions .transaction-list .table-wrap{max-height:28vh}
+}
+
 </style>
 </head>
 <body>
@@ -243,7 +290,7 @@
       <button class="strategy selected" data-engine="matches"><span class="icon">≡</span><span class="badge">ALPHA</span><b>Matches Printer</b><p>Smart matches for consistent hits.</p><span class="card-status"><span class="mini-dot" data-card-dot="matches"></span><strong data-card-state="matches">Ready</strong> · <span data-card-recovery="matches">Flat</span> · <span data-card-accuracy="matches">Accuracy —</span></span><span class="card-markets">10 Volatility markets</span></button>
       <button class="strategy" data-engine="over8"><span class="icon">◎</span><span class="badge">QUANTUM</span><b>Over 8 Killer</b><p>High-accuracy Over 8 sniper.</p><span class="card-status"><span class="mini-dot" data-card-dot="over8"></span><strong data-card-state="over8">Ready</strong> · <span data-card-recovery="over8">Flat</span> · <span data-card-accuracy="over8">Accuracy —</span></span><span class="card-markets">10 Volatility markets</span></button>
       <button class="strategy" data-engine="tickstrike"><span class="icon">ϟ</span><span class="badge">APEX</span><b>TickStrike Pro</b><p>High-speed tick momentum plays.</p><span class="card-status"><span class="mini-dot" data-card-dot="tickstrike"></span><strong data-card-state="tickstrike">Ready</strong> · <span data-card-recovery="tickstrike">Flat</span> · <span data-card-accuracy="tickstrike">Accuracy —</span></span><span class="card-markets">10 Volatility markets</span></button>
-      <button class="strategy" data-engine="autoswitch"><span class="icon">⤨</span><span class="badge">APEX</span><b>Auto Switcher</b><p>Auto-switches Rise/Fall direction from the strongest live market.</p><span class="card-status"><span class="mini-dot" data-card-dot="autoswitch"></span><strong data-card-state="autoswitch">Ready</strong> · <span data-card-recovery="autoswitch">Flat</span> · <span data-card-accuracy="autoswitch">Accuracy —</span></span><span class="card-markets">10 Volatility markets</span></button>
+      <button class="strategy" data-engine="autoswitch"><span class="icon">⤨</span><span class="badge">APEX</span><b>Auto Switcher</b><p>Select one Volatility market; adapt Rise/Fall direction to its live ticks.</p><span class="card-status"><span class="mini-dot" data-card-dot="autoswitch"></span><strong data-card-state="autoswitch">Ready</strong> · <span data-card-recovery="autoswitch">Flat</span> · <span data-card-accuracy="autoswitch">Accuracy —</span></span><span class="card-markets">One selected Volatility market</span></button>
     </div>
     <div class="controls"><div class="field"><label>Selected scanner</label><div class="tag gold" id="premiumEngineName">Matches Printer</div></div><div class="field"><label>Live scan</label><div class="status"><span class="dot" id="premiumScanDot"></span><span id="premiumScanState">Waiting for tick history</span></div></div></div>
     <div class="card-market-control" id="premiumMarketControl"><label for="premiumMarketSelect">Volatility market for this card</label><select id="premiumMarketSelect"><option value="__auto__">Automatic — choose strongest market</option></select><p class="foot" id="premiumMarketHelp">Matches Printer, Over 8 Killer, TickStrike Pro and Auto Switcher use the market you choose.</p></div>
@@ -253,19 +300,19 @@
     <div class="control-row">
       <div class="field"><label for="premiumStake">Base stake</label><div class="money"><input id="premiumStake" type="number" min="0.35" step="0.01" value="1"><span class="currency">USD</span></div></div>
       <div class="field"><label for="premiumStakeMode">Recovery mode</label><select id="premiumStakeMode"><option value="flat">Flat — 1.00×</option><option value="tims16">Tims 1.6 — 1.00× → 1.60× → 2.56×</option><option value="tims2">Tims 2 — 1.00× → 2.00× → 4.00×</option></select></div>
-      <div class="field"><label for="premiumTarget">Profit target</label><div class="money"><input id="premiumTarget" type="number" min="0.35" step="0.01" value="20"><span class="currency">USD</span></div></div>
-      <div class="field"><label for="premiumMaxLoss">Max loss</label><div class="money"><input id="premiumMaxLoss" type="number" min="0.35" step="0.01" value="20"><span class="currency">USD</span></div></div>
+      <div class="field"><label for="premiumTarget">Profit target</label><div class="money"><input id="premiumTarget" type="number" min="0.35" step="0.01" value="10"><span class="currency">USD</span></div></div>
+      <div class="field"><label for="premiumMaxLoss">Max loss</label><div class="money"><input id="premiumMaxLoss" type="number" min="0.35" step="0.01" value="10"><span class="currency">USD</span></div></div>
     </div>
-    <div class="runrow"><button class="btn gold" id="premiumRun">♛ &nbsp;Run selected Premium scanner</button><button class="btn hide" id="premiumStop">Stop scanner</button><button class="btn" id="premiumReset" type="button">Reset session</button></div>
+    <div class="runrow"><button class="btn gold" id="premiumRun">♛ &nbsp;Run selected Premium scanner</button><button class="btn primary" id="premiumRunAll" type="button">▶ Run all 4 Premium cards</button><button class="btn hide" id="premiumStop">Stop scanner</button><button class="btn" id="premiumReset" type="button">Reset session</button></div>
     <div id="premiumRiskNote" class="callout">Choose Flat, Tims 1.6, or Tims 2. Flat never increases the stake. Tims 1.6 uses 1.00× → 1.60× → 2.56×; Tims 2 uses 1.00× → 2.00× → 4.00×. Both recovery modes are capped at two recovery steps and reset to base after a win. A card stops when its session target or max-loss limit is reached; the next stake is capped by the remaining loss limit.</div>
     <div class="table-wrap"><table><thead><tr><th>Market</th><th>Mode / signal</th><th class="num">Accuracy</th><th class="num">Tests</th><th class="num">Signal strength</th><th>Execution</th></tr></thead><tbody id="premiumBoard"></tbody></table></div>
   </div>
 </section>
 
 
-<section class="card" id="transactions">
-  <div class="transaction-head" id="transactionToggle" role="button" tabindex="0" aria-expanded="true">
-    <div><h2 style="margin:0">Transactions</h2><p class="subtitle" style="margin:4px 0 0">Live execution, open contracts and settled results.</p></div>
+<section class="card collapsed" id="transactions">
+  <div class="transaction-head" id="transactionToggle" role="button" tabindex="0" aria-expanded="false">
+    <div><h2 style="margin:0">Transactions</h2><p class="subtitle" style="margin:4px 0 0">Live Deriv purchases · newest first · actual entry/exit and settlement.</p></div>
     <div class="transaction-summary"><span>Settled P/L <strong id="totalPnl">0.00</strong></span><span>Wins <strong id="winCount">0</strong></span><span>Losses <strong id="lossCount">0</strong></span><span>Open <strong id="openCount">0</strong></span></div>
     <span id="transactionChevron">⌃</span>
   </div>
@@ -277,13 +324,14 @@
     <div class="transaction-kpi"><small>Contracts won</small><strong id="txWon">0</strong></div>
     <div class="transaction-kpi"><small>Total P/L</small><strong id="txTotalProfit">0.00 USD</strong></div>
   </div>
-  <div class="tx-control-panel" aria-label="Immediate scanner controls">
-    <div class="tx-control-heading"><div><strong>Quick controls</strong><small>Stop new entries immediately. Open Deriv contracts continue to settlement.</small></div><button class="btn danger-btn" id="stopAllEngines" type="button">■ Stop all scanners</button></div>
+  <div class="tx-control-panel" aria-label="Individual scanner controls">
+    <div class="tx-scan-status" id="txScanStatus" aria-live="polite"><span class="tx-scan-pulse" id="txScanPulse"></span><div><strong id="txScanTitle">Scanning the market</strong><small id="txScanDetail">Waiting for a scanner to start · live market feed remains ready</small></div><span class="tx-scan-count" id="txScanCount">0 / 8 ACTIVE</span></div>
+    <div class="tx-terminal" aria-label="Live NEXORA scanner log"><div class="tx-terminal-head"><span class="tx-terminal-lamp"></span><span>NEXORA LIVE SCAN FEED</span><span id="txTerminalState">STANDBY</span></div><div class="tx-terminal-lines" id="txTerminalLines"><div>[SYSTEM] Scanner console initialised · waiting for live market events</div></div></div>
+    <div class="tx-control-heading"><div><strong>Scanner controls</strong><small>Each card is controlled independently. Stopping one card does not stop the others; open Deriv contracts continue to settlement.</small></div></div>
     <div class="tx-engine-controls" id="txEngineControls"></div>
-    <div class="tx-reset-row"><label for="txResetEngine">Reset session for</label><select id="txResetEngine"></select><button class="btn" id="txResetSelected" type="button">↻ Reset selected</button></div>
   </div>
   <div id="transactionList" class="transaction-list">
-    <div class="table-wrap"><table><thead><tr><th>Time</th><th>Card</th><th>Market</th><th>Contract</th><th>Stake</th><th>Status</th><th class="num">Profit / loss</th></tr></thead><tbody id="transactionsBody"><tr><td colspan="7" class="muted">Sign in and run a strategy or place a manual order to see transactions.</td></tr></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Time</th><th>Type</th><th>Entry / Exit spot</th><th>Buy price / Payout</th><th>Card / Market</th><th>Status</th><th class="num">Profit / loss</th></tr></thead><tbody id="transactionsBody"><tr><td colspan="7" class="muted">Sign in and run a strategy or place a manual order to see transactions.</td></tr></tbody></table></div>
   </div>
 </section>
 <p class="foot">Real markets can move unpredictably. No strategy can guarantee accuracy or profit; video results are examples, not guarantees. The site reports measured walk-forward results and actual Deriv contract outcomes. Internal decisions run without timer-based coalescing; Deriv quote/buy confirmations and market tick cadence determine real trade throughput. Auto-running a card requires sign-in, account selection and a clear start action; each card uses its own stake, exposure and stop limits.</p>
@@ -296,7 +344,7 @@
 "use strict";
 const $=function(s){return document.querySelector(s)};
 const $$=function(s){return Array.from(document.querySelectorAll(s))};
-const APP_VERSION="0.6.3";
+const APP_VERSION="0.6.6";
 const MIN_VALIDATION_TESTS=12; // Demo warm-up sample; real-account automation retains the 40-outcome evidence gate.
 const REAL_ACCOUNT_VALIDATION_TESTS=40;
 const FALLBACK_SCAN_MS=250; // Recovery only; live ticks remain the primary trigger.
@@ -346,7 +394,7 @@ const engineMarketChoice=new Map(engineIds.map(function(id){return [id,id==="aut
 const engineRetryTimers=new Map();
 const engineRunTokens=new Map(engineIds.map(function(id){return [id,0]}));
 const recoverySteps=new Map(engineIds.map(function(id){return [id,0]}));
-const engineConfig=new Map(engineIds.map(function(id){return [id,{stake:20,target:200,maxLoss:50,stakeMode:"flat"}]}));
+const engineConfig=new Map(engineIds.map(function(id){return [id,{stake:1,target:10,maxLoss:10,stakeMode:"flat"}]}));
 const trades=[];
 const archivedTrades=[];
 const authPending=new Map();
@@ -357,13 +405,17 @@ let activeFree="rise",activePremium="matches",manualQuote=null,startingEngine=nu
 const maxTicks=1500;
 const matchGateLogAt=new Map();
 const engineGateLogAt=new Map();
+const enginePauseReason=new Map();
 function engineGate(id,market,reason,command){
   if(!id||!market)return;
   const key=id+"|"+market.symbol+"|"+reason,now=Date.now(),last=engineGateLogAt.get(key)||0;
   if(now-last<3000)return;
   engineGateLogAt.set(key,now);
+  const changed=enginePauseReason.get(id)!==reason;
+  enginePauseReason.set(id,reason);
   log(engineDefs[id].name+" · "+market.name+" · "+reason,"warn");
   machineRecord(command||"WAIT",id,market,reason);
+  if(changed){updateCardStates();if(activeFree===id)updateSelectedPanel("free");if(activePremium===id)updateSelectedPanel("premium");}
 }
 function matchesGate(id,market,reason){
   if(id!=="matches"||!market)return;
@@ -387,7 +439,7 @@ function loadMachineOutcomeMemory(){
 function persistMachineOutcomeMemory(){
   clearTimeout(machineMemorySaveTimer);machineMemorySaveTimer=setTimeout(function(){try{const compact=Array.from(nexoraMachine.outcomeMemory.entries()).map(([key,items])=>[key,items.slice(-500).map(x=>!!x.hit)]);localStorage.setItem(MACHINE_MEMORY_KEY,JSON.stringify(compact));}catch(e){log("NEXORA memory could not be saved in this browser session","warn");}},350);
 }
-const nexoraMachine={version:"0.6.3",status:"INITIALISING",marketMemory:new Map(),outcomeMemory:loadMachineOutcomeMemory(),learned:0,decisions:0,entries:0,rejections:0,waits:0,last:{command:"WAIT",detail:"Building live Deriv market memory…",card:"—",market:"—",at:0},cardMemory:new Map(engineIds.map(id=>[id,{learned:0,entries:0,rejections:0,settledTrades:0,realizedPnl:0,lastCommand:"WAIT"}])),tradeMemory:loadMachineTradeMemory()};
+const nexoraMachine={version:"0.6.6",status:"INITIALISING",marketMemory:new Map(),outcomeMemory:loadMachineOutcomeMemory(),learned:0,decisions:0,entries:0,rejections:0,waits:0,last:{command:"WAIT",detail:"Building live Deriv market memory…",card:"—",market:"—",at:0},cardMemory:new Map(engineIds.map(id=>[id,{learned:0,entries:0,rejections:0,settledTrades:0,realizedPnl:0,lastCommand:"WAIT"}])),tradeMemory:loadMachineTradeMemory()};
 function refreshMachineLearnedCount(){const forecasts=Array.from(nexoraMachine.outcomeMemory.values()).reduce((sum,items)=>sum+items.length,0),settlements=Array.from(nexoraMachine.tradeMemory.values()).reduce((sum,items)=>sum+items.length,0);nexoraMachine.learned=forecasts+settlements;}
 refreshMachineLearnedCount();
 for(const [key,items] of nexoraMachine.tradeMemory.entries()){const id=key.split("|")[0],card=nexoraMachine.cardMemory.get(id);if(card){card.settledTrades+=items.length;card.realizedPnl+=items.reduce((sum,item)=>sum+Number(item.profit||0),0);}}
@@ -475,7 +527,7 @@ function renderMachinePanel(){
 }
 function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]})}
 function money(v,cur){return Number.isFinite(Number(v))?Number(v).toFixed(2)+" "+(cur||currency):"—"}
-function log(text,kind){const box=$("#activityLog");if(!box)return;const d=document.createElement("div");d.className="logline";d.textContent="["+new Date().toLocaleTimeString()+"] "+text;box.prepend(d);while(box.children.length>35)box.lastElementChild.remove()}
+function log(text,kind){const stamp="["+new Date().toLocaleTimeString()+"] ",box=$("#activityLog"),terminal=$("#txTerminalLines");if(box){const d=document.createElement("div");d.className="logline";d.textContent=stamp+text;box.prepend(d);while(box.children.length>35)box.lastElementChild.remove()}if(terminal){const line=document.createElement("div");line.textContent=stamp+String(text);terminal.prepend(line);while(terminal.children.length>16)terminal.lastElementChild.remove()}}
 function toast(text){const box=$("#heroStatus");if(box)box.textContent=text}
 function status(text,live){$("#feedStatus").textContent=text;$("#feedDot").classList.toggle("live",!!live);$("#heroStatus").textContent=text}
 function decimalsFrom(v){const n=Number(v);if(!Number.isFinite(n)||n<0)return 2;if(Number.isInteger(n)&&n<=10)return n;if(n<1){const p=Math.round(-Math.log10(n));return p>=0&&p<=10?p:2}return 2}
@@ -643,28 +695,28 @@ function candidateScore(id,symbol,c){
   const confidence=met.n>=12?Math.min(1,Math.sqrt(met.n/(met.n+80))):0;
   return .65*observedEdge*confidence+.35*liveEdge;
 }
-function bestFor(id){let arr=[];for(const m of markets.values()){const c=metricsFor(id,m.symbol).latest;if(c)arr.push({market:m,candidate:c,score:candidateScore(id,m.symbol,c),metrics:metricsFor(id,m.symbol).metrics})}arr.sort(function(a,b){return b.score-a.score});return arr[0]||null}
+function bestFor(id){const choice=engineMarketChoice.get(id);if(choice==="")return null;const source=choice&&choice!=="__auto__"?[markets.get(choice)]:Array.from(markets.values());let arr=[];for(const m of source){if(!m)continue;const c=metricsFor(id,m.symbol).latest;if(c)arr.push({market:m,candidate:c,score:candidateScore(id,m.symbol,c),metrics:metricsFor(id,m.symbol).metrics})}arr.sort(function(a,b){return b.score-a.score});return arr[0]||null}
 function percent(x){return Number.isFinite(x)?(x*100).toFixed(1)+"%":"—"}
 function accuracyScope(id){const choice=engineMarketChoice.get(id);if(choice==="")return [];if(choice!=="__auto__")return [choice];return Array.from(markets.keys())}
 function aggregateAccuracy(id){const symbols=accuracyScope(id),all=[];for(const symbol of symbols){const s=metricsFor(id,symbol);if(s.results.length)all.push.apply(all,s.results)}const n=all.length,h=all.reduce(function(a,x){return a+(x?1:0)},0);if(!n)return {n:0,rate:null,lower:null,upper:null,baseline:engineDefs[id].baseline};const w=wilson(h,n,1.96);return {n:n,hits:h,rate:h/n,lower:w.lower,upper:w.upper,baseline:engineDefs[id].baseline}}
 function executionStats(id){const vals=[];for(const symbol of accuracyScope(id)){const s=metricsFor(id,symbol);if(Array.isArray(s.executionSamples))vals.push.apply(vals,s.executionSamples)}const latest=vals.length?vals[vals.length-1]:null;const avg=vals.length?vals.reduce((a,x)=>a+x,0)/vals.length:null;return {latest:latest,avg:avg,n:vals.length}}
 function executionText(id){const e=executionStats(id);if(e.latest===null)return "—";return (e.latest<1000?Math.round(e.latest)+" ms":(e.latest/1000).toFixed(2)+" s")}
 function renderStats(id,prefix){const acc=aggregateAccuracy(id),exec=executionStats(id);const pnl=trades.filter(function(t){return t.engineId===id&&t.settled}).reduce(function(a,t){return a+Number(t.profit||0)},0);$("#"+prefix+"Accuracy").textContent=acc.rate===null?"—":percent(acc.rate);$("#"+prefix+"Tests").textContent=String(acc.n);$("#"+prefix+"Lower").textContent=acc.lower===null?"—":percent(acc.lower);$("#"+prefix+"ExecTime").textContent=exec.latest===null?"—":executionText(id);$("#"+prefix+"Pnl").textContent=money(pnl)}
-function renderBoard(id,target){const rows=[];for(const m of markets.values()){const s=metricsFor(id,m.symbol),c=s.latest,mt=s.metrics,signal=c?c.label:"Collecting ticks";const strength=c?percent(c.strength):"—",accuracy=percent(mt.rate),tests=String(mt.n);const active=running.has(id)&&s.activeContract?"Trade open":"Scan live";rows.push('<tr><td>'+esc(m.name)+'</td><td>'+esc(signal)+'</td><td class="num">'+esc(accuracy)+'</td><td class="num">'+esc(tests)+'</td><td class="num">'+esc(strength)+'</td><td>'+esc(active)+'</td></tr>')}$(target).innerHTML=rows.join("")||'<tr><td colspan="6" class="muted">Waiting for Deriv active_symbols…</td></tr>'}
-function updateSelectedPanel(tier){const id=tier==="free"?activeFree:activePremium,def=engineDefs[id],choice=engineMarketChoice.get(id);const selectedMarket=choice&&choice!=="__auto__"?markets.get(choice):null;const best=bestFor(id);const sel=$("#"+tier+"MarketSelect");if(sel)sel.value=selectedMarket?selectedMarket.symbol:"__auto__";if(tier==="free"){ $("#freeEngineName").textContent=def.name;renderStats(id,"free");renderBoard(id,"#freeBoard");const state=best&&metricsFor(id,best.market.symbol);$("#freeScanState").textContent=best?(running.has(id)?"Running · best candidate "+best.market.name+" · "+best.candidate.label:"Scanning all markets · best candidate "+best.market.name+" · "+best.candidate.label):"Waiting for enough live ticks";$("#freeScanDot").classList.toggle("live",liveConnected);$("#freeRun").textContent=running.has(id)?"✓ "+def.name+" is running":"▷ Run "+def.name;$("#freeStop").classList.toggle("hide",!running.has(id));}
-else{$("#premiumEngineName").textContent=def.name;renderStats(id,"premium");renderBoard(id,"#premiumBoard");const state=best&&metricsFor(id,best.market.symbol);$("#premiumScanState").textContent=best?(running.has(id)?"Running · best candidate "+best.market.name+" · "+best.candidate.label:"Scanning all markets · best candidate "+best.market.name+" · "+best.candidate.label):"Waiting for enough live ticks";$("#premiumScanDot").classList.toggle("live",liveConnected);$("#premiumRun").textContent=running.has(id)?"✓ "+def.name+" is running":"♛ Run "+def.name;$("#premiumStop").classList.toggle("hide",!running.has(id));}}
+function renderBoard(id,target){const rows=[];for(const m of markets.values()){const s=metricsFor(id,m.symbol),c=s.latest,mt=s.metrics,signal=c?c.label:"Collecting ticks";const strength=c?percent(c.strength):"—",accuracy=percent(mt.rate),tests=String(mt.n);const selected=engineMarketChoice.get(id),outsideSelected=selected&&selected!=="__auto__"&&selected!==m.symbol;const active=outsideSelected?"Monitor only · not executable":running.has(id)&&s.activeContract?"Trade open":"Scan live";rows.push('<tr><td>'+esc(m.name)+'</td><td>'+esc(signal)+'</td><td class="num">'+esc(accuracy)+'</td><td class="num">'+esc(tests)+'</td><td class="num">'+esc(strength)+'</td><td>'+esc(active)+'</td></tr>')}$(target).innerHTML=rows.join("")||'<tr><td colspan="6" class="muted">Waiting for Deriv active_symbols…</td></tr>'}
+function updateSelectedPanel(tier){const id=tier==="free"?activeFree:activePremium,def=engineDefs[id],choice=engineMarketChoice.get(id);const selectedMarket=choice&&choice!=="__auto__"?markets.get(choice):null;const best=bestFor(id);const sel=$("#"+tier+"MarketSelect");if(sel)sel.value=selectedMarket?selectedMarket.symbol:"__auto__";if(tier==="free"){ $("#freeEngineName").textContent=def.name;renderStats(id,"free");renderBoard(id,"#freeBoard");const state=best&&metricsFor(id,best.market.symbol);$("#freeScanState").textContent=running.has(id)?(enginePauseReason.get(id)?"Running · "+enginePauseReason.get(id):best?"Running · best candidate "+best.market.name+" · "+best.candidate.label:"Running · waiting for a qualifying live signal"):best?("Scanning · best candidate "+best.market.name+" · "+best.candidate.label):(enginePauseReason.get(id)||"Waiting for enough live ticks");$("#freeScanDot").classList.toggle("live",liveConnected);$("#freeRun").textContent=running.has(id)?"✓ "+def.name+" is running":"▷ Run "+def.name;$("#freeStop").classList.toggle("hide",!running.has(id));}
+else{$("#premiumEngineName").textContent=def.name;renderStats(id,"premium");renderBoard(id,"#premiumBoard");const state=best&&metricsFor(id,best.market.symbol);$("#premiumScanState").textContent=running.has(id)?(enginePauseReason.get(id)?"Running · "+enginePauseReason.get(id):best?"Running · best candidate "+best.market.name+" · "+best.candidate.label:"Running · waiting for a qualifying live signal"):best?("Scanning · best candidate "+best.market.name+" · "+best.candidate.label):(enginePauseReason.get(id)||"Waiting for enough live ticks");$("#premiumScanDot").classList.toggle("live",liveConnected);$("#premiumRun").textContent=running.has(id)?"✓ "+def.name+" is running":"♛ Run "+def.name;$("#premiumStop").classList.toggle("hide",!running.has(id));}}
 function recoveryLabel(id){const cfg=getSettings(id),step=recoverySteps.get(id)||0;if(cfg.stakeMode==="flat")return "Flat";if(cfg.stakeMode==="tims16")return step===0?"Tims 1.6 · Step 0":step===1?"Tims 1.6 · Step 1":"Tims 1.6 · Step 2";return step===0?"Tims 2 · Step 0":step===1?"Tims 2 · Step 1":"Tims 2 · Step 2"}
 function updateCardStates(){
   for(const id of engineIds){
     const stateEl=document.querySelector('[data-card-state="'+id+'"]'),dot=document.querySelector('[data-card-dot="'+id+'"]'),rec=document.querySelector('[data-card-recovery="'+id+'"]'),acc=document.querySelector('[data-card-accuracy="'+id+'"]');
     if(!stateEl)continue;
     const def=engineDefs[id],best=bestFor(id);
-    let state=running.has(id)?"Scanning":best?"Ready":"Waiting";
+    let state=running.has(id)?(enginePauseReason.get(id)?"Waiting":"Scanning"):(enginePauseReason.get(id)?"Paused":best?"Ready":"Waiting");
     if(running.has(id)&&activeCountForEngine(id)>0)state="Trade open · "+activeCountForEngine(id);
     if(id==="smart"&&running.has(id)&&best)state="Auto · "+best.market.name;
     stateEl.textContent=state;
-    stateEl.classList.toggle("scanning",running.has(id));
-    if(dot)dot.className="mini-dot "+(running.has(id)?(activeCountForEngine(id)>0?"busy":"live"):"");
+    stateEl.classList.toggle("scanning",running.has(id)&&!enginePauseReason.get(id));
+    if(dot)dot.className="mini-dot "+(running.has(id)&&!enginePauseReason.get(id)?(activeCountForEngine(id)>0?"busy":"live"):"");
     if(rec)rec.textContent=recoveryLabel(id);
     if(acc){const am=aggregateAccuracy(id);acc.textContent="Accuracy "+(am.rate===null?"—":percent(am.rate));}
   }
@@ -678,7 +730,7 @@ $$("[data-go]").forEach(function(b){b.addEventListener("click",function(){setPag
 $("#tradeMarket").addEventListener("change",function(){const m=markets.get(this.value);if(m){$("#manualMarketName").textContent=m.name;$("#manualPrice").textContent=m.latest===null?"—":priceText(m,m.latest);renderMarkets();renderChart()}});
 ["manualMarketTiles","marketTiles"].forEach(function(id){$("#"+id).addEventListener("click",function(e){const tile=e.target.closest(".market-tile");if(!tile)return;const name=tile.querySelector("b")?.textContent;const m=[...markets.values()].find(function(x){return x.name===name});if(m){$("#tradeMarket").value=m.symbol;$("#manualMarketName").textContent=m.name;$("#manualPrice").textContent=m.latest===null?"—":priceText(m,m.latest);renderMarkets();renderChart()}});});
 $("#contractType").addEventListener("change",function(){$("#barrierField").classList.toggle("hide",!["DIGITMATCH","DIGITOVER"].includes(this.value))});
-$("#transactionToggle").addEventListener("click",function(){const list=$("#transactionList"),collapsed=list.classList.toggle("collapsed");this.setAttribute("aria-expanded",String(!collapsed));$("#transactionChevron").textContent=collapsed?"⌄":"⌃"});
+$("#transactionToggle").addEventListener("click",function(){const panel=$("#transactions"),collapsed=panel.classList.toggle("collapsed");this.setAttribute("aria-expanded",String(!collapsed));$("#transactionChevron").textContent=collapsed?"⌄":"⌃"});
 $("#transactionToggle").addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();this.click()}});
 $$("[data-engine]").forEach(function(b){b.addEventListener("click",function(){const id=b.dataset.engine;if(engineDefs[id].tier==="premium"&&!signedIn){toast("Sign in with Deriv to use Premium testing access.");return}if(engineDefs[id].tier==="free"){activeFree=id;$$('#freeCards .strategy').forEach(function(x){x.classList.toggle("selected",x===b)});updateSelectedPanel("free")}else{activePremium=id;loadSettingsToUI(id);$$('#premiumCards .strategy').forEach(function(x){x.classList.toggle("selected",x===b)});updateSelectedPanel("premium")}})});
 function getSettings(id){const cfg=engineConfig.get(id);return {stake:cfg.stake,target:cfg.target,maxLoss:cfg.maxLoss,stakeMode:cfg.stakeMode}}
@@ -696,7 +748,7 @@ function activeCountTotal(){return trades.filter(function(t){return !t.settled})
 function pendingCountForEngine(id){let n=0;for(const key of engineBusyMarkets)if(key.startsWith(id+"|"))n++;return n}
 function hasActiveContract(id,symbol){return activeEngineContracts.has(contractKey(id,symbol))}
 function marketPipelineBusy(id,symbol){return engineBusyMarkets.has(contractKey(id,symbol))}
-function openTransactionPanel(scroll){const list=$("#transactionList");list.classList.remove("collapsed");$("#transactionToggle").setAttribute("aria-expanded","true");$("#transactionChevron").textContent="⌃";if(scroll)$("#transactions").scrollIntoView({behavior:"smooth",block:"start"})}
+function openTransactionPanel(scroll){const panel=$("#transactions");panel.classList.remove("collapsed");$("#transactionToggle").setAttribute("aria-expanded","true");$("#transactionChevron").textContent="⌃";if(scroll)$("#transactionList").scrollIntoView({behavior:"smooth",block:"nearest"})}
 ["freeStake","freeStakeMode","freeTarget","freeMaxLoss","premiumStake","premiumStakeMode","premiumTarget","premiumMaxLoss"].forEach(function(id){$("#"+id).addEventListener("change",function(){const engine=(id.startsWith("free")?activeFree:activePremium);saveSettingsFromUI(engine);updateAll()})});
 ["free","premium"].forEach(function(tier){$("#"+tier+"MarketSelect").addEventListener("change",function(){const id=tier==="free"?activeFree:activePremium;const raw=this.value;const choice=id==="autoswitch"?(raw==="__auto__"?"":raw):(raw||"__auto__");engineMarketChoice.set(id,choice);if(running.has(id)){stopEngine(id,"Market selection changed · restart the card to apply the new market");toast(engineDefs[id].name+" stopped so the new market selection can be applied. Run it again.")}renderMarketOptions();updateAll()})});
 
@@ -759,11 +811,38 @@ function scheduleEngineRetry(id,delay){
 }
 function clearEngineRetry(id){clearTimeout(engineRetryTimers.get(id));engineRetryTimers.delete(id)}
 function bumpEngineRunToken(id){const next=(engineRunTokens.get(id)||0)+1;engineRunTokens.set(id,next);return next}
-function stopAllEngines(reason){const ids=Array.from(running);ids.forEach(function(id){stopEngine(id,reason||"Stopped all by user")});if(!ids.length){updateTransactionControls();toast("No scanners are currently running.")}}
-function updateTransactionControls(){const host=$("#txEngineControls");if(!host)return;const ids=Object.keys(engineDefs);host.innerHTML=ids.map(function(id){const active=running.has(id);return '<div class="tx-engine-control"><span><strong>'+esc(engineDefs[id].name)+'</strong><span class="state '+(active?'running':'')+'"> · '+(active?'RUNNING':'STOPPED')+'</span></span><button type="button" class="btn '+(active?'danger-btn':'')+'" data-tx-stop="'+esc(id)+'" '+(active?'':'disabled')+'>'+(active?'■ Stop':'Stopped')+'</button></div>'}).join("");const sel=$("#txResetEngine");if(sel&&sel.options.length!==ids.length){sel.innerHTML=ids.map(function(id){return '<option value="'+esc(id)+'">'+esc(engineDefs[id].name)+'</option>'}).join("")}}
-async function activateEngine(id){const choice=engineMarketChoice.get(id);if(choice===""){toast("Choose a Volatility market for "+engineDefs[id].name+" before starting.");return}toast(engineDefs[id].name+" · connecting your selected Deriv account…");log(engineDefs[id].name+" · Run requested · establishing authenticated trading socket");try{await ensureAuthSocket();}catch(e){toast(e.message||"Could not connect the selected Deriv account.");log(engineDefs[id].name+" start failed · "+(e.message||"account socket unavailable"),"warn");return}bumpEngineRunToken(id);running.add(id);openTransactionPanel(false);log(engineDefs[id].name+" started · "+(choice==="__auto__"?"10 independent market pipelines":"selected market "+(markets.get(choice)?.name||choice))+" · immediate tick-driven decisions · bounded concurrent exposure");toast(engineDefs[id].name+" is scanning live ticks. Each eligible market has an independent execution pipeline; risk and exposure limits remain active.");updateAll();if(choice!=="__auto__"){const m=markets.get(choice);if(m)scheduleLatestDecision(id,choice,choice,m.epoch||0);}else {for(const m of markets.values())if(m.latest!==null)scheduleLatestDecision(id,m.symbol,m.symbol,m.epoch||0);}scheduleEngineRetry(id,FALLBACK_SCAN_MS)}
+function updateTransactionControls(){const host=$("#txEngineControls");if(!host)return;const ids=Object.keys(engineDefs),activeCount=running.size,status=$("#txScanStatus");if(status)status.classList.toggle("active",activeCount>0);$("#txScanTitle").textContent=activeCount?"Scanning the market":"Scanner standing by";$("#txScanDetail").textContent=activeCount?Array.from(running).map(id=>engineDefs[id].name).join(" · ")+" · evaluating live ticks independently":"Start an individual strategy card to begin live scanning";$("#txScanCount").textContent=activeCount+" / "+ids.length+" ACTIVE";$("#txTerminalState").textContent=activeCount?"LIVE SCANNING":"STANDBY";host.innerHTML=ids.map(function(id){const active=running.has(id),open=trades.some(function(t){return t.engineId===id&&!t.settled});return '<div class="tx-engine-control"><span><strong>'+esc(engineDefs[id].name)+'</strong><span class="state '+(active?'running':'')+'"> · '+(active?'SCANNING':'STOPPED')+'</span></span><span class="tx-card-actions"><button type="button" class="btn '+(active?'danger-btn':'')+'" data-tx-stop="'+esc(id)+'" '+(active?'':'disabled')+'>'+(active?'■ Stop':'Stopped')+'</button><button type="button" class="btn" data-tx-reset="'+esc(id)+'" '+(active||open?'disabled':'')+'>↻ Reset</button></span></div>'}).join("")}
+function beginEngineNow(id){
+  const choice=engineMarketChoice.get(id);
+  if(choice===""){enginePauseReason.set(id,"Choose one Volatility market before starting Auto Switcher.");updateAll();return false}
+  bumpEngineRunToken(id);enginePauseReason.delete(id);running.add(id);
+  openTransactionPanel(false);
+  log(engineDefs[id].name+" started · "+(choice==="__auto__"?"10 independent market pipelines":"selected market "+(markets.get(choice)?.name||choice))+" · immediate tick-driven decisions · bounded concurrent exposure");
+  updateAll();
+  if(choice!=="__auto__"){const m=markets.get(choice);if(m)scheduleLatestDecision(id,choice,choice,m.epoch||0);}
+  else{for(const m of markets.values())if(m.latest!==null)scheduleLatestDecision(id,m.symbol,m.symbol,m.epoch||0);}
+  scheduleEngineRetry(id,FALLBACK_SCAN_MS);
+  return true;
+}
+async function activateEngine(id){
+  const choice=engineMarketChoice.get(id);
+  if(choice===""){toast("Choose a Volatility market for "+engineDefs[id].name+" before starting.");return}
+  toast(engineDefs[id].name+" · connecting your selected Deriv account…");
+  log(engineDefs[id].name+" · Run requested · establishing authenticated trading socket");
+  try{await ensureAuthSocket()}catch(e){toast(e.message||"Could not connect the selected Deriv account.");log(engineDefs[id].name+" start failed · "+(e.message||"account socket unavailable"),"warn");return}
+  if(beginEngineNow(id))toast(engineDefs[id].name+" is scanning live ticks. Each eligible market has an independent execution pipeline; risk and exposure limits remain active.");
+}
+async function activateEngines(ids){
+  const unique=Array.from(new Set(ids)).filter(id=>engineDefs[id]&&!running.has(id));
+  if(!unique.length){toast("All selected cards are already running.");return}
+  try{await ensureAuthSocket()}catch(e){toast(e.message||"Could not connect the selected Deriv account.");return}
+  const started=[];
+  for(const id of unique){if(beginEngineNow(id))started.push(id)}
+  if(started.length)toast("Started "+started.length+" independent Premium cards. Each keeps its own model, market pipelines and risk limits.");
+  else toast("No cards started. Check the selected markets and card settings.");
+}
 function showSessionResult(id,reason){const mine=trades.filter(function(t){return t.engineId===id&&t.settled}),pnl=mine.reduce(function(a,t){return a+Number(t.profit||0)},0),wins=mine.filter(function(t){return Number(t.profit)>0}).length,losses=mine.filter(function(t){return Number(t.profit)<0}).length;$("#resultStrategy").textContent=engineDefs[id].name;$("#resultPnl").textContent=money(pnl);$("#resultPnl").className=pnl>=0?"good-text":"bad-text";$("#resultWins").textContent=String(wins);$("#resultLosses").textContent=String(losses);$("#resultTitle").textContent=pnl>=0?"Congratulations!":"Session stopped";$("#resultText").textContent=reason+" · actual Deriv results are shown below.";$("#resultOverlay").classList.add("show")}
-function stopEngine(id,reason){const wasRunning=running.has(id);bumpEngineRunToken(id);running.delete(id);clearEngineRetry(id);for(const m of markets.values()){const key=contractKey(id,m.symbol);engineDecisionTimers.delete(key);enginePendingTick.delete(key);const st=metricsFor(id,m.symbol);st.quoteKey="";}recoverySteps.set(id,0);log(engineDefs[id].name+" stopped · "+reason);updateAll();updateTransactionControls();if(wasRunning&&/(profit target reached|two recovery steps exhausted)/i.test(reason))showSessionResult(id,reason)}
+function stopEngine(id,reason){const wasRunning=running.has(id);enginePauseReason.set(id,reason);bumpEngineRunToken(id);running.delete(id);clearEngineRetry(id);for(const m of markets.values()){const key=contractKey(id,m.symbol);engineDecisionTimers.delete(key);enginePendingTick.delete(key);const st=metricsFor(id,m.symbol);st.quoteKey="";}recoverySteps.set(id,0);log(engineDefs[id].name+" stopped · "+reason);updateAll();updateTransactionControls();if(wasRunning&&/(profit target reached|max loss reached|risk budget cannot support|two recovery steps exhausted)/i.test(reason))showSessionResult(id,reason)}
 
 function precisionOutcome(candidate,previous,next,m){return hitFor(candidate,previous,next,m)}
 function currentCandidate(id,symbol){const m=markets.get(symbol);if(!m||m.latest===null)return null;return metricsFor(id,symbol).latest||null}
@@ -798,6 +877,7 @@ async function considerEntry(id,symbol,decisionEpoch){
     if(!selectedMarket||!selectedMarket.epoch||liveTickAgeMs(selectedMarket)>MAX_SIGNAL_AGE_MS)return;
   }
   const settings=getSettings(id);
+  enginePauseReason.delete(id);
   const realized=realizedFor(id);
   if(realized>=settings.target){stopEngine(id,"profit target reached");return}
   if(realized<=-settings.maxLoss){stopEngine(id,"max loss reached");return}
@@ -811,10 +891,13 @@ async function considerEntry(id,symbol,decisionEpoch){
   // Auto Switcher remains pinned to its one manually selected market.
   const candidates=[{market:currentMarket,candidate:localCandidate,score:candidateScore(id,symbol,localCandidate),metrics:metricsFor(id,symbol).metrics}];
   const plannedStake=stakeForNext(id,settings),riskLeft=remainingRisk(id,settings);
-  if(plannedStake<0.35||(settings.stakeMode==="flat"&&plannedStake>riskLeft)||(balance!==null&&reservedStakeTotal()+plannedStake>balance)){
-    engineGate(id,currentMarket,"Full configured stake cannot be supported by remaining risk or available account balance.","REJECT");
+  if(plannedStake<0.35||(settings.stakeMode==="flat"&&plannedStake>riskLeft)){
+    const openOrPending=activeCountForEngine(id)+pendingCountForEngine(id);
+    if(openOrPending>0){engineGate(id,currentMarket,"Waiting for "+openOrPending+" open/pending contract(s) to settle; remaining loss budget is "+money(riskLeft)+" and the next full stake is "+money(settings.stake)+".");return;}
+    stopEngine(id,"Risk budget cannot support the next full "+(settings.stakeMode==="flat"?"Flat":"recovery")+" stake · remaining loss allowance "+money(riskLeft)+" · next stake "+money(plannedStake)+". Increase the max-loss limit or lower the base stake before restarting.");
     return;
   }
+  if(balance!==null&&reservedStakeTotal()+plannedStake>balance){engineGate(id,currentMarket,"Waiting for available account balance; requested stake "+money(plannedStake)+" exceeds unreserved balance.");return;}
   if(activeCountForEngine(id)+pendingCountForEngine(id)>=MAX_OPEN_CONTRACTS_PER_CARD||activeCountTotal()+engineBusyMarkets.size>=MAX_OPEN_CONTRACTS_TOTAL||engineBusyMarkets.size>=MAX_PARALLEL_MARKET_ORDERS)return;
 
   // Try the strongest eligible live candidate, then immediately fall through to the
@@ -908,12 +991,44 @@ function showManualQuote(){if(!manualQuote)return;const p=manualQuote.quote,ask=
 $("#manualBuy").addEventListener("click",async function(){if(!manualQuote)return;const q=manualQuote;try{if(selectedType!=="demo"&&!window.confirm("Buy one "+q.candidate.contractType+" contract for "+money(Number(q.quote.ask_price))+" from your REAL Deriv account? The stake can be lost."))return;await buyProposal({quote:q.quote,market:q.market,candidate:q.candidate,engineId:"manual",stake:Number(q.quote.ask_price),settings:{target:0,maxLoss:0},auto:false,evLower:null,breakEven:Number(q.quote.ask_price)/Number(q.quote.payout)});manualQuote=null;$("#manualQuoteBox").classList.add("hide");$("#manualBuy").classList.add("hide")}catch(e){toast(e.message||"Could not buy contract.")}});
 async function buyProposal(payload){const p=payload.quote,ask=Number(p.ask_price);if(!p.id||!Number.isFinite(ask)||ask<=0)throw new Error("Deriv returned an invalid proposal.");if(payload.auto&&(!running.has(payload.engineId)||payload.auto!==true||(engineRunTokens.get(payload.engineId)||0)!==payload.runToken))return;const req={buy:p.id,price:ask,req_id:nextReq++};const d=await sendAuthRequest(req,"buy",8000);const b=d.buy;if(!b||!b.contract_id)throw new Error("Deriv did not confirm a purchase.");const actualBuyPrice=Number(b.buy_price||ask);
   const quotedPayout=Number(p.payout||0);
-  const t={id:String(b.contract_id),signalEpoch:payload.signalEpoch||null,engineId:payload.engineId,engineName:payload.engineId==="manual"?"Manual Trading":engineDefs[payload.engineId].name,market:payload.market.name,symbol:payload.market.symbol,contract:payload.candidate.label||payload.candidate.contractType,contractType:payload.candidate.contractType,stake:actualBuyPrice,status:"Open",profit:null,settled:false,time:Number(b.purchase_time||Date.now()/1000),currency:currency,auto:payload.auto,evLower:payload.evLower,breakEven:payload.breakEven,payout:quotedPayout,potentialProfit:quotedPayout-actualBuyPrice,realizedPayout:null,signalAt:payload.signalAt||null,tickAgeMs:payload.tickAgeMs??null,quoteMs:payload.quoteMs??null,decisionToBuyMs:payload.signalAt?performance.now()-payload.signalAt:null,executionMs:payload.signalAt?performance.now()-payload.signalAt:null};trades.unshift(t);if(payload.engineId!=="manual"&&t.executionMs!==null){const st=metricsFor(payload.engineId,payload.market.symbol);st.lastDecisionEpoch=t.signalEpoch||st.lastDecisionEpoch;if(!Array.isArray(st.executionSamples))st.executionSamples=[];st.executionSamples.push(t.executionMs);if(st.executionSamples.length>100)st.executionSamples.shift();st.lastExecutionMs=t.executionMs;}if(payload.engineId!=="manual"){metricsFor(payload.engineId,payload.market.symbol).activeContract=t.id;
+  const t={id:String(b.contract_id),signalEpoch:payload.signalEpoch||null,engineId:payload.engineId,engineName:payload.engineId==="manual"?"Manual Trading":engineDefs[payload.engineId].name,market:payload.market.name,symbol:payload.market.symbol,contract:payload.candidate.label||payload.candidate.contractType,contractType:payload.candidate.contractType,stake:actualBuyPrice,status:"Open",profit:null,settled:false,time:Number(b.purchase_time||Date.now()/1000),currency:currency,auto:payload.auto,evLower:payload.evLower,breakEven:payload.breakEven,payout:quotedPayout,potentialProfit:quotedPayout-actualBuyPrice,realizedPayout:null,entrySpot:null,exitSpot:null,signalAt:payload.signalAt||null,tickAgeMs:payload.tickAgeMs??null,quoteMs:payload.quoteMs??null,decisionToBuyMs:payload.signalAt?performance.now()-payload.signalAt:null,executionMs:payload.signalAt?performance.now()-payload.signalAt:null};trades.unshift(t);if(payload.engineId!=="manual"&&t.executionMs!==null){const st=metricsFor(payload.engineId,payload.market.symbol);st.lastDecisionEpoch=t.signalEpoch||st.lastDecisionEpoch;if(!Array.isArray(st.executionSamples))st.executionSamples=[];st.executionSamples.push(t.executionMs);if(st.executionSamples.length>100)st.executionSamples.shift();st.lastExecutionMs=t.executionMs;}if(payload.engineId!=="manual"){metricsFor(payload.engineId,payload.market.symbol).activeContract=t.id;
     const activeKey=contractKey(payload.engineId,payload.market.symbol);
     let activeSet=activeEngineContracts.get(activeKey);
     if(!(activeSet instanceof Set)){activeSet=new Set(activeSet?[activeSet]:[]);activeEngineContracts.set(activeKey,activeSet)}
-    activeSet.add(t.id)}openTransactionPanel(true);sendAuth({proposal_open_contract:1,contract_id:Number(t.id),subscribe:1,req_id:nextReq++});log(t.engineName+" · Deriv confirmed contract "+t.id+" on "+t.market);updateAll()}
-function renderTransactions(){const body=$("#transactionsBody");if(!trades.length){body.innerHTML='<tr><td colspan="7" class="muted">No contracts have been placed in this session.</td></tr>'}else{body.innerHTML=trades.slice(0,100).map(function(t){const pnl=t.profit===null?"—":money(t.profit,t.currency),n=Number(t.profit),status=t.settled?(n>0?"Won":n<0?"Lost":"Settled"):"Open",statusClass=status.toLowerCase(),rowClass=t.settled?(n>0?"transaction-row-win":n<0?"transaction-row-loss":""):"transaction-row-open",recovery=t.engineId!=="manual"?'<span class="recovery-chip">'+esc(recoveryLabel(t.engineId))+'</span>':'';const liveLabel=!t.settled&&t.profit!==null?'<span class="tx-meta">Floating P/L · '+esc(money(t.profit,t.currency))+'</span>':'';const payoutLabel=t.settled&&Number.isFinite(Number(t.realizedPayout))?'<span class="tx-meta">Payout · '+esc(money(t.realizedPayout,t.currency))+'</span>':'';return '<tr class="'+rowClass+'"><td>'+esc(new Date(t.time*1000).toLocaleTimeString())+'</td><td><span class="tx-card">'+esc(t.engineName)+'</span>'+recovery+'</td><td><strong>'+esc(t.market)+'</strong><span class="tx-meta">'+esc(t.symbol)+' · '+esc(t.contract)+'</span></td><td>'+esc(t.contract)+'</td><td>'+esc(money(t.stake,t.currency))+'</td><td><span class="status-pill '+statusClass+'">'+esc(status)+'</span>'+liveLabel+payoutLabel+'</td><td class="num '+(t.profit===null?'':n>=0?'good-text':'bad-text')+'">'+esc(pnl)+'</td></tr>'}).join("")}const closed=trades.filter(function(t){return t.settled}),total=closed.reduce(function(a,t){return a+Number(t.profit||0)},0),wins=closed.filter(function(t){return Number(t.profit)>0}).length,losses=closed.filter(function(t){return Number(t.profit)<0}).length,open=trades.filter(function(t){return !t.settled}).length,totalStake=trades.reduce(function(a,t){return a+Number(t.stake||0)},0),totalPayout=closed.reduce(function(a,t){return a+(Number.isFinite(Number(t.realizedPayout))?Number(t.realizedPayout):Math.max(0,Number(t.stake||0)+Number(t.profit||0)))},0);$("#totalPnl").textContent=money(total);$("#totalPnl").className=total>=0?"good-text":"bad-text";$("#winCount").textContent=String(wins);$("#lossCount").textContent=String(losses);$("#openCount").textContent=String(open);$("#txTotalStake").textContent=money(totalStake);$("#txTotalPayout").textContent=money(totalPayout);$("#txRuns").textContent=String(trades.length);$("#txLost").textContent=String(losses);$("#txWon").textContent=String(wins);$("#txTotalProfit").textContent=money(total)}
+    activeSet.add(t.id)}sendAuth({proposal_open_contract:1,contract_id:Number(t.id),subscribe:1,req_id:nextReq++});log(t.engineName+" · Deriv confirmed contract "+t.id+" on "+t.market);updateAll()}
+function renderTransactions(){
+  const body=$("#transactionsBody");
+  if(!trades.length){body.innerHTML='<tr><td colspan="7" class="muted">No confirmed Deriv purchases yet.</td></tr>'}
+  else{
+    body.innerHTML=trades.slice(0,100).map(function(t){
+      const pnl=t.profit===null?"—":money(t.profit,t.currency),n=Number(t.profit);
+      const status=t.settled?(n>0?"Won":n<0?"Lost":"Settled"):"Open";
+      const statusClass=status.toLowerCase(),rowClass=t.settled?(n>0?"transaction-row-win":n<0?"transaction-row-loss":""):"transaction-row-open";
+      const type=t.contract||t.contractType||"Contract";
+      const entry=t.entrySpot==null?"—":String(t.entrySpot);
+      const exit=t.exitSpot==null?(t.settled?"—":"Pending"):String(t.exitSpot);
+      const payout=t.settled?money(t.realizedPayout||0,t.currency):"Pending";
+      const marketLine=(t.market||"Deriv account")+" · "+(t.symbol||"");
+      const cardLine=t.engineName||"Deriv account";
+      const liveLabel=!t.settled&&t.profit!==null?'<span class="tx-payout">Live P/L · '+esc(money(t.profit,t.currency))+'</span>':'';
+      const payoutLabel='<span class="tx-payout">'+(t.settled?"Actual payout · ":"Quoted payout · ")+esc(payout==="Pending"?money(t.payout||0,t.currency):payout)+'</span>';
+      return '<tr class="'+rowClass+'"><td>'+esc(new Date(t.time*1000).toLocaleTimeString())+'</td><td><span class="tx-contract-type">'+esc(type)+'</span></td><td><span class="tx-spot"><small>IN</small> '+esc(entry)+'</span><span class="tx-spot"><small>OUT</small> '+esc(exit)+'</span></td><td><span class="tx-buy">Buy · '+esc(money(t.stake,t.currency))+'</span>'+payoutLabel+liveLabel+'</td><td><strong>'+esc(cardLine)+'</strong><span class="tx-meta">'+esc(marketLine)+'</span></td><td><span class="status-pill '+statusClass+'">'+esc(status)+'</span></td><td class="num '+(t.profit===null?'':n>=0?'good-text':'bad-text')+'">'+esc(pnl)+'</td></tr>';
+    }).join("");
+  }
+  const closed=trades.filter(function(t){return t.settled});
+  const total=closed.reduce(function(a,t){return a+Number(t.profit||0)},0);
+  const wins=closed.filter(function(t){return Number(t.profit)>0}).length;
+  const losses=closed.filter(function(t){return Number(t.profit)<0}).length;
+  const open=trades.filter(function(t){return !t.settled}).length;
+  const totalStake=trades.reduce(function(a,t){return a+Number(t.stake||0)},0);
+  const totalPayout=closed.reduce(function(a,t){return a+(Number.isFinite(Number(t.realizedPayout))?Number(t.realizedPayout):0)},0);
+  $("#totalPnl").textContent=money(total);$("#totalPnl").className=total>=0?"good-text":"bad-text";
+  $("#winCount").textContent=String(wins);$("#lossCount").textContent=String(losses);$("#openCount").textContent=String(open);
+  $("#txTotalStake").textContent=money(totalStake);$("#txTotalPayout").textContent=money(totalPayout);
+  $("#txRuns").textContent=String(trades.length);$("#txLost").textContent=String(losses);
+  $("#txWon").textContent=String(wins);$("#txTotalProfit").textContent=money(total);
+  const count=$("#txRuns");if(count)count.title=trades.length+" confirmed purchases in this session";
+}
 function handleAuthMessage(d){
   if(d.error){
     const pending=authPending.get(d.req_id);
@@ -930,6 +1045,8 @@ function handleAuthMessage(d){
     const t=trades.find(function(x){return x.id===id});
     if(t){
       const p=Number(c.profit);if(Number.isFinite(p))t.profit=p;
+      if(c.entry_tick_display_value!==undefined)t.entrySpot=c.entry_tick_display_value;else if(c.entry_tick!==undefined)t.entrySpot=c.entry_tick;
+      if(c.exit_tick_display_value!==undefined)t.exitSpot=c.exit_tick_display_value;else if(c.exit_tick!==undefined)t.exitSpot=c.exit_tick;
       const livePayout=Number(c.payout);
       if(Number.isFinite(livePayout)&&livePayout>=0)t.livePayout=livePayout;
       const liveSell=Number(c.sell_price);
@@ -1002,10 +1119,25 @@ const cardClick=function(event){const b=event.target.closest("[data-engine]");if
 $("#freeCards").addEventListener("click",cardClick);$("#premiumCards").addEventListener("click",cardClick);
 $("#freeRun").addEventListener("click",function(){startEngine(activeFree)});
 $("#premiumRun").addEventListener("click",function(){startEngine(activePremium)});
+$("#premiumRunAll").addEventListener("click",async function(){
+  if(!liveConnected||markets.size<1){toast("Wait for live Deriv market data before starting.");return}
+  if(!signedIn||!selectedAccount){toast("Sign in and choose a Deriv account before starting trades.");return}
+  const ids=["matches","over8","tickstrike","autoswitch"].filter(id=>!running.has(id));
+  const ready=ids.filter(id=>{
+    const cfg=getSettings(id),choice=engineMarketChoice.get(id);
+    return choice!==""&&Number.isFinite(cfg.stake)&&cfg.stake>0&&Number.isFinite(cfg.target)&&cfg.target>0&&Number.isFinite(cfg.maxLoss)&&cfg.maxLoss>0;
+  });
+  const skipped=ids.length-ready.length;
+  if(!ready.length){toast(skipped?"Choose a market for Auto Switcher or correct the card settings.":"All four Premium cards are already running.");return}
+  const combinedStake=ready.reduce((sum,id)=>sum+getSettings(id).stake,0);
+  if(balance!==null&&reservedStakeTotal()+combinedStake>balance){toast("The combined base stakes exceed available unreserved balance.");return}
+  await activateEngines(ready);
+  if(skipped)toast("Some Premium cards were not started because a market or valid risk settings are missing.");
+});
 $("#freeStop").addEventListener("click",function(){stopEngine(activeFree,"Stopped by user")});
 $("#premiumStop").addEventListener("click",function(){stopEngine(activePremium,"Stopped by user")});
 function resetEngineSession(id){
-  if(running.has(id))stopEngine(id,"Session reset by user");
+  if(running.has(id)){toast("Stop "+engineDefs[id].name+" individually before resetting its session.");return}
   const open=trades.some(function(t){return t.engineId===id&&!t.settled;});
   if(open){toast("Cannot reset "+engineDefs[id].name+" while a Deriv contract is still open. Wait for settlement first.");return}
   const old=trades.filter(function(t){return t.engineId===id;});
@@ -1018,9 +1150,7 @@ function resetEngineSession(id){
 }
 $("#freeReset").addEventListener("click",function(){resetEngineSession(activeFree)});
 $("#premiumReset").addEventListener("click",function(){resetEngineSession(activePremium)});
-$("#stopAllEngines").addEventListener("click",function(){if(running.size&&!window.confirm("Stop all scanners now? Any contract already purchased will remain open until Deriv settles it."))return;stopAllEngines("Stopped from Transactions")});
-$("#txEngineControls").addEventListener("click",function(e){const b=e.target.closest("[data-tx-stop]");if(!b)return;const id=b.dataset.txStop;if(running.has(id))stopEngine(id,"Stopped from Transactions")});
-$("#txResetSelected").addEventListener("click",function(){const id=$("#txResetEngine").value;if(id)resetEngineSession(id)});
+$("#txEngineControls").addEventListener("click",function(e){const stop=e.target.closest("[data-tx-stop]"),reset=e.target.closest("[data-tx-reset]");if(stop){const id=stop.dataset.txStop;if(running.has(id))stopEngine(id,"Stopped individually from Scanner controls");return}if(reset){const id=reset.dataset.txReset;if(id)resetEngineSession(id)}});
 ["freeStake","freeStakeMode","freeTarget","freeMaxLoss","premiumStake","premiumStakeMode","premiumTarget","premiumMaxLoss"].forEach(function(id){$("#"+id).addEventListener("change",function(){const engine=(id.startsWith("free")?activeFree:activePremium);saveSettingsFromUI(engine);updateAll()})});
 
 function renderAll(){updateAll()}

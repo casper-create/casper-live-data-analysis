@@ -1,3 +1,18 @@
+## 0.6.6 — video-reference scanner controls
+
+- Replaced the transaction drawer's global Stop all scanners and Reset selected controls with a live “Scanning the market” status panel and green terminal-style feed populated only by real application log events.
+- Each of the eight strategy cards now has its own Stop and Reset controls in the transaction drawer.
+- Reset is disabled while that card is running or has an unsettled contract. A reset request no longer silently stops an active card.
+- Stopping one strategy does not stop any other strategy. Open Deriv contracts continue to settlement.
+- Kept existing market analysis, strategy logic, Deriv authentication, quote/buy execution, exposure checks and transaction accounting unchanged.
+## 0.6.5 — execution-state and risk-budget correction
+
+- Fixed a runtime/UI configuration mismatch that silently initialized every strategy at $20 stake / $200 target / $50 max loss even though the form displayed $1 defaults. Runtime and visible defaults now agree at $1 / $10 / $10.
+- Flat scanners now stop clearly when no open exposure remains and the remaining loss budget cannot support the full configured stake; they no longer appear RUNNING while unable to enter.
+- Temporary open/pending exposure is reported as a settlement wait, not mistaken for an exhausted loss budget.
+- Added visible card-level wait/paused reasons and corrected Auto Switcher best-candidate display to honor its selected single market.
+- Preserved quote EV, freshness, balance, max-loss, and concurrency checks.
+
 ## 0.6.3 — resilient live execution and socket recovery
 
 - Public Deriv WebSocket now has an explicit 10-second opening-handshake timeout. Hung handshakes are closed and retried with exponential backoff plus jitter.
