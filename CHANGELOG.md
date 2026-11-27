@@ -150,3 +150,11 @@
 - Updated the standalone Worker Content Security Policy to permit the public Deriv market-data WebSocket host `wss://api.derivws.com`, matching the public feed URL used by the dashboard.
 - Kept `wss://ws.derivws.com` allowed for compatibility with Deriv WebSocket endpoints.
 - Added a regression test for the standalone Worker CSP.
+
+
+## 0.6.7 — reference workflow and risk-math correction
+- Fixed recovery progression so the two configured recovery steps are actually reached before cycle reset.
+- Removed silent recovery stake reduction and blocked entries when the complete planned stake exceeds remaining risk.
+- Calculated remaining risk from the configured net-session loss boundary while reserving open and pending stakes.
+- Added a Deriv-confirmed Sell action for eligible open transactions; updated current Deriv spot fields and released settled contract subscriptions.
+- Updated deployed version markers and added regression tests.

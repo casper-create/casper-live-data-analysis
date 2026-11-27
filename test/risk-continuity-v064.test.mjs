@@ -33,7 +33,7 @@ test('v0.6.6 exposes the actual paused/risk reason instead of a false generic RU
 });
 
 test('all app and auth surfaces identify v0.6.6', () => {
-  assert.match(html, /APP_VERSION="0\.6\.6"/);
-  assert.match(auth, /APP_VERSION = '0\.6\.6'/);
-  assert.match(worker, /APP_VERSION = '0\.6\.6'/);
+  assert.match(html, /APP_VERSION="0\.6\.7"/);
+  assert.match(auth, /APP_VERSION = '0\.6\.7'/);
+  assert.match(worker, /APP_VERSION = '0\.6\.7'/);
 });

@@ -1,4 +1,4 @@
-# CASPER Live Data Analysis — v0.6.6
+# CASPER Live Data Analysis — v0.6.7
 
 Dashboard with Deriv OAuth login. One shared auth module (`auth-core.js`) runs on both hosts, so Render and Cloudflare cannot drift apart again:
 
@@ -7,6 +7,10 @@ Dashboard with Deriv OAuth login. One shared auth module (`auth-core.js`) runs o
 - `build-pages.mjs`: builds `dist/` for Cloudflare Pages, assembling `_worker.js` from `auth-core.js`
 
 Sessions are stateless: an AES-GCM encrypted HttpOnly cookie. Nothing is kept on the server, so restarts, sleeping instances and redeploys do not log anyone out. The Deriv access token never reaches page JavaScript.
+
+## v0.6.7 notes
+
+See `RELEASE-NOTES-v0.6.7.md` for recovery-stake, remaining-risk, and open-contract Sell changes. Test on a Deriv Demo account before any real-money use.
 
 ## Environment variables
 

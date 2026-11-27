@@ -38,9 +38,9 @@ test('v0.6.6 does not claim or hardcode first-five trade profits', () => {
 });
 
 test('all deployed version markers identify v0.6.6', () => {
-  assert.match(html, /APP_VERSION="0\.6\.6"/);
-  assert.match(auth, /APP_VERSION = '0\.6\.6'/);
-  assert.match(worker, /APP_VERSION = '0\.6\.6'/);
+  assert.match(html, /APP_VERSION="0\.6\.7"/);
+  assert.match(auth, /APP_VERSION = '0\.6\.7'/);
+  assert.match(worker, /APP_VERSION = '0\.6\.7'/);
 });
 
 test('v0.6.6 reports wait/reject reasons for all eight cards instead of silently skipping gates', () => {

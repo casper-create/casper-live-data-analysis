@@ -169,3 +169,37 @@ test('v0.6.6 scanner reference includes a live green terminal fed by real applic
   assert.match(html, /terminal\.prepend\(line\)/);
   assert.match(html, /LIVE SCANNING/);
 });
+
+
+test('v0.6.7 recovery sequence reaches both configured recovery steps before resetting', () => {
+  assert.match(html, /const nextStep=\(recoverySteps\.get\(t\.engineId\)\|\|0\)\+1/);
+  assert.match(html, /nextStep>2/);
+  assert.match(html, /function stakeForNext\([\s\S]*?return Math\.round\(\(desired\+Number\.EPSILON\)\*100\)\/100/);
+  assert.match(html, /plannedStake>riskLeft/);
+  assert.doesNotMatch(html, /Math\.min\(desired,remainingRisk/);
+});
+
+test('v0.6.7 remaining risk follows the configured net session loss stop and reserves open/pending stakes', () => {
+  assert.match(html, /Number\(settings\.maxLoss\|\|0\)\+realized-open-pending/);
+});
+
+test('v0.6.7 open Deriv transactions expose a confirmed sell action', () => {
+  assert.match(html, /data-sell-contract=/);
+  assert.match(html, /sell:Number\(id\),price:0/);
+  assert.match(html, /awaiting final contract settlement/);
+});
+
+
+test('v0.6.7 reads current Deriv spot fields and only offers Sell when Deriv says it is valid', () => {
+  assert.match(html, /c\.entry_spot!==undefined/);
+  assert.match(html, /c\.exit_spot!==undefined/);
+  assert.match(html, /c\.is_valid_to_sell!==undefined/);
+  assert.match(html, /t\.settled\|\|!t\.isValidToSell/);
+  assert.match(html, /c\.is_expired/);
+});
+
+
+test('v0.6.7 releases each Deriv contract stream after settlement', () => {
+  assert.match(html, /d\.subscription&&d\.subscription\.id/);
+  assert.match(html, /forget:t\.subscriptionId/);
+});

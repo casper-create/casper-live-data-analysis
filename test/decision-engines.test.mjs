@@ -119,8 +119,9 @@ test('v0.6.0 records actual settled P/L into persistent card/market memory', () 
 });
 
 test('v0.6.0 preserves full Flat stake or skips instead of silently reducing it', () => {
-  assert.match(html, /settings\.stakeMode==="flat"\?desired/);
-  assert.match(html, /settings\.stakeMode==="flat"&&plannedStake>riskLeft/);
+  assert.match(html, /function stakeForNext\([\s\S]*?return Math\.round/);
+  assert.match(html, /plannedStake>riskLeft/);
+  assert.doesNotMatch(html, /Math\.min\(desired,remainingRisk/);
 });
 
 test('v0.6.0 reserves stake while proposals are in flight and counts open exposure', () => {
